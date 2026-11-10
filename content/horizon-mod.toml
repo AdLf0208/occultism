@@ -1,0 +1,13 @@
+# Port-owned content mod for the Occultism 1.225.0 slice: the spirit-fire block,
+# the 45 items the conversion loop reads and writes, and the carried assets/data.
+# The block models, textures, blockstates, recipes and lang strings are
+# upstream's own MIT assets, read from the exact ATM10 jar
+# (see ../../_shared/carry-work/occultism/SOURCE.md). The 4 loot tables and the
+# 3 spirit-fire face tags are re-spelled for 26.3 (singular typed conditions) or
+# written for the slice (self-drop).
+id = "occultism"
+name = "Occultism"
+version = "0.1.0"
+api = "0.2"
+side = "both"
+capabilities = ["registries"]

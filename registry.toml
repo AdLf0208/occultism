@@ -1,0 +1,48 @@
+id = "occultism"
+kind = "native-mod"
+name = "occultism"
+summary = "A Horizon port of occultism."
+description = """
+A port of [occultism](klikli-dev/occultism) for Horizon.
+
+**Implemented so far**
+
+- The block.** `occultism:spirit_fire` on the **`minecraft:torch`** template
+- (vanilla's only fire-like class with no fire damage and a sturdy-face
+- survival rule): no collision, instabreak, light 12, wool sound, purple map
+- colour, empty drops, a declinable `color` state with the jar's 18 values
+- (default `white`), and the jar's animated model/blockstate.
+- Ignition.** Flint and steel or a fire charge struck on a block with a
+- `#occultism:start_spiritfire` item entity (datura) inside upstream's
+- `AABB(-1,-1,-1,1,1,1)` around the clicked block's centre: every datura is
+
+**Not yet ported**
+
+- | Declared library | What it would have provided | What this slice does |
+- |---|---|---|
+- | **Modonomicon** (required) | the guide book, its 260 pages, ritual and recipe pages | nothing: no guide-book reader at the pin; the knowledge is in this file |
+- | **Curios** (required) | accessory slots (familiar ring, spirit lamp) | nothing: no accessory-slot API (planned 0.4) |
+- | **GeckoLib** | the 21 animated spirit models | nothing: no spirits in this slice |
+- | **SmartBrainLib** | the spirits' job AI | nothing: no spirits in this slice |
+- Skills: superpowers/using-superpowers, brainstorming, writing-plans, test-driven-development, systematic-debugging, verification-before-completion; BeautifulRust/rust-best-practices, rust-port
+
+Original copyright and licence notices are kept in this repository. Pinned to
+Horizon 1d63e0a and horizon-mixins 5a64af93. Help with the remaining slices is
+welcome.
+"""
+authors = ["AdLf0208"]
+owners = ["AdLf0208"]
+owner_ids = [107615167]
+license = "MIT"
+source = "https://github.com/AdLf0208/occultism"
+icon = "icons/occultism.png"
+categories = ["utility"]
+tags = ["port", "horizon"]
+
+[[versions]]
+version = "0.1.0"
+published = "2026-11-10"
+game = "26.3"
+file = "occultism.hnmod"
+sha256 = "777bba624ff38f0c08bb8785f5f11d6c6fae3cdf59d96dbc40835a7504f0b43f"
+changelog = "First release"

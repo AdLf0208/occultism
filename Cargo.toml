@@ -1,0 +1,18 @@
+[package]
+# Ported from: Occultism 1.225.0 (klikli-dev/occultism, MIT), Minecraft Java
+# 1.21.1 NeoForge, tag release/v1.21.1-1.225.0. Local-only until the maintainer
+# approves publishing (ARCHITECTURE.md §8).
+name = "horizon-occultism"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+description = "Occultism for Horizon: the spirit-fire conversion loop and its carried data"
+
+[lib]
+# This exact source is also injected as a same-crate module by horizon-mixins.
+path = "mixins/occultism/runtime.rs"
+
+[workspace]
+members = ["tools/audit"]
+resolver = "2"

@@ -1,0 +1,56 @@
+{
+  "collision_shapes": {
+    "default": []
+  },
+  "default_state": {
+    "color": "white"
+  },
+  "item": false,
+  "properties": {
+    "explosion_resistance": 0.0,
+    "hardness": 0.0,
+    "light": 12,
+    "map_color": 24,
+    "occludes": false,
+    "requires_tool": false,
+    "sounds": "minecraft:white_wool"
+  },
+  "shapes": {
+    "default": [
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    ]
+  },
+  "state_properties": {
+    "color": {
+      "type": "enum",
+      "values": [
+        "white",
+        "light_gray",
+        "gray",
+        "black",
+        "brown",
+        "red",
+        "orange",
+        "yellow",
+        "lime",
+        "green",
+        "cyan",
+        "light_blue",
+        "blue",
+        "purple",
+        "magenta",
+        "pink",
+        "rainbow",
+        "void"
+      ]
+    }
+  },
+  "template": "minecraft:torch"
+}
