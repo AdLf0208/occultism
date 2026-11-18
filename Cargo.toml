@@ -1,0 +1,20 @@
+[package]
+# Port of Occultism 1.225.0 (klikli-dev/occultism, MIT, tag release/v1.21.1-1.225.0).
+# Minecraft Java 1.21.1 NeoForge; the port targets Horizon 26.3 at the pin in
+# horizon-mod.toml. Clean-room Rust rewrite from the mod's behaviour (FINDINGS.md);
+# local-only until the maintainer approves publishing, publishable under MIT with
+# this source.
+#
+# Cargo's name and version are not the mod's identity: horizon-mod.toml is.
+name = "occultism"
+version = "0.2.0"
+edition = "2024"
+license = "MIT"
+description = "Occultism for Horizon: the spirit-fire conversion loop and its carried data"
+publish = false
+
+[dependencies]
+# The pinned SDK's API crate, fetched into .horizon/sdk/ by any `cargo horizon-mod` command (the
+# launcher builds against its own copy of the same build). Any other registry dependency must be
+# pinned with `horizon-launcher native-lock .` before building.
+horizon-mod-api = { path = ".horizon/sdk/api/crates/horizon-mod-api" }

@@ -1,0 +1,30 @@
+id = "occultism"
+name = "Occultism"
+version = "0.2.0"
+description = """A port of Occultism 1.225.0 for Horizon, slice 1: the spirit-fire conversion loop. A datura
+(Demon's Dream Fruit) struck with flint and steel or a fire charge lights occultism:spirit_fire; any item
+entity standing in that fire which one of the carried occultism:spirit_fire recipes accepts becomes the
+recipe's result with the input's own count (3 feathers become 3 awakened feathers); a chalk right-clicked
+on the fire recolours it (16 chalks, the gold chalk is yellow); /occultism info <pos> and /occultism
+recipes read the fire, the conversions and the loaded recipe table back. The package carries the block,
+41 items, 27 recipes, 7 tags, 4 loot tables and the models, textures and lang the loop needs. The pentacle
+rituals, the summoned spirits and their AI, the GeckoLib models, the Otherworld dimension, the guide book,
+Curios slots and the datura crop are not ported yet."""
+authors = ["klikli-dev", "AdLf0208"]
+# The original's licence: MIT (klikli-dev/Occultism, tag release/v1.21.1-1.225.0); its text and
+# copyright notice travel inside the package as LICENSE / LICENSE-NOTICE.md.
+# A native mod: Rust in src/, compiled by the launcher against the game build [native] pins,
+# beside data/ and assets/. The id is the resource namespace and the only identity: Cargo's
+# package name and version are not the mod's.
+api = "0.2"
+# The installation side, not the hook's: the conversion and the readouts run on the server, and
+# single player's integrated server belongs to the client installation, so "both".
+side = "both"
+# The one shared value every manifest carries ("May add blocks, items, mob effects and entity
+# types"): the package declares the spirit-fire block, its 41 items and their creative tab.
+capabilities = ["registries"]
+
+[native]
+game = "26.3"
+horizon = "0b14f8acfd97fa2c750e42795249dcc981178ca4"
+mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"

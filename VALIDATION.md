@@ -1,0 +1,119 @@
+# Validation — Occultism slice 1 (spirit fire)
+
+> **Historical (0.1.0, the retired `.hnmod`).** Sections 1–3 below are the record of the
+> 2026-11-10/11 `.hnmod` port, kept as evidence. Their paths (`mixins/occultism/runtime.rs`,
+> `tools/carry_content.py`, `tools/horizon.py`, `content/…`) and their in-game runs describe the
+> retired container; the 0.2.0 SDK package is validated in §4. The in-game harness itself is
+> unchanged in behaviour and is now launched by the launcher (`tools/e2e.sh`); see the gap in
+> `notes.md`.
+
+Cheapest first. Every command ran through a leased slot with
+`CARGO_INCREMENTAL=0`; no bare cargo, no `--target-dir`. Logs are the evidence:
+`ports/_shared/evidence/occultism/`.
+
+Where each step ran (the campaign's two machines, `AGENTS.md` "build slots" and
+`_shared/remote-build.md`): the standalone tests and `check`/`test` compiles on
+the **far box** (`build-slot.sh run`, forwarded, artefacts and evidence pulled
+back); the three game legs (`e2e-devmod`, `e2e-embedded`, `e2e-selftest`) through
+`build-slot.sh e2e`, forwarded to the far box, which has the prepared 26.3
+resources and the published `horizon-ctl`; the content-package-only leg
+(`hmod-load`) **local**, because the published shared game needs GLIBC 2.44 and
+the far box has 2.43 — the leg skips itself there with `SKIP:` and exit 77
+instead of failing.
+
+## 1. The pure runtime, standalone
+
+| Step | Command | Result |
+|---|---|---|
+| RED | `cargo test --locked --offline` | **FAILED. 6 passed; 10 failed** — the 10 failed on their assertions (`left: None`, `left: [10, 64, -3]`), not on a compile error (the output is quoted below; the log file of that run was not kept) |
+| GREEN | `cargo fmt --check` + `cargo clippy --all-targets --locked --offline -- -D warnings` + `cargo test --locked --offline` | **fmt clean, 0 clippy warnings, 16 tests passed** (`evidence/occultism/runtime-green.log`) |
+| red→green | 16 tests (see `mixins/occultism/runtime.rs`) | one test's expected box was mis-typed on the first green run (`[11.5, 65.5, -2.5]` for upstream's `[11.5, 65.5, -1.5]`); the implementation was right, the expectation was fixed |
+
+The RED run, verbatim:
+
+```
+---- tests::first_rule_wins stdout ----
+thread 'tests::first_rule_wins' panicked at mixins/occultism/runtime.rs:166:9:
+assertion `left == right` failed
+  left: None
+ right: Some("occultism:taboo_book")
+
+---- tests::fire_target_moves_onto_the_clicked_face stdout ----
+thread 'tests::fire_target_moves_onto_the_clicked_face' panicked at mixins/occultism/runtime.rs:274:9:
+assertion `left == right` failed
+  left: [10, 64, -3]
+ right: [10, 65, -3]
+
+failures:
+    tests::a_block_result_is_an_item_id
+    tests::accepts_every_tag_member
+    tests::chalk_gold_is_yellow
+    tests::chalk_items_name_their_colour
+    tests::converts_whole_stacks
+    tests::datura_box_matches_upstream
+    tests::fire_target_moves_onto_the_clicked_face
+    tests::first_rule_wins
+    tests::lighters_are_flint_and_steel_and_fire_charge
+    tests::matches_by_exact_id
+
+test result: FAILED. 6 passed; 10 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+
+## 2. Inside the game crate (staged at the pin)
+
+| Step | Command | Result |
+|---|---|---|
+| content carry | `python3 tools/carry_content.py` | 5 blocks, 41 items, 27 recipes, 171 files; `--check` green |
+| package | `tools/package.sh` | `.hmod` 86,714 B sha256 `2e2b74de…95a8`, 171 entries, `no code: content only`; `.hnmod` 68,204 B sha256 `dce9da26…2489`, 11 entries (`evidence/occultism/ladder-remote.log`) |
+| stage | `python3 tools/horizon.py stage` | ok, `stage_changed: true`, 302 s (the pin's `git archive` + the game.rs hash) |
+| check | `python3 tools/horizon.py check` | **`cargo_exit: 0`** — the injected modules compile inside the real `horizon-client` (557 s) |
+| test | `python3 tools/horizon.py test` | first run **filtered the copied `game::charginggadgets::tests` and ran 0 tests** (exit 0, vacuous); the filter is now `game::occultism::tests` and the leg is part of `tools/e2e-all.sh`, which fails if 0 tests match |
+| build | `python3 tools/horizon.py build` | **`cargo_exit: 0`**, binary `slot-5/target/fast/horizon-client` |
+
+`check` also showed 3 `private_interfaces` warnings (a `pub fn` taking the
+private `Game`); each such function now carries the campaign's
+`#[allow(private_interfaces, reason = "the injected bundle is this crate's own module")]`,
+so the re-run is warning-free.
+
+## 2b. Reproducibility
+
+| Artefact | Rebuild | Result |
+|---|---|---|
+| `content/occultism.hmod` | `cargo horizon-mod build` again on the far box | **byte-identical**: 86,714 B, sha256 `2e2b74de…95a8`, 171 entries |
+| `occultism.hnmod` | `tools/package.py` twice on this box | **byte-identical**: 69,082 B, sha256 `777bba62…b43f`, 11 entries |
+| `occultism.hnmod` | the same sources packaged on the far box | **different bytes, identical contents**: 69,053 B, every entry's CRC and size the same, only the deflate streams differ (the two boxes' zlib builds). The registry hash must be the releasing box's file, which is this one. |
+
+## 3. In game
+
+| Step | Command | Result |
+|---|---|---|
+| content package alone | `tools/hmod-load.sh` | _filled by the run_ |
+| e2e (dev-mod content) | `build-slot.sh e2e -- tools/e2e.sh` | _filled by the run_ |
+| e2e (embedded, control) | `EMBEDDED=1 …` | _filled by the run_ |
+| selftest | `SELFTEST=1 …` | _filled by the run_ (must exit ≠ 0) |
+| log checker | `python3 ports/tools/check-e2e-logs.py occultism --strict` | _filled by the run_ |
+
+## 4. SDK 0.2.0 (the flat `.hmod`, pins `0b14f8a` / `e59da90`)
+
+Every step ran in a `ports/tools/build-slot.sh` lease with `BUILD_LOCAL=1` (the remote box's
+sync has no `ports/occultism` path for the brief's `cd`), `CARGO_INCREMENTAL=0`, no
+`--target-dir`, and the evidence is `ports/_shared/evidence/occultism/sdk-*.log`.
+
+| Step | Command | Result |
+|---|---|---|
+| runtime first | `cargo test --offline` on the new crate before any glue | **19 runtime tests** (the byte-identical file) |
+| runtime alone | `rustc --edition 2024 --test src/runtime.rs` (no `mod_api` at all) | **19 passed**, 0 failed — `sdk-runtime-standalone.log` |
+| glue red | `cargo test --offline` with the JSON-reference helper on `todo!()` | **20 passed, 3 failed** on the `todo!()` (a real red, not a compile error) — `sdk-test-red.log` |
+| tests | `cargo test --offline` | **23 passed, 0 failed** (19 `runtime::`, 4 `support::`) — `sdk-test.log` |
+| lints | `cargo clippy --all-targets -- -D warnings` | exit 0, **0 warnings** — `sdk-clippy.log` |
+| format | `cargo fmt --check` (**not** `--all`) | exit 0, empty diff — `sdk-fmt.log` |
+| package | `rm -f Cargo.lock && cargo horizon-mod build` | `SDK 0b14f8a … in ./.horizon/sdk` / `Built ./target/horizon-mod/occultism.hmod` — `sdk-build.log` |
+| registry check | `cargo horizon-mod check occultism.hmod` | `occultism 0.2.0 (native-mod, format native-1/0b14f8a…/e59da90…, for 26.3)` / **109,133 B**, sha256 `044b8360…4dc8`, **exit 0** — `sdk-check.log` |
+| fits the pinned build | `cargo horizon-mod fits occultism.hmod --build nightly` | `Occultism:` / `0b14f8a  made for`, exit 0 — `sdk-fits.log` |
+| twice | `rm -f Cargo.lock && cargo horizon-mod build` again | **byte-identical**: 109,133 B, sha256 `044b8360…4dc8` both times — `sdk-reproducible.txt` |
+| runtime untouched | `unzip -p occultism.hmod src/runtime.rs \| sha256sum` | `108987a614c73f1e2ad4d76c21ac7d65774333d426e69380d64df83832330f9d` = the retired file and `src/runtime.rs`, byte for byte — `sdk-runtime-sha256.txt` |
+| content carry | `diff -r` against the retired `content/occultism.hmod` | 87 `assets/` + 85 `data/` files, **unchanged** — `sdk-content-diff.log` |
+| archive | `unzip -l occultism.hmod` | **181 entries**: 87 `assets/`, 85 `data/`, 3 `src/`, 6 root (`horizon-mod.toml`, `Cargo.toml`, `LICENSE`, `LICENSE-NOTICE.md`, `README.md`, `uses.json`); **no `Cargo.lock`** — `sdk-entries.txt` |
+| surface | `unzip -p occultism.hmod uses.json` | 251 entries: 8 hook ids, 24 methods, 55 handles, 17 traits, 127 types, 1 macro, 1 capability, 3 parts — `sdk-uses-summary.txt`, `sdk-uses-from-package.json` |
+| in game | `tools/e2e.sh` | **not run**: no launcher (`horizon-launcher`) at this pin, so no launcher-built game exists; recorded as a gap |
