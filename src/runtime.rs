@@ -210,6 +210,69 @@ pub fn datura_box(pos: [i32; 3]) -> ([f64; 3], [f64; 3]) {
 /// only: it is bounded so a long-lived server cannot grow it per fire.
 pub const RECENT_LIMIT: usize = 256;
 
+/// The operator level `/occultism info` requires. The readout names the block at
+/// coordinates the caller chooses, so it is a gamemaster tool (level 2), as
+/// `/data` is — not a player command.
+pub const INFO_LEVEL: u8 = 2;
+
+/// The refusal a source below [`INFO_LEVEL`] gets. It names no block.
+pub const INFO_DENIED: &str =
+    "occultism info: operator permission is required to read a spirit fire";
+
+/// The answer for a position that holds no spirit fire. It names no block: the
+/// readout must not double as a world probe at arbitrary coordinates.
+pub const NOT_A_FIRE: &str = "not a spirit fire";
+
+/// Whether a command source at `level` may read a fire. The usage is registered
+/// at [`INFO_LEVEL`] *and* the body asks again, so a source that reaches the
+/// body by another route (a function, a future dispatcher change) is refused
+/// too.
+pub fn info_permitted(level: u8) -> bool {
+    level >= INFO_LEVEL
+}
+
+/// The readout for `pos`: a spirit fire's state, or [`NOT_A_FIRE`] for any other
+/// block — which is why the answer can never name the block it found.
+pub fn info_line(
+    pos: [i32; 3],
+    block: &str,
+    colour: &str,
+    last: &str,
+    rules: usize,
+    files: usize,
+) -> String {
+    if block != SPIRIT_FIRE {
+        return NOT_A_FIRE.to_owned();
+    }
+    format!(
+        "Spirit Fire at {pos:?}: block={block}, colour={colour}, last={last}, rules={rules}/{files}"
+    )
+}
+
+/// A player's game mode, as the click guard needs it.
+///
+/// A mirror of the game's four modes rather than the SDK's `GameMode`: this
+/// module carries no `mod_api` type, so the glue maps one to the other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    /// Survival.
+    Survival,
+    /// Creative.
+    Creative,
+    /// Adventure.
+    Adventure,
+    /// Spectator: Horizon calls `right_click_block` for this one too.
+    Spectator,
+}
+
+impl Mode {
+    /// Whether a click from a player in this mode may change the world. A
+    /// spectator changes nothing and loses nothing.
+    pub fn may_change(self) -> bool {
+        !matches!(self, Self::Spectator)
+    }
+}
+
 /// One conversion, keyed by its world, dimension and position.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecentConversion {
@@ -487,6 +550,55 @@ mod tests {
                 .is_some(),
             "the newest conversion is kept"
         );
+    }
+
+    #[test]
+    fn the_info_readout_needs_an_operator() {
+        // `/occultism info` names the block at coordinates the caller chooses,
+        // so a player below level 2 must be refused (the reviewer's finding: a
+        // non-operator could find hidden ores or containers).
+        assert!(!info_permitted(0), "a plain player");
+        assert!(!info_permitted(1), "a moderator");
+        assert!(info_permitted(INFO_LEVEL), "a gamemaster");
+        assert!(info_permitted(4), "the console");
+    }
+
+    #[test]
+    fn a_non_fire_readout_names_no_block() {
+        // A position holding no spirit fire must not echo what is there: that
+        // would turn the readout into a world probe even for an operator.
+        let line = info_line([10, 64, 0], "minecraft:diamond_ore", "none", "none", 26, 27);
+        assert_eq!(line, NOT_A_FIRE);
+        assert!(
+            !line.contains(':'),
+            "the answer must not carry a block id: {line}"
+        );
+        // A fire's own line is unchanged, so the existing e2e assertions hold.
+        assert_eq!(
+            info_line(
+                [10, 64, 0],
+                SPIRIT_FIRE,
+                "yellow",
+                "occultism:awakened_feather x3",
+                26,
+                27
+            ),
+            "Spirit Fire at [10, 64, 0]: block=occultism:spirit_fire, colour=yellow, \
+             last=occultism:awakened_feather x3, rules=26/27"
+        );
+    }
+
+    #[test]
+    fn a_spectator_click_changes_nothing() {
+        // Horizon calls `right_click_block` for a spectator too (the hook's own
+        // doc says so), so the click path must ask before it writes anything.
+        assert!(
+            !Mode::Spectator.may_change(),
+            "a spectator must not recolour, light or consume anything"
+        );
+        for mode in [Mode::Survival, Mode::Creative, Mode::Adventure] {
+            assert!(mode.may_change(), "{mode:?} may still use the loop");
+        }
     }
 
     #[test]

@@ -19,12 +19,13 @@ use std::sync::{LazyLock, Mutex};
 
 use mod_api::{
     BlockUpdateFlags, Command, CommandArgumentValue, EntityRef, EntityTickListenedEvent,
-    EntityTickPostEvent, Flow, Host, HostBlockStates, HostSide, Identifier, InteractionResult,
-    ItemStack, LevelRef, Recipe, RightClickBlockEvent, RunModCommandEvent, ServerHost, Text,
+    EntityTickPostEvent, Flow, GameMode, Host, HostBlockStates, HostSide, Identifier,
+    InteractionResult, ItemStack, LevelRef, Recipe, RightClickBlockEvent, RunModCommandEvent,
+    ServerHost, Text,
 };
 
 use crate::runtime::{
-    self, Conversion, DATURA, RECIPE_TYPE, Recent, RecentConversion, SPIRIT_FIRE,
+    self, Conversion, DATURA, Mode, RECIPE_TYPE, Recent, RecentConversion, SPIRIT_FIRE,
 };
 
 /// The block state property the chalks set (`SpiritFireBlock.COLOR`).
@@ -156,6 +157,20 @@ fn replaceable(host: &dyn Host, level: LevelRef, pos: [i32; 3]) -> bool {
         .unwrap_or(false)
 }
 
+/// The mode the clicking player is in, or `None` when the game cannot name it.
+///
+/// The click guard **fails closed**: a click whose player or mode is unknown
+/// changes nothing, because an unauthorised write is worse than a lost click.
+fn click_mode(host: &dyn Host, player: u128) -> Option<Mode> {
+    let mode = host.player(player)?.game_mode(host)?;
+    Some(match mode {
+        GameMode::Survival => Mode::Survival,
+        GameMode::Creative => Mode::Creative,
+        GameMode::Adventure => Mode::Adventure,
+        GameMode::Spectator => Mode::Spectator,
+    })
+}
+
 /// A right click with an item on a block: paint the fire with a chalk, or strike the datura
 /// lying on the clicked block alight (NeoForge's `PlayerInteractEvent.RightClickBlock`, which is
 /// what upstream's `PlayerEventHandler.spiritFire` listens on: before the block's own use and
@@ -173,6 +188,13 @@ pub fn right_click(host: HostSide<'_>, event: &mut RightClickBlockEvent<'_>) -> 
     let HostSide::Server(server) = host else {
         return Flow::Continue;
     };
+    // Horizon calls this hook for a spectator too (the hook's own doc says so:
+    // "for a spectator too, the server then only lets one open a menu"), so the
+    // mode is checked before anything is written: a spectator recolours
+    // nothing, lights nothing and consumes no datura.
+    if !click_mode(&*server, click.player).is_some_and(Mode::may_change) {
+        return Flow::Continue;
+    }
     let Some(level) = server.level(server.dimension()) else {
         return Flow::Continue;
     };
@@ -289,7 +311,12 @@ pub fn listen(event: &mut EntityTickListenedEvent) {
 
 /// `/occultism info|recipes`.
 pub fn declare_commands(commands: &mut Vec<Command>) {
-    commands.push(Command::new("occultism info <pos:block_pos>"));
+    // `/occultism info` names the block at coordinates the caller chooses, so it
+    // is registered at the gamemaster level (2), as `/data` is.
+    commands.push(Command::op(
+        "occultism info <pos:block_pos>",
+        runtime::INFO_LEVEL,
+    ));
     commands.push(Command::new("occultism recipes"));
 }
 
@@ -301,40 +328,47 @@ pub fn run_command(host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>
     }
     let line = match literals.get(1).map(String::as_str) {
         Some("info") => {
-            let Some(CommandArgumentValue::BlockPos(pos)) = event.command.argument("pos") else {
-                let _ = host.commands().feedback(Text::literal(INFO_USAGE));
-                return Flow::Cancel;
-            };
-            let pos = *pos;
-            let (block, colour, rules, files, world, dimension) = {
-                let view: &dyn Host = &*host;
-                let level = view.level(view.dimension());
-                let block = level
-                    .and_then(|level| level.block(view, pos))
-                    .map(|block| block.id(view))
-                    .unwrap_or_default();
-                let colour = level
-                    .and_then(|level| level.block_property(view, pos, COLOR))
-                    .unwrap_or_else(|| "none".to_owned());
-                let (rules, files) =
-                    with_table(view, |cached| (cached.table.rules().len(), cached.files));
-                let world = level.map(|level| level.epoch().get()).unwrap_or(0);
-                let dimension = level
-                    .and_then(|level| level.dimension().id(view))
-                    .unwrap_or_default();
-                (block, colour, rules, files, world, dimension)
-            };
-            let last = STATS
-                .lock()
-                .expect("occultism stats poisoned")
-                .last(world, &dimension, pos)
-                .map_or_else(
-                    || "none".to_owned(),
-                    |recent| format!("{} x{}", recent.result, recent.count),
-                );
-            Text::literal(format!(
-                "Spirit Fire at {pos:?}: block={block}, colour={colour}, last={last}, rules={rules}/{files}"
-            ))
+            // The usage is registered at `INFO_LEVEL` and the source is checked
+            // again here: a source that reaches this body by another route (a
+            // function, a future dispatcher change) is still refused, and the
+            // refusal names no block.
+            if !runtime::info_permitted(event.source.permission().level()) {
+                runtime::INFO_DENIED.to_owned()
+            } else if let Some(CommandArgumentValue::BlockPos(pos)) = event.command.argument("pos")
+            {
+                let pos = *pos;
+                let (block, colour, rules, files, world, dimension) = {
+                    let view: &dyn Host = &*host;
+                    let level = view.level(view.dimension());
+                    let block = level
+                        .and_then(|level| level.block(view, pos))
+                        .map(|block| block.id(view))
+                        .unwrap_or_default();
+                    let colour = level
+                        .and_then(|level| level.block_property(view, pos, COLOR))
+                        .unwrap_or_else(|| "none".to_owned());
+                    let (rules, files) =
+                        with_table(view, |cached| (cached.table.rules().len(), cached.files));
+                    let world = level.map(|level| level.epoch().get()).unwrap_or(0);
+                    let dimension = level
+                        .and_then(|level| level.dimension().id(view))
+                        .unwrap_or_default();
+                    (block, colour, rules, files, world, dimension)
+                };
+                let last = STATS
+                    .lock()
+                    .expect("occultism stats poisoned")
+                    .last(world, &dimension, pos)
+                    .map_or_else(
+                        || "none".to_owned(),
+                        |recent| format!("{} x{}", recent.result, recent.count),
+                    );
+                // A position holding no spirit fire is answered without naming
+                // the block, so the readout is not a world probe.
+                runtime::info_line(pos, &block, &colour, &last, rules, files)
+            } else {
+                INFO_USAGE.to_owned()
+            }
         }
         Some("recipes") => {
             let (rules, files, items, skipped) = {
@@ -348,13 +382,13 @@ pub fn run_command(host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>
                     )
                 })
             };
-            Text::literal(format!(
+            format!(
                 "Spirit fire recipes: {rules} rules, {files} files, {items} items, {skipped} skipped."
-            ))
+            )
         }
-        _ => Text::literal(USAGE),
+        _ => USAGE.to_owned(),
     };
-    let _ = host.commands().feedback(line);
+    let _ = host.commands().feedback(Text::literal(line));
     Flow::Cancel
 }
 
@@ -390,5 +424,31 @@ mod tests {
             "#occultism:books/books_for_empty"
         );
         assert_eq!(bare_ref("minecraft:diorite"), "minecraft:diorite");
+    }
+
+    #[test]
+    fn the_info_command_is_declared_for_operators() {
+        // The readout names the block at coordinates the caller chooses, so the
+        // usage itself must be level 2 — the dispatcher then refuses a player
+        // before the body runs.
+        let mut commands = Vec::new();
+        declare_commands(&mut commands);
+        let info = commands
+            .iter()
+            .find(|command| command.usage.starts_with("occultism info "))
+            .expect("info is declared");
+        assert_eq!(info.level, runtime::INFO_LEVEL);
+        assert_eq!(
+            info.level, 2,
+            "a non-operator must not read a block at chosen coordinates"
+        );
+        let recipes = commands
+            .iter()
+            .find(|command| command.usage.starts_with("occultism recipes"))
+            .expect("recipes is declared");
+        assert_eq!(
+            recipes.level, 0,
+            "the recipe table names no world state, so it stays a player command"
+        );
     }
 }

@@ -117,3 +117,28 @@ sync has no `ports/occultism` path for the brief's `cd`), `CARGO_INCREMENTAL=0`,
 | archive | `unzip -l occultism.hmod` | **181 entries**: 87 `assets/`, 85 `data/`, 3 `src/`, 6 root (`horizon-mod.toml`, `Cargo.toml`, `LICENSE`, `LICENSE-NOTICE.md`, `README.md`, `uses.json`); **no `Cargo.lock`** — `sdk-entries.txt` |
 | surface | `unzip -p occultism.hmod uses.json` | 251 entries: 8 hook ids, 24 methods, 55 handles, 17 traits, 127 types, 1 macro, 1 capability, 3 parts — `sdk-uses-summary.txt`, `sdk-uses-from-package.json` |
 | in game | `tools/e2e.sh` | **not run**: no launcher (`horizon-launcher`) at this pin, so no launcher-built game exists; recorded as a gap |
+
+## 5. SDK 0.2.2 (review repair: operator-only readout, spectator guard)
+
+Every step in a `ports/tools/build-slot.sh` lease with `BUILD_LOCAL=1` and `CARGO_INCREMENTAL=0`;
+no `--target-dir`, no private slots. Evidence in `../_shared/evidence/occultism/` and
+`../_shared/evidence/occultism-e2e/`.
+
+| Step | Command | Result |
+|---|---|---|
+| red (unit) | `cargo test --offline` with the new tests | **4 failed** on assertions (`the_info_readout_needs_an_operator`, `a_non_fire_readout_names_no_block`, `a_spectator_click_changes_nothing`, `the_info_command_is_declared_for_operators`) — `sdk-test-red2-0.2.2.log` |
+| green (unit) | `cargo test --offline` | **29 passed, 0 failed** — `sdk-test.log` |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy-0.2.2.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt-0.2.2.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice | **byte-identical**: 113,674 B, sha256 `35714e6f…` — `sdk-reproducible-0.2.2.txt` |
+| package | `sha256sum`, `unzip -l` | 113,674 B, **181 entries**, no packed `Cargo.lock`, declares **0.2.2** — `sdk-artifact-0.2.2.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` | exit 0 — `sdk-check-0.2.2.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0b14f8a` | `0b14f8a  made for`, exit 0 — `sdk-fits-0.2.2.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 6d765e0` | `6d765e0  fits`, exit 0 — `sdk-fits-next-0.2.2.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** |
+| in game (reviewed 0.2.1) | `bash tools/e2e.sh` against the 0.2.1 export | **FAIL** on both findings: `a spectator recoloured the fire to 'red'` (`e2e-red-0.2.1.log`), `a non-fire position answered 'Spirit Fire at … block=minecraft:air …'` (`e2e-red2-0.2.1.log`) |
+| in game (0.2.2) | `bash tools/e2e.sh` | **PASS** + `EXIT:0` — `e2e-default-0.2.2.log` |
+| in game (+ control leg) | `CONTROL_GAME=…` | **PASS** + `EXIT:0`; the unmodded Nightly has no datura item and no block — `e2e-default-with-control-leg-0.2.2.log` |
+| in game (control) | `GAME=$CONTROL_GAME` | **FAIL** + `EXIT:1` (`the datura item did not register`) — `e2e-control-0.2.2.log` |
+| fail-capability | `SELFTEST=1` | **FAIL** + `EXIT:1` — `e2e-selftest-0.2.2.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | 8 logs, 8 ok, 0 missing-exit, 0 bad-exit |

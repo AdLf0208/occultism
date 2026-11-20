@@ -56,9 +56,9 @@ SDK `.hmod` (mod API 0.2) after the `.hnmod` retirement; see
   `run/data/occultism/recipe/spirit_fire/*.json` says.
 - **Recolour.** A chalk right-clicked on the fire sets `color` (16 chalks; the
   gold chalk is the yellow one).
-- **Readouts.** `/occultism info <x> <y> <z>` (block, colour, conversions of
-  that fire, last conversion, rules loaded) and `/occultism recipes` (rules,
-  files, distinct inputs, skipped) — the e2e asserts the numbers.
+- **Readouts.** `/occultism info <x> <y> <z>` (block, colour, last conversion,
+  rules loaded — **operator only, level 2, since 0.2.2**) and `/occultism
+  recipes` (rules, files, distinct inputs, skipped) — the e2e asserts the numbers.
 - **Carried content** (the retired `tools/carry_content.py`, decisions in
   [`../../_shared/carry-work/occultism/SOURCE.md`](../../_shared/carry-work/occultism/SOURCE.md)):
   5 blocks, 41 items, 27 recipes, 7 tags, 4 loot tables, the blockstates,
@@ -405,3 +405,133 @@ is the truth.
 the conversion rules.
 
 Skills: superpowers/using-superpowers,systematic-debugging,test-driven-development,verification-before-completion; BeautifulRust/rust-best-practices
+
+## Review fixes (2026-11-21) — 0.2.2: operator-only readout, spectator guard
+
+Review of **#1241** at `55013216` (2026-11-20 22:35), two findings, fixed here; version **0.2.2**
+(113,674 B, sha256 `35714e6fd044bf52c4d2a3c63c68dabee5a3aa898525700e5ffdbfd54bdd38e2`, 181 entries,
+no packed `Cargo.lock`). The `occultism` id collision with **#1311** is a listing decision, not code:
+nothing is renamed here.
+
+| Reviewer's finding (verbatim) | This job |
+|---|---|
+| **`src/support.rs:292,312`:** `/occultism info` lets any player read the block id at any loaded coordinate, so a non-operator can find hidden ores or containers. Please make it operator-only. | **fixed**: `Command::op("occultism info <pos:block_pos>", 2)` **and** a body re-check of `event.source.permission().level()` (a source reaching the body by another route is refused too). The refusal names no block; a position holding no fire answers `not a spirit fire`, so the readout is not a world probe even for an operator. |
+| **`src/support.rs:173,214`:** Horizon calls this hook for spectator clicks too, so a spectator can recolour or place fire and clear datura. Please check the player's game mode before changing anything. | **fixed**: `right_click` resolves the clicking player (`BlockClick::player` → `Host::player` → `PlayerRef::game_mode`) and returns before any read/write when `runtime::Mode::may_change` says no. The guard **fails closed**: an unknown player or mode changes nothing. A spectator recolours nothing, lights nothing and consumes no datura. |
+
+The hook's own doc says the click fires "for a spectator too (the server then only lets one open a
+menu)", which is the reviewer's premise; the pre-fix run below reproduces it in game.
+
+### Red → green, unit tests (quoted before the fix)
+
+The tests were written first; the first run failed to compile because the API they demand did not
+exist (`error[E0425]: cannot find function 'info_permitted'`, `cannot find value 'NOT_A_FIRE'`,
+`cannot find type 'Mode'`), so the functions were then added with **today's behaviour** as their body
+(everyone permitted, the block always named, every mode may change) to make the defect a failing
+assertion rather than a compile error. `ports/_shared/evidence/occultism/sdk-test-red2-0.2.2.log`:
+
+```
+---- runtime::tests::a_non_fire_readout_names_no_block stdout ----
+thread 'runtime::tests::a_non_fire_readout_names_no_block' (22674) panicked at src/runtime.rs:559:9:
+assertion `left == right` failed
+  left: "Spirit Fire at [10, 64, 0]: block=minecraft:diamond_ore, colour=none, last=none, rules=26/27"
+ right: "not a spirit fire"
+
+---- runtime::tests::a_spectator_click_changes_nothing stdout ----
+thread 'runtime::tests::a_spectator_click_changes_nothing' (22675) panicked at src/runtime.rs:583:9:
+a spectator must not recolour, light or consume anything
+
+---- runtime::tests::the_info_readout_needs_an_operator stdout ----
+thread 'runtime::tests::the_info_readout_needs_an_operator' (22693) panicked at src/runtime.rs:541:9:
+a plain player
+
+---- support::tests::the_info_command_is_declared_for_operators stdout ----
+thread 'support::tests::the_info_command_is_declared_for_operators' (22700) panicked at src/support.rs:407:9:
+assertion `left == right` failed: a non-operator must not read a block at chosen coordinates
+  left: 0
+ right: 2
+
+failures:
+    runtime::tests::a_non_fire_readout_names_no_block
+    runtime::tests::a_spectator_click_changes_nothing
+    runtime::tests::the_info_readout_needs_an_operator
+    support::tests::the_info_command_is_declared_for_operators
+
+test result: FAILED. 25 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+Green after the fix: **29 passed, 0 failed** (`sdk-test.log`).
+
+### Red → green, in game (the reviewed 0.2.1 package)
+
+The same scenario run against the **0.2.1** export (the reviewed head) fails on both findings,
+which is also the fail-capability proof for the two new legs:
+
+| leg | 0.2.1 (red) | 0.2.2 (green) |
+|---|---|---|
+| spectator chalk | `e2e-red-0.2.1.log`: `FAIL: a spectator recoloured the fire to 'red' (the click must change nothing)` | `e2e-default-0.2.2.log`: `a spectator's red chalk left the fire white` |
+| non-fire readout | `e2e-red2-0.2.1.log`: `FAIL: a non-fire position answered 'Spirit Fire at [200, 101, 4]: block=minecraft:air, colour=none, last=none, rules=26/27'; it must name no block` | `a position holding no fire: not a spirit fire` |
+
+The spectator red line also proves the hook **does** fire for a spectator click in this harness
+(the pre-fix build mutated the fire), so the green leg is not vacuous.
+
+### The readout's non-operator leg
+
+A de-opped player cannot be produced in this harness: `op`/`deop` are **dedicated-server-only**
+commands (`lan/commands.rs` `DEDICATED_ONLY`), the owner console is level 4, and an integrated
+server gives every LAN guest **level 2** when guest commands are on
+(`lan/hub.rs::default_permission`). So the non-operator is a LAN guest with guest commands **off**
+(level 0), and the guest's own command path is proven alive in the same run:
+
+```
+  the level-0 guest runs /occultism recipes: Spirit fire recipes: 26 rules, 27 files, 59 items, 1 skipped.
+  as a level-0 guest: occultism info 200 101 0<--[HERE] Incorrect argument for command Spirit fire recipes: ...
+```
+
+`/occultism recipes` is a level-0 usage of the same command and answers the guest; `/occultism info`
+is refused by the dispatcher and the window carries no `Spirit Fire at` / `block=` line. That pair is
+the differential: the refusal is the level gate, not "commands are off for guests".
+
+### Ladder
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests | `cargo test --offline` | `sdk-test.log` | **29 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy-0.2.2.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt-0.2.2.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.2.log`, `sdk-build-second-0.2.2.log`, `sdk-reproducible-0.2.2.txt` | **byte-identical**, 113,674 B, `35714e6f…` |
+| package | `sha256sum; stat -c%s; unzip -l` | `sdk-artifact-0.2.2.txt` | 113,674 B, `35714e6f…`, **181 entries**, no packed `Cargo.lock`, declares **0.2.2** |
+| package check | `cargo horizon-mod check occultism.hmod` | `sdk-check-0.2.2.log` | exit 0, `occultism 0.2.2 (native-mod, … for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0b14f8a` | `sdk-fits-0.2.2.log` | `0b14f8a  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 6d765e0` | `sdk-fits-next-0.2.2.log` | **`6d765e0  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | — | **1/1** |
+| in game (modded) | `bash tools/e2e.sh` in a slot | `e2e-default-0.2.2.log` | **PASS** + `EXIT:0` |
+| in game (+ control leg) | `CONTROL_GAME=…` (the same Nightly without the package) | `e2e-default-with-control-leg-0.2.2.log` | **PASS** + `EXIT:0`; the control game has no datura item and no block |
+| in game (control) | `GAME=$CONTROL_GAME` | `e2e-control-0.2.2.log` | **FAIL** + `EXIT:1` (`the datura item did not register`) |
+| fail-capability | `SELFTEST=1` | `e2e-selftest-0.2.2.log` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | 8 logs, 8 ok, 0 missing-exit, 0 bad-exit |
+
+`src/runtime.rs` gained `INFO_LEVEL`, `INFO_DENIED`, `NOT_A_FIRE`, `info_permitted`, `info_line` and
+the `Mode` mirror (the click guard's rule, kept free of `mod_api` types); `src/support.rs` gained
+`click_mode` and the body re-check. `src/lib.rs` is unchanged.
+
+### Parity coverage (0.2.2)
+
+Every family this slice ships, and where it is exercised. `tested` names the phase/assertion in
+`tools/e2e.sh` (or the unit test when the in-game leg covers only a representative).
+
+| family | state |
+|---|---|
+| `occultism:spirit_fire` block (id, state, `color` state) | **tested** — C (block at the clicked face, `colour=white`), G (yellow), I (white → red) |
+| the 27 carried `occultism:spirit_fire` recipes (26 loadable) | **tested** — B (`26 rules, 27 files, 1 skipped`), D (feathers → awakened), F (an unmatched item stays) |
+| conversion count = input count (`assemble`) | **tested** — D (3 feathers → exactly 3 awakened feathers), SELFTEST flips it |
+| ignition: datura + flint and steel | **tested** — C (fire lit, datura consumed) |
+| ignition: fire charge | **not tested in game** — the same code path as flint and steel (`runtime::starts_fire`), unit-tested only |
+| ignition reach (`AABB(-1,-1,-1,1,1,1)`) | **tested** — H (datura two blocks away: no fire, not consumed) |
+| chalk recolour, 16 chalks | **tested** — G (gold → yellow), I (red), plus the 18-entry table unit test; the other 14 colours are the same table, not each clicked in game |
+| `/occultism info` readout | **tested** — J (operator reads; non-fire answers `not a spirit fire`; level-0 guest refused, no readout leaked) |
+| `/occultism recipes` readout | **tested** — B (host), J (level-0 guest) |
+| spectator click guard | **tested** — I (chalk, lighter + datura, then the survival differential) |
+| the four carried loot tables | **not tested** — they belong to `otherstone`/`otherrock`/`otherflower`/`otherworld_sapling`, which are outside the conversion loop and have no in-game assertion yet; recorded as a gap for the next slice |
+| pentacle rituals, spirits/AI, GeckoLib models, Otherworld, guide book, Curios, machine recipes, datura crop | **not ported** — see the gap list above (unchanged) |
+
+Skills: superpowers/using-superpowers,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
