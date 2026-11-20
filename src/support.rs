@@ -15,7 +15,6 @@
 //! each item entity's own tick, which is where vanilla's `Entity.checkInsideBlocks` calls
 //! `entityInside` for upstream.
 
-use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
 use mod_api::{
@@ -24,7 +23,9 @@ use mod_api::{
     ItemStack, LevelRef, Recipe, RightClickBlockEvent, RunModCommandEvent, ServerHost, Text,
 };
 
-use crate::runtime::{self, Conversion, DATURA, RECIPE_TYPE, SPIRIT_FIRE};
+use crate::runtime::{
+    self, Conversion, DATURA, RECIPE_TYPE, Recent, RecentConversion, SPIRIT_FIRE,
+};
 
 /// The block state property the chalks set (`SpiritFireBlock.COLOR`).
 const COLOR: &str = "color";
@@ -40,15 +41,10 @@ struct Cached {
     table: runtime::Table,
 }
 
-/// What one spirit-fire block has converted, for the command readout.
-#[derive(Debug, Clone, Default)]
-struct Stats {
-    conversions: u32,
-    last: Option<(String, u32)>,
-}
-
-static STATS: LazyLock<Mutex<HashMap<[i32; 3], Stats>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+/// The recent conversions `/occultism info` reads. Bounded, and keyed by the
+/// open of the world and the dimension as well as the position, so an earlier
+/// world (or another dimension) at the same coordinates is never reported.
+static STATS: LazyLock<Mutex<Recent>> = LazyLock::new(|| Mutex::new(Recent::default()));
 
 /// The table, rebuilt from `host`'s recipes every time it is read.
 ///
@@ -270,16 +266,20 @@ pub fn entity_tick_post(host: &mut dyn ServerHost, event: &mut EntityTickPostEve
         return;
     };
     if item.set_stack(host, result).unwrap_or(false) {
-        record(pos, &conversion);
+        record(level, event.dimension, pos, &conversion);
     }
 }
 
 /// One conversion, for `/occultism info`.
-fn record(pos: [i32; 3], conversion: &Conversion) {
+fn record(level: LevelRef, dimension: &str, pos: [i32; 3], conversion: &Conversion) {
     let mut guard = STATS.lock().expect("occultism stats poisoned");
-    let stats = guard.entry(pos).or_default();
-    stats.conversions += 1;
-    stats.last = Some((conversion.result.clone(), conversion.count));
+    guard.record(RecentConversion {
+        world: level.epoch().get(),
+        dimension: dimension.to_owned(),
+        pos,
+        result: conversion.result.clone(),
+        count: conversion.count,
+    });
 }
 
 /// Whether the mod hears entity ticks: without this answer the game tells none of them.
@@ -306,7 +306,7 @@ pub fn run_command(host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>
                 return Flow::Cancel;
             };
             let pos = *pos;
-            let (block, colour, rules, files) = {
+            let (block, colour, rules, files, world, dimension) = {
                 let view: &dyn Host = &*host;
                 let level = view.level(view.dimension());
                 let block = level
@@ -318,21 +318,22 @@ pub fn run_command(host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>
                     .unwrap_or_else(|| "none".to_owned());
                 let (rules, files) =
                     with_table(view, |cached| (cached.table.rules().len(), cached.files));
-                (block, colour, rules, files)
+                let world = level.map(|level| level.epoch().get()).unwrap_or(0);
+                let dimension = level
+                    .and_then(|level| level.dimension().id(view))
+                    .unwrap_or_default();
+                (block, colour, rules, files, world, dimension)
             };
-            let stats = STATS
+            let last = STATS
                 .lock()
                 .expect("occultism stats poisoned")
-                .get(&pos)
-                .cloned()
-                .unwrap_or_default();
-            let last = match &stats.last {
-                Some((item, count)) => format!("{item} x{count}"),
-                None => "none".to_owned(),
-            };
+                .last(world, &dimension, pos)
+                .map_or_else(
+                    || "none".to_owned(),
+                    |recent| format!("{} x{}", recent.result, recent.count),
+                );
             Text::literal(format!(
-                "Spirit Fire at {pos:?}: block={block}, colour={colour}, conversions={}, last={last}, rules={rules}/{files}",
-                stats.conversions
+                "Spirit Fire at {pos:?}: block={block}, colour={colour}, last={last}, rules={rules}/{files}"
             ))
         }
         Some("recipes") => {

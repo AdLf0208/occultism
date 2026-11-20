@@ -120,7 +120,7 @@ impl Table {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IngredientRef {
     /// A single item id.
-    Item(String),
+    ItemId(String),
     /// A tag, held without its `#`.
     Tag(String),
 }
@@ -128,7 +128,7 @@ pub enum IngredientRef {
 impl IngredientRef {
     /// An item ingredient, `{"item": "minecraft:diorite"}`.
     pub fn item(id: &str) -> Self {
-        Self::Item(id.to_owned())
+        Self::ItemId(id.to_owned())
     }
 
     /// A tag ingredient, `{"tag": "c:feathers"}`; a leading `#` is not repeated.
@@ -140,7 +140,7 @@ impl IngredientRef {
     /// `#namespace:path` for a tag.
     pub fn reference(&self) -> String {
         match self {
-            Self::Item(id) => id.clone(),
+            Self::ItemId(id) => id.clone(),
             Self::Tag(tag) => format!("#{tag}"),
         }
     }
@@ -204,6 +204,54 @@ pub fn datura_box(pos: [i32; 3]) -> ([f64; 3], [f64; 3]) {
         [centre[0] - 1.0, centre[1] - 1.0, centre[2] - 1.0],
         [centre[0] + 1.0, centre[1] + 1.0, centre[2] + 1.0],
     )
+}
+
+/// How many recent conversions the readout keeps. The state is diagnostic
+/// only: it is bounded so a long-lived server cannot grow it per fire.
+pub const RECENT_LIMIT: usize = 256;
+
+/// One conversion, keyed by its world, dimension and position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecentConversion {
+    /// The open of the world the fire was in.
+    pub world: u64,
+    /// The dimension's id (`minecraft:overworld`).
+    pub dimension: String,
+    /// The fire's position.
+    pub pos: [i32; 3],
+    /// The item the conversion produced.
+    pub result: String,
+    /// How many of it.
+    pub count: u32,
+}
+
+/// The bounded ring of recent conversions [`RecentConversion`] describes.
+/// A fire in another dimension, or in an earlier open of the world at the same
+/// coordinates, is not the same fire.
+#[derive(Debug, Default)]
+pub struct Recent {
+    entries: std::collections::VecDeque<RecentConversion>,
+}
+
+impl Recent {
+    /// Remember one conversion, dropping the oldest once [`RECENT_LIMIT`] is
+    /// reached.
+    pub fn record(&mut self, conversion: RecentConversion) {
+        self.entries.push_back(conversion);
+        while self.entries.len() > RECENT_LIMIT {
+            self.entries.pop_front();
+        }
+    }
+
+    /// The newest conversion at `pos` in `dimension` of `world`, if this ring
+    /// still holds one.
+    #[must_use]
+    pub fn last(&self, world: u64, dimension: &str, pos: [i32; 3]) -> Option<&RecentConversion> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|entry| entry.world == world && entry.dimension == dimension && entry.pos == pos)
+    }
 }
 
 #[cfg(test)]
@@ -410,5 +458,64 @@ mod tests {
         // An entity two blocks east of the block's centre is outside.
         assert!(2.5 > max[0]);
         assert!(-2.5 < min[0]);
+    }
+
+    fn conversion(world: u64, dimension: &str, pos: [i32; 3], result: &str) -> RecentConversion {
+        RecentConversion {
+            world,
+            dimension: dimension.to_owned(),
+            pos,
+            result: result.to_owned(),
+            count: 1,
+        }
+    }
+
+    #[test]
+    fn recent_conversions_are_bounded() {
+        let mut recent = Recent::default();
+        for index in 0..(RECENT_LIMIT as i32 + 10) {
+            recent.record(conversion(1, "minecraft:overworld", [index, 64, 0], "a"));
+        }
+        assert_eq!(recent.entries.len(), RECENT_LIMIT);
+        assert!(
+            recent.last(1, "minecraft:overworld", [0, 64, 0]).is_none(),
+            "the oldest conversion was dropped"
+        );
+        assert!(
+            recent
+                .last(1, "minecraft:overworld", [RECENT_LIMIT as i32 + 9, 64, 0])
+                .is_some(),
+            "the newest conversion is kept"
+        );
+    }
+
+    #[test]
+    fn a_conversion_is_scoped_to_its_world_and_dimension() {
+        let mut recent = Recent::default();
+        recent.record(conversion(1, "minecraft:overworld", [0, 64, 0], "old"));
+        recent.record(conversion(2, "minecraft:overworld", [0, 64, 0], "new"));
+        recent.record(conversion(2, "minecraft:the_nether", [0, 64, 0], "nether"));
+        assert_eq!(
+            recent
+                .last(1, "minecraft:overworld", [0, 64, 0])
+                .unwrap()
+                .result,
+            "old"
+        );
+        assert_eq!(
+            recent
+                .last(2, "minecraft:overworld", [0, 64, 0])
+                .unwrap()
+                .result,
+            "new"
+        );
+        assert_eq!(
+            recent
+                .last(2, "minecraft:the_nether", [0, 64, 0])
+                .unwrap()
+                .result,
+            "nether"
+        );
+        assert!(recent.last(2, "minecraft:overworld", [1, 64, 0]).is_none());
     }
 }

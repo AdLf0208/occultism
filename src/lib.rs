@@ -29,10 +29,44 @@
 pub mod runtime;
 pub mod support;
 
+use std::sync::Arc;
+
 use mod_api::{
-    self, EntityTickListenedEvent, EntityTickPostEvent, Flow, Hooks, HostSide,
-    RegisterCommandsEvent, RightClickBlockEvent, RunModCommandEvent, ServerHost,
+    self, CraftingGrid, CraftingRecipeHandler, CraftingRecipeValue, EntityTickListenedEvent,
+    EntityTickPostEvent, Flow, Hooks, HostSide, ItemStack, RegisterCommandsEvent, Registrar,
+    RegistrationContext, RightClickBlockEvent, RunModCommandEvent, ServerHost,
 };
+
+/// The serializer the carried `occultism:spirit_fire` files need. The port reads
+/// the recipes' raw JSON through the recipe service, so the decoded value is
+/// empty and no crafting-grid callback is used: this only admits the files.
+struct SpiritFireSerializer;
+
+impl CraftingRecipeHandler for SpiritFireSerializer {
+    fn decode(&self, _json: &str) -> Result<CraftingRecipeValue, String> {
+        Ok(CraftingRecipeValue::new(Vec::new()))
+    }
+
+    fn write(&self, _value: &CraftingRecipeValue) -> Result<String, String> {
+        Ok("{}".to_owned())
+    }
+
+    fn matches(&self, _value: &CraftingRecipeValue, _grid: CraftingGrid) -> bool {
+        false
+    }
+
+    fn assemble(&self, _value: &CraftingRecipeValue, _grid: CraftingGrid) -> Option<ItemStack> {
+        None
+    }
+
+    fn remaining_items(
+        &self,
+        _value: &CraftingRecipeValue,
+        _grid: CraftingGrid,
+    ) -> Option<Vec<Option<ItemStack>>> {
+        None
+    }
+}
 
 /// The mod keeps its state (the per-fire conversion counters) in `support`; one loop serves
 /// every fire in every dimension.
@@ -41,6 +75,20 @@ struct Mod;
 
 #[mod_api::horizon_mod]
 impl Hooks for Mod {
+    /// Declare the carried `occultism:spirit_fire` recipe type and a serializer
+    /// for it. The data files name that type; without a registered serializer the
+    /// game refuses the package at load (`unregistered recipe serializer
+    /// occultism:spirit_fire`). The port reads the recipes through the recipe
+    /// service, so the serializer needs no crafting handler.
+    fn register(&self, r: &mut dyn Registrar, _: &RegistrationContext) {
+        r.register_recipe_type("occultism:spirit_fire");
+        r.add_recipe_serializer(
+            "occultism:spirit_fire",
+            "occultism:spirit_fire",
+            Some(Arc::new(SpiritFireSerializer)),
+        );
+    }
+
     /// `/occultism info|recipes`: the fire's readout and the loaded recipe table.
     fn register_commands(&self, _host: &mut dyn ServerHost, event: &mut RegisterCommandsEvent<'_>) {
         support::declare_commands(event.commands);

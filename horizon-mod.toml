@@ -1,12 +1,13 @@
 id = "occultism"
 name = "Occultism"
-version = "0.2.0"
+version = "0.2.1"
 description = """A port of Occultism 1.225.0 for Horizon, slice 1: the spirit-fire conversion loop. A datura
 (Demon's Dream Fruit) struck with flint and steel or a fire charge lights occultism:spirit_fire; any item
 entity standing in that fire which one of the carried occultism:spirit_fire recipes accepts becomes the
 recipe's result with the input's own count (3 feathers become 3 awakened feathers); a chalk right-clicked
 on the fire recolours it (16 chalks, the gold chalk is yellow); /occultism info <pos> and /occultism
-recipes read the fire, the conversions and the loaded recipe table back. The package carries the block,
+recipes read the fire, its most recent conversion and the loaded recipe table back (the recent
+conversion ring is bounded to 256 and scoped to the world, dimension and position). The package carries the block,
 41 items, 27 recipes, 7 tags, 4 loot tables and the models, textures and lang the loop needs. The pentacle
 rituals, the summoned spirits and their AI, the GeckoLib models, the Otherworld dimension, the guide book,
 Curios slots and the datura crop are not ported yet."""
