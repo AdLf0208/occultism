@@ -1,17 +1,21 @@
 id = "occultism"
 name = "Occultism"
-version = "0.2.2"
-description = """A port of Occultism 1.225.0 for Horizon, slice 1: the spirit-fire conversion loop. A datura
-(Demon's Dream Fruit) struck with flint and steel or a fire charge lights occultism:spirit_fire; any item
-entity standing in that fire which one of the carried occultism:spirit_fire recipes accepts becomes the
-recipe's result with the input's own count (3 feathers become 3 awakened feathers); a chalk right-clicked
-on the fire recolours it (16 chalks, the gold chalk is yellow); /occultism info <pos> (operator only, level
-2) and /occultism recipes read the fire, its most recent conversion and the loaded recipe table back (the
-recent conversion ring is bounded to 256 and scoped to the world, dimension and position). A spectator's
-click changes nothing and consumes no datura. The package carries the block,
-41 items, 27 recipes, 7 tags, 4 loot tables and the models, textures and lang the loop needs. The pentacle
-rituals, the summoned spirits and their AI, the GeckoLib models, the Otherworld dimension, the guide book,
-Curios slots and the datura crop are not ported yet."""
+version = "0.2.3"
+description = """A port of Occultism 1.225.0 for Horizon: the spirit-fire conversion loop and the datura it
+is lit with. A datura (Demon's Dream Fruit) struck with flint and steel or a fire charge lights
+occultism:spirit_fire; any item entity standing in that fire which one of the carried
+occultism:spirit_fire recipes accepts becomes the recipe's result with the input's own count (3 feathers
+become 3 awakened feathers); a chalk right-clicked on the fire recolours it (16 chalks, the gold chalk is
+yellow); /occultism info <pos> (operator only, level 2) and /occultism recipes read the fire, its most
+recent conversion and the loaded recipe table back (the recent conversion ring is bounded to 256 and
+scoped to the world, dimension and position). A spectator's click changes nothing and consumes no datura.
+The datura crop grows from occultism:datura_seeds on farmland by random tick (the wheat template, ages
+0-7), is harvested by right-click at its last age (the loot table's fruit and seeds, replanted at age 0),
+and breaks by hand into its loot table; breaking short or tall grass without shears has the jar's 2%
+chance of a seed. The package carries the crop block, 42 items, 5 loot tables (the crop's and the four
+carried blocks'), 27 recipes, 9 tags and the models, textures and lang they need. The pentacle rituals,
+the summoned spirits and their AI, the GeckoLib models, the Otherworld dimension, the guide book, Curios
+slots and the spirit-job recipes are not ported yet."""
 authors = ["klikli-dev", "AdLf0208"]
 # The original's licence: MIT (klikli-dev/Occultism, tag release/v1.21.1-1.225.0); its text and
 # copyright notice travel inside the package as LICENSE / LICENSE-NOTICE.md.
@@ -23,10 +27,11 @@ api = "0.2"
 # single player's integrated server belongs to the client installation, so "both".
 side = "both"
 # The one shared value every manifest carries ("May add blocks, items, mob effects and entity
-# types"): the package declares the spirit-fire block, its 41 items and their creative tab.
+# types"): the package declares the spirit-fire block, the datura crop, their 42 items and a
+# creative tab.
 capabilities = ["registries"]
 
 [native]
 game = "26.3"
-horizon = "0b14f8acfd97fa2c750e42795249dcc981178ca4"
+horizon = "0a875da91dbb0fdcb7ba8c42c11341aa229af51a"
 mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"

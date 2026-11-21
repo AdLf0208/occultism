@@ -33,8 +33,8 @@ use std::sync::Arc;
 
 use mod_api::{
     self, CraftingGrid, CraftingRecipeHandler, CraftingRecipeValue, EntityTickListenedEvent,
-    EntityTickPostEvent, Flow, Hooks, HostSide, ItemStack, RegisterCommandsEvent, Registrar,
-    RegistrationContext, RightClickBlockEvent, RunModCommandEvent, ServerHost,
+    EntityTickPostEvent, Flow, Hooks, HostSide, ItemStack, LootDropsEvent, RegisterCommandsEvent,
+    Registrar, RegistrationContext, RightClickBlockEvent, RunModCommandEvent, ServerHost,
 };
 
 /// The serializer the carried `occultism:spirit_fire` files need. The port reads
@@ -122,5 +122,11 @@ impl Hooks for Mod {
     /// `occultism:spirit_fire` recipe accepts it (upstream's `entityInside`).
     fn entity_tick_post(&self, host: &mut dyn ServerHost, event: &mut EntityTickPostEvent<'_>) {
         support::entity_tick_post(host, event);
+    }
+
+    /// A block broke and the game built its drops: a hand-broken grass carries the jar's 2%
+    /// chance of a datura seed (upstream's `add_item` loot modifier).
+    fn loot_drops(&self, host: &mut dyn ServerHost, event: &mut LootDropsEvent<'_>) {
+        support::loot_drops(host, event);
     }
 }

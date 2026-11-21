@@ -2,9 +2,12 @@
 """Parse `/occultism info`'s line into shell assignments.
 
 `Spirit Fire at [200, 101, 0]: block=occultism:spirit_fire, colour=yellow,
-conversions=2, last=occultism:awakened_feather x3, rules=26/27`
+last=occultism:awakened_feather x3, rules=26/27`
 
-Prints `ok=1` plus `BLOCK=… COLOUR=… CONVERSIONS=… LAST=… RULES=… FILES=…`
+The conversion count is gone in 0.2.1: the diagnostic is a bounded ring, not a
+per-fire counter (the review finding), so only the newest conversion is reported.
+
+Prints `ok=1` plus `BLOCK=… COLOUR=… LAST=… RULES=… FILES=…`
 (or `ok=0`), for the e2e to `eval`.
 """
 
@@ -16,8 +19,7 @@ import sys
 LINE = re.compile(
     r"^Spirit Fire at \[(?P<x>-?\d+), (?P<y>-?\d+), (?P<z>-?\d+)\]: "
     r"block=(?P<block>\S+), colour=(?P<colour>\S+), "
-    r"conversions=(?P<conversions>\d+), last=(?P<last>.+?), "
-    r"rules=(?P<rules>\d+)/(?P<files>\d+)$"
+    r"last=(?P<last>.+?), rules=(?P<rules>\d+)/(?P<files>\d+)$"
 )
 
 
@@ -28,7 +30,7 @@ def main() -> None:
         print("ok=0")
         return
     print("ok=1")
-    for field in ("x", "y", "z", "conversions", "rules", "files"):
+    for field in ("x", "y", "z", "rules", "files"):
         print(f"{field.upper()}={match[field]}")
     print(f"BLOCK={match['block']!r}")
     print(f"COLOUR={match['colour']!r}")

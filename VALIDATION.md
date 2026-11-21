@@ -142,3 +142,34 @@ no `--target-dir`, no private slots. Evidence in `../_shared/evidence/occultism/
 | in game (control) | `GAME=$CONTROL_GAME` | **FAIL** + `EXIT:1` (`the datura item did not register`) — `e2e-control-0.2.2.log` |
 | fail-capability | `SELFTEST=1` | **FAIL** + `EXIT:1` — `e2e-selftest-0.2.2.log` |
 | log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | 8 logs, 8 ok, 0 missing-exit, 0 bad-exit |
+
+## 6. SDK 0.2.3 (the datura crop and its seed source), pin `0a875da`
+
+Repinned `0b14f8a` → `0a875da` (`[native] horizon`, `.horizon/sdk` deleted so the SDK fetched
+again). Every step in a `ports/tools/build-slot.sh` lease with `BUILD_LOCAL=1` and
+`CARGO_INCREMENTAL=0`; no `--target-dir`, no private slots. Evidence in
+`../_shared/evidence/occultism/` and `../_shared/evidence/occultism-e2e/`.
+
+| Step | Command | Result |
+|---|---|---|
+| SDK fetch | `cargo horizon-mod build` after deleting `.horizon/sdk` | `SDK 0a875da … in ./.horizon/sdk` — `sdk-build-fetch-0.2.3.log` |
+| red (unit) | `cargo test --offline` with the new tests | **29 passed; 4 failed** on assertions (`a_ripe_datura_is_harvested_and_a_young_one_is_not`, `the_harvest_replants_the_crop_at_age_zero`, `a_hand_break_of_grass_is_a_seed_source`, `the_seed_roll_is_upstreams_two_percent`) — `sdk-test-red-0.2.3.log` |
+| green (unit) | `cargo test --offline` | **33 passed, 0 failed** — `sdk-test.log` |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **byte-identical**: 124,954 B, sha256 `e81ce017…` — `sdk-build-0.2.3.log`, `sdk-build-second-0.2.3.log`, `sdk-reproducible-0.2.3.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | 124,954 B, `e81ce0172de24411deefb93a3479b1c043e1e57c93c04924cb726b1ff93e5949`, **202 entries**, no packed `Cargo.lock`, declares **0.2.3** — `sdk-artifact-0.2.3.txt` |
+| tree match | rebuild + `cmp occultism.hmod` | `PACKAGE_MATCHES_TREE` (the delivered file is the tree) |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed in the log) | exit 0, `occultism 0.2.3 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da` (sha printed) | `0a875da  made for`, exit 0 — `sdk-fits.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8a` (sha printed) | `0b14f8a  fits`, exit 0 — `sdk-fits-next.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** |
+| in game (modded) | `launcher-game.sh build occultism` (`Compiling occultism (1 of 1)`) then `bash tools/e2e.sh` | **PASS** + `EXIT:0` — `e2e-default-0.2.3.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME= bash tools/e2e.sh` | **FAIL** + `EXIT:1` (`the datura item did not register`) — `e2e-control-0.2.3.log` |
+| fail-capability (scenario) | `SELFTEST=1` | **FAIL** + `EXIT:1` — `e2e-selftest-0.2.3.log` |
+| fail-capability (the crop family) | `NEGATIVE=1` | **FAIL** + `EXIT:1` (`negative: the ripe crop dropped 1 fruit`) — `e2e-negative-0.2.3.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | 12 logs, 12 ok, 0 missing-exit, 0 bad-exit |
+
+The in-game phases K..N and the measured pin behaviours (an explosion's loot has no block context,
+`ctl break` mines the crosshair, the control-leg/HORIZON_HOME interaction, random ticks during the age
+read-back) are in `notes.md` under "Slice 2 (0.2.3, 2026-11-21)".

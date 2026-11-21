@@ -18,10 +18,10 @@
 use std::sync::{LazyLock, Mutex};
 
 use mod_api::{
-    BlockUpdateFlags, Command, CommandArgumentValue, EntityRef, EntityTickListenedEvent,
-    EntityTickPostEvent, Flow, GameMode, Host, HostBlockStates, HostSide, Identifier,
-    InteractionResult, ItemStack, LevelRef, Recipe, RightClickBlockEvent, RunModCommandEvent,
-    ServerHost, Text,
+    BlockClick, BlockUpdateFlags, Command, CommandArgumentValue, EntityRef,
+    EntityTickListenedEvent, EntityTickPostEvent, Flow, GameMode, Host, HostBlockStates, HostSide,
+    Identifier, InteractionResult, ItemStack, LevelRef, LootDropsEvent, RandomSource, Recipe,
+    RightClickBlockEvent, RunModCommandEvent, ServerHost, Text,
 };
 
 use crate::runtime::{
@@ -30,6 +30,8 @@ use crate::runtime::{
 
 /// The block state property the chalks set (`SpiritFireBlock.COLOR`).
 const COLOR: &str = "color";
+/// The food exhaustion one harvest costs (`IReplantableCrops.EXHAUSTION_PER_HARVEST`).
+const HARVEST_EXHAUSTION: f32 = 0.005;
 /// `/occultism info` for a missing position.
 const INFO_USAGE: &str = "usage: /occultism info <x> <y> <z>";
 /// `/occultism` with no recognised subcommand.
@@ -171,9 +173,10 @@ fn click_mode(host: &dyn Host, player: u128) -> Option<Mode> {
     })
 }
 
-/// A right click with an item on a block: paint the fire with a chalk, or strike the datura
-/// lying on the clicked block alight (NeoForge's `PlayerInteractEvent.RightClickBlock`, which is
-/// what upstream's `PlayerEventHandler.spiritFire` listens on: before the block's own use and
+/// A right click on a block: harvest a ripe datura, paint the fire with a chalk, or strike
+/// the datura lying on the clicked block alight (NeoForge's
+/// `PlayerInteractEvent.RightClickBlock`, which is what upstream's
+/// `PlayerEventHandler.spiritFire` listens on: before the block's own use and
 /// before the item's).
 pub fn right_click(host: HostSide<'_>, event: &mut RightClickBlockEvent<'_>) -> Flow {
     if event.cancelled {
@@ -182,20 +185,39 @@ pub fn right_click(host: HostSide<'_>, event: &mut RightClickBlockEvent<'_>) -> 
     let click = event.click;
     let pos = click.pos;
     let face = click.hit.face;
-    let Some(stack) = click.stack else {
-        return Flow::Continue;
-    };
     let HostSide::Server(server) = host else {
         return Flow::Continue;
     };
     // Horizon calls this hook for a spectator too (the hook's own doc says so:
     // "for a spectator too, the server then only lets one open a menu"), so the
     // mode is checked before anything is written: a spectator recolours
-    // nothing, lights nothing and consumes no datura.
+    // nothing, lights nothing, consumes no datura and harvests no crop.
     if !click_mode(&*server, click.player).is_some_and(Mode::may_change) {
         return Flow::Continue;
     }
     let Some(level) = server.level(server.dimension()) else {
+        return Flow::Continue;
+    };
+    // The crop harvest comes first: an empty hand is the normal way to click it.
+    let clicked = level
+        .block(&*server, pos)
+        .map(|block| block.id(&*server))
+        .unwrap_or_default();
+    let crop_age = level.block_property(&*server, pos, runtime::AGE);
+    if let Some(harvest_age) = crop_age
+        .as_deref()
+        .and_then(|age| runtime::harvest_age(&clicked, age))
+    {
+        if !harvest(&mut *server, level, pos, click, harvest_age) {
+            // The loot roll was refused: nothing changed, so the click is not claimed.
+            return Flow::Continue;
+        }
+        // Upstream answers `SUCCESS` for a harvest, so the crop's own use and the
+        // held item's never run.
+        *event.cancellation_result = InteractionResult::Success;
+        return Flow::Cancel;
+    }
+    let Some(stack) = click.stack else {
         return Flow::Continue;
     };
     let item = stack.item().id(server);
@@ -247,6 +269,47 @@ pub fn right_click(host: HostSide<'_>, event: &mut RightClickBlockEvent<'_>) -> 
     // ... and claims the click, so the lighter's own use never runs.
     *event.cancellation_result = InteractionResult::Success;
     Flow::Cancel
+}
+
+/// Upstream's `IReplantableCrops.onHarvest`: the ripe crop's own drops (its loot table
+/// rolled with the held stack and the player as the breaker), the block replanted at
+/// `harvest_age`, each stack dropped at the block's centre, and the harvest's exhaustion.
+///
+/// `Block.getDrops(state, level, pos, null, player, stack)` is `level_block_drops`; the
+/// stacks then go through `Containers.dropItemStack(level, x+0.5, y+0.5, z+0.5, stack)`,
+/// which is `level_spawn_item` at the block's centre with vanilla's pickup delay of 10.
+fn harvest(
+    host: &mut dyn ServerHost,
+    level: LevelRef,
+    pos: [i32; 3],
+    click: &BlockClick<'_>,
+    harvest_age: &str,
+) -> bool {
+    let player = host.player(click.player);
+    // A refused roll (the level's random is not writable in this scope) returns
+    // `None`. The crop is left ripe then: losing a harvest's yield would be
+    // worse than a click that does nothing, and the next click can roll again.
+    let Some(stacks) = level
+        .block_drops(host, pos, click.stack, player.map(|player| player.entity()))
+        .ok()
+        .flatten()
+    else {
+        return false;
+    };
+    // The roll above sees the crop at its ripe age, as upstream's does: the reset comes after.
+    host.set_block_property(pos, runtime::AGE, harvest_age);
+    let centre = [
+        f64::from(pos[0]) + 0.5,
+        f64::from(pos[1]) + 0.5,
+        f64::from(pos[2]) + 0.5,
+    ];
+    for stack in stacks {
+        let _ = level.spawn_item(host, centre[0], centre[1], centre[2], stack, 10);
+    }
+    if let Some(player) = player {
+        player.add_exhaustion(host, HARVEST_EXHAUSTION);
+    }
+    true
 }
 
 /// One item entity's tick ended: convert it when it stands in a spirit fire and a recipe accepts
@@ -307,6 +370,45 @@ fn record(level: LevelRef, dimension: &str, pos: [i32; 3], conversion: &Conversi
 /// Whether the mod hears entity ticks: without this answer the game tells none of them.
 pub fn listen(event: &mut EntityTickListenedEvent) {
     event.listened = true;
+}
+
+/// A block broke and `event.drops` are what its loot table rolled: a hand-broken
+/// `short_grass`/`tall_grass` has the jar's 2% chance of a datura seed
+/// (`data/occultism/loot_modifiers/datura_seed_from_grass.json`, `…_from_tall_grass.json`:
+/// NeoForge's `add_item` global loot modifier, which is this hook).
+pub fn loot_drops(host: &mut dyn ServerHost, event: &mut LootDropsEvent<'_>) {
+    let context = event.context;
+    let Some((_pos, state)) = context.block else {
+        return;
+    };
+    // `minecraft:short_grass[<properties>]`: the block's id before the state's properties.
+    let Some(text) = host.block_state_string(state) else {
+        return;
+    };
+    let block = text.split('[').next().unwrap_or(&text);
+    let tool = context.tool.map(|stack| stack.item().id(&*host));
+    if !runtime::seed_source(block, tool.as_deref()) {
+        return;
+    }
+    let Some(level) = host.level(context.dimension) else {
+        return;
+    };
+    // `random.nextFloat() < 0.02`, drawn from the level's own stream in vanilla's order.
+    let Some(draw) = level.with_random(host, |random| random.next_float()) else {
+        return;
+    };
+    if !runtime::seed_rolls(draw) {
+        return;
+    }
+    let Some(key) = Identifier::parse(runtime::DATURA_SEEDS)
+        .ok()
+        .and_then(|id| host.item_key(&id))
+    else {
+        return;
+    };
+    if let Some(stack) = ItemStack::new(key, 1) {
+        event.drops.push(stack);
+    }
 }
 
 /// `/occultism info|recipes`.

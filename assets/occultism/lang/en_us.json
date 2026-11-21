@@ -1,4 +1,5 @@
 {
+  "block.occultism.datura": "Demon's Dream",
   "block.occultism.otherflower": "Otherflower",
   "block.occultism.otherrock": "Otherrock",
   "block.occultism.otherstone": "Otherstone",
@@ -38,6 +39,7 @@
   "item.occultism.chalk_white_impure": "Impure White Chalk",
   "item.occultism.chalk_yellow_impure": "Impure Yellow Chalk",
   "item.occultism.datura": "Demon's Dream Fruit",
+  "item.occultism.datura_seeds": "Demon's Dream Seeds",
   "item.occultism.demons_dream_essence": "Demon's Dream Essence",
   "item.occultism.otherworld_ashes": "Otherworld Ashes",
   "item.occultism.otherworld_essence": "Otherworld Essence",

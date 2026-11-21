@@ -1,7 +1,8 @@
-// Pure Occultism slice-1 rules (standalone crate lib, injected as
+// Pure Occultism rules (standalone crate lib, injected as
 // `crate::game::occultism`). No game access lives here: the spirit-fire recipe
 // table as it is matched, the lighters that may strike datura alight, the
-// chalk-to-colour table, and the two pieces of geometry the click needs.
+// chalk-to-colour table, the two pieces of geometry the click needs, and the
+// datura crop's two rules (its ripe harvest and its seed source).
 //
 // Upstream (`SpiritFireBlock`, `SpiritFireRecipe`, `PlayerEventHandler.spiritFire`,
 // read from Occultism 1.225.0 / tag `release/v1.21.1-1.225.0`):
@@ -149,6 +150,47 @@ impl IngredientRef {
 /// Whether `item` is a lighter that may strike datura alight.
 pub fn starts_fire(item: &str) -> bool {
     LIGHTERS.contains(&item)
+}
+
+/// The crop block the jar registers as `occultism:datura`: a `CropBlock`
+/// (`ReplantableCropsBlock`) on the wheat template, with no block item.
+pub const DATURA_CROP: &str = "occultism:datura";
+/// The crop's seed item, upstream's `ItemNameBlockItem` pointing at the block.
+pub const DATURA_SEEDS: &str = "occultism:datura_seeds";
+/// The crop's `age` state property, inherited from the wheat template.
+pub const AGE: &str = "age";
+/// The age a harvest leaves behind (`state.setValue(CropBlock.AGE, 0)`).
+pub const HARVEST_AGE: &str = "0";
+
+/// The blocks the jar's two loot modifiers turn into a seed source: `short_grass`
+/// and `tall_grass` (`data/occultism/loot_modifiers/datura_seed_from_*.json`).
+const SEED_SOURCES: [&str; 2] = ["minecraft:short_grass", "minecraft:tall_grass"];
+
+/// The chance a hand-broken seed source yields one seed: the modifiers'
+/// `minecraft:random_chance` of 0.02.
+pub const SEED_CHANCE: f32 = 0.02;
+
+/// The shears the modifiers exclude (`#c:tools/shear`): the pin has no item-tag
+/// read, and vanilla's shears is the tag's only member at 26.3.
+const SHEARS: &str = "minecraft:shears";
+
+/// The age a right click leaves a ripe crop at, or none when the clicked block is
+/// not a ripe datura (`ReplantableCropsBlock.useItemOn` then `IReplantableCrops`:
+/// `state.getValue(CropBlock.AGE) >= 7`).
+pub fn harvest_age(block: &str, age: &str) -> Option<&'static str> {
+    (block == DATURA_CROP && age.parse::<u8>().is_ok_and(|age| age >= 7)).then_some(HARVEST_AGE)
+}
+
+/// Whether a break of `block` holding `tool` can yield a datura seed: one of the
+/// jar's two seed sources, broken by anything but shears.
+pub fn seed_source(block: &str, tool: Option<&str>) -> bool {
+    SEED_SOURCES.contains(&block) && tool != Some(SHEARS)
+}
+
+/// Whether one uniform draw in `[0, 1)` yields a seed
+/// (`LootItemRandomChanceCondition`: `random.nextFloat() < 0.02`).
+pub fn seed_rolls(draw: f32) -> bool {
+    draw < SEED_CHANCE
 }
 
 /// The `color` state value a chalk item sets, or none for anything else.
@@ -598,6 +640,66 @@ mod tests {
         );
         for mode in [Mode::Survival, Mode::Creative, Mode::Adventure] {
             assert!(mode.may_change(), "{mode:?} may still use the loop");
+        }
+    }
+
+    #[test]
+    fn a_ripe_datura_is_harvested_and_a_young_one_is_not() {
+        // `ReplantableCropsBlock.useItemOn` -> `IReplantableCrops.onHarvest`: only a
+        // crop at its last age is harvested; a young one falls through to the game.
+        assert_eq!(harvest_age(DATURA_CROP, "7"), Some(HARVEST_AGE));
+        for young in ["0", "1", "3", "6"] {
+            assert_eq!(harvest_age(DATURA_CROP, young), None, "age {young}");
+        }
+        // Another block's `age` property is not this crop's.
+        assert_eq!(harvest_age("minecraft:wheat", "7"), None);
+        assert_eq!(harvest_age("occultism:otherflower", "7"), None);
+        // A state the game cannot parse is not ripe.
+        assert_eq!(harvest_age(DATURA_CROP, "ripe"), None);
+    }
+
+    #[test]
+    fn the_harvest_replants_the_crop_at_age_zero() {
+        // `level.setBlockAndUpdate(pos, state.setValue(CropBlock.AGE, 0))`.
+        assert_eq!(harvest_age(DATURA_CROP, "7"), Some("0"));
+        assert_eq!(HARVEST_AGE, "0");
+    }
+
+    #[test]
+    fn a_hand_break_of_grass_is_a_seed_source() {
+        // The jar's two loot modifiers: `short_grass` and `tall_grass`, each at a
+        // 0.02 chance, each inverted on `#c:tools/shear`.
+        for source in ["minecraft:short_grass", "minecraft:tall_grass"] {
+            assert!(seed_source(source, None), "{source} by hand");
+            assert!(
+                seed_source(source, Some("minecraft:flint_and_steel")),
+                "{source} with a lighter"
+            );
+            assert!(
+                !seed_source(source, Some("minecraft:shears")),
+                "{source} sheared: the modifier is inverted on shears"
+            );
+        }
+        // Not a seed source: stone, a flower, the crop itself.
+        for other in [
+            "minecraft:stone",
+            "minecraft:grass_block",
+            "occultism:datura",
+            "minecraft:fern",
+        ] {
+            assert!(!seed_source(other, None), "{other}");
+        }
+    }
+
+    #[test]
+    fn the_seed_roll_is_upstreams_two_percent() {
+        // `LootItemRandomChanceCondition`: `random.nextFloat() < 0.02`.
+        assert_eq!(SEED_CHANCE, 0.02);
+        for inside in [0.0, 0.0001, 0.019_999] {
+            assert!(seed_rolls(inside), "draw {inside} is below the chance");
+        }
+        for outside in [0.02, 0.5, 0.999_999] {
+            assert!(!seed_rolls(outside), "draw {outside} is not below it");
         }
     }
 

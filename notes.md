@@ -4,14 +4,17 @@ Ported from **Occultism 1.225.0** (`occultism-1.21.1-neoforge-1.225.0.jar`, MIT,
 `klikli-dev/occultism` at tag `release/v1.21.1-1.225.0`), Minecraft Java 1.21.1
 NeoForge. The upstream source and the jar were read for behaviour and assets
 only; the Rust is a clean-room rewrite. Local-only until publishing is approved
-(ARCHITECTURE.md §8). Pin **`1d63e0a5`** (`game.rs` `64813cf4…`), mixins
-**`5a64af93…`** (schema 6).
+(ARCHITECTURE.md §8). Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`),
+mixins **`e59da90…`** (schema 6/native-1); 0.2.0–0.2.2 were built at `0b14f8a`.
 
 Status: **ported-partial** — slice 1 (the spirit-fire conversion loop, with its
-book-free data) is implemented and verified in game. The gap list below is the
-rest of the mod. **0.2.0 (2026-11-18):** the same slice republished as the flat
+book-free data) and slice 2 (the datura crop and its seed source, §"Slice 2"
+below) are implemented and verified in game. The gap list below is the rest of
+the mod. **0.2.0 (2026-11-18):** the same slice republished as the flat
 SDK `.hmod` (mod API 0.2) after the `.hnmod` retirement; see
 [`## Migration to the SDK format`](#migration-to-the-sdk-format-020-2026-11-18).
+**0.2.3 (2026-11-21):** the crop, its seeds and the 2% grass seed source, at the
+new pin.
 
 ## Class + tier and the approach
 
@@ -535,3 +538,187 @@ Every family this slice ships, and where it is exercised. `tested` names the pha
 | pentacle rituals, spirits/AI, GeckoLib models, Otherworld, guide book, Curios, machine recipes, datura crop | **not ported** — see the gap list above (unchanged) |
 
 Skills: superpowers/using-superpowers,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+## Slice 2 (0.2.3, 2026-11-21) — the datura crop and its seed source
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`), repinned from
+`0b14f8a` here (the `[native] horizon` field moved; `.horizon/sdk` was deleted so the SDK fetched
+again — the pin trap). Class **content**, tier **deep** (ledger row 345). Licence **MIT**.
+
+**Gap line it comes from** (`FINDINGS.md`, "Out (recorded gaps)"): *"the datura crop block and its
+growth: `occultism:datura` is a plain item here"* — and the 0.2.2 coverage table's *"the four
+carried loot tables — not tested"* is the same family's data half. Before this slice datura was
+creative-only, so the whole spirit-fire loop was unreachable in survival: this is the mod's own
+first step (`getting_started/demons_dream.json`).
+
+**Shape** (logic half of a `deep` mod): carried data (`minecraft:wheat` template block with no block
+item, the seeds item, the loot table, the two `c:` tags, the crop models/textures/lang) plus two rules
+in `runtime.rs` and three glue points. No block entity, menu, entity or dimension.
+
+- **The block** `occultism:datura`: `CropBlock` on the `minecraft:wheat` template (ages 0..7, farmland
+  survival, random tick, instant break, CROP sounds, no block item — upstream registers it with
+  `false`, exactly as `ReplantableCropsBlock` does).
+- **The seed** `occultism:datura_seeds`: `minecraft:wheat_seeds` template with `"block":
+  "occultism:datura"`, so it plants the crop (a creative click keeps the stack, a survival one spends
+  it — vanilla's rule, asserted).
+- **Growth** is the template's own `CropBlock` random tick (no code): `random_tick_speed 0` keeps the
+  age, `400` ripens it to 7 — the differential the `farmersdelight`/`mysticalagriculture` ports use.
+- **The harvest** (`Hooks::right_click_block`, upstream's `ReplantableCropsBlock.useItemOn` →
+  `IReplantableCrops.onHarvest`): a click on a crop at age 7 rolls the block's own loot table with the
+  held stack and the player as breaker (`LevelRef::block_drops` = `Block.getDrops`), writes age 0,
+  drops each stack at the block's centre (`LevelRef::spawn_item`, pickup delay 10) and adds
+  `EXHAUSTION_PER_HARVEST = 0.005` (`PlayerRef::add_exhaustion`). A young crop is left alone.
+- **The carried loot table** `data/occultism/loot_table/blocks/datura.json` (the jar's shape in the
+  26.3 dialect): pool 1 `alternatives` (age 7 → 1 `occultism:datura`, else 1 seed), pool 2 (age 7 only)
+  1 seed with `apply_bonus`/`binomial_with_bonus_count`, table-level `explosion_decay`. Both branches
+  are mined in game (M).
+- **The seed source** (`Hooks::loot_drops`, the jar's two `add_item` loot modifiers
+  `datura_seed_from_grass`/`…_from_tall_grass`): a broken `short_grass`/`tall_grass` with anything but
+  shears has a 0.02 chance of one seed, drawn from the level's own random
+  (`LevelRef::with_random`) in vanilla's order.
+
+### Red → green, unit tests (verbatim, quoted before the fix)
+
+The functions were added with today's behaviour as their body (`harvest_age` → `None`,
+`seed_source` → `false`, `seed_rolls` → `false`) so the defect is an assertion, not a compile error.
+`ports/_shared/evidence/occultism/sdk-test-red-0.2.3.log`:
+
+```
+---- runtime::tests::a_hand_break_of_grass_is_a_seed_source stdout ----
+thread 'runtime::tests::a_hand_break_of_grass_is_a_seed_source' (162308) panicked at src/runtime.rs:679:13:
+minecraft:short_grass by hand
+
+---- runtime::tests::a_ripe_datura_is_harvested_and_a_young_one_is_not stdout ----
+thread 'runtime::tests::a_ripe_datura_is_harvested_and_a_young_one_is_not' (162310) panicked at src/runtime.rs:656:9:
+assertion `left == right` failed
+  left: None
+ right: Some("0")
+
+---- runtime::tests::the_harvest_replants_the_crop_at_age_zero stdout ----
+thread 'runtime::tests::the_harvest_replants_the_crop_at_age_zero' (162331) panicked at src/runtime.rs:670:9:
+assertion `left == right` failed
+  left: None
+ right: Some("0")
+
+---- runtime::tests::the_seed_roll_is_upstreams_two_percent stdout ----
+thread 'runtime::tests::the_seed_roll_is_upstreams_two_percent' (162333) panicked at src/runtime.rs:705:13:
+draw 0 is below the chance
+
+test result: FAILED. 29 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+Green: **33 passed, 0 failed** (`sdk-test.log`).
+
+### Ladder
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests | `cargo test --offline` | `sdk-test.log` | **33 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.3.log`, `sdk-build-second-0.2.3.log`, `sdk-reproducible-0.2.3.txt` | **byte-identical**, 124,954 B, `e81ce017…` |
+| package | `sha256sum; stat -c%s; unzip -l` | `sdk-artifact-0.2.3.txt` | 124,954 B, `e81ce0172de24411deefb93a3479b1c043e1e57c93c04924cb726b1ff93e5949`, **202 entries**, no packed `Cargo.lock`, declares **0.2.3** |
+| tree match | rebuild + `cmp` against `occultism.hmod` | this run | `PACKAGE_MATCHES_TREE` |
+| package check | `cargo horizon-mod check occultism.hmod` | `sdk-check.log` (sha printed) | exit 0, `occultism 0.2.3 (native-mod, …/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da` | `sdk-fits.log` (sha printed) | `0a875da  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8a` | `sdk-fits-next.log` (sha printed) | **`0b14f8a  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | — | **1/1** |
+| in game (modded) | `bash tools/e2e.sh` (launcher-built game, `launcher-game.sh build occultism`) | `e2e-default-0.2.3.log` | **PASS** + `EXIT:0` |
+| in game (control) | `GAME=$CONTROL_GAME` | `e2e-control-0.2.3.log` | **FAIL** + `EXIT:1` (`the datura item did not register`) |
+| fail-capability (scenario) | `SELFTEST=1` | `e2e-selftest-0.2.3.log` | **FAIL** + `EXIT:1` (3 feathers ≠ the flipped 2) |
+| fail-capability (this family) | `NEGATIVE=1` | `e2e-negative-0.2.3.log` | **FAIL** + `EXIT:1` (`negative: the ripe crop dropped 1 fruit`) |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | 12 logs, 12 ok, 0 missing-exit, 0 bad-exit |
+
+### In game (the transcript, trimmed to the new phases)
+
+```
+== K: the datura crop binds ages 0..7, its seed plants it, and it grows by random tick ==
+  ages 0..7 read back on occultism:datura (the wheat template's crop state)
+  planted occultism:datura[age=0] on farmland
+  the same click on stone left air
+  control: the planted crop is still age 0 after 200 ticks at random_tick_speed 0
+  the planted crop advanced from age 0 to age 7 under random ticks
+== L: a ripe crop is harvested by a right click, replanted at age 0 ==
+  the harvest replanted occultism:datura[age=0] and dropped 1 fruit + 3 seeds
+  a young crop (occultism:datura[age=3]) stayed and dropped nothing
+== M: the carried loot table: a ripe crop drops its fruit and seed, a young one a seed ==
+  ripe crop drops: {"occultism:datura":1,"occultism:datura_seeds":3}
+  young crop drops: {"occultism:datura_seeds":1}
+  the table's two branches: age 7 -> 1 fruit + 3 seeds, age 0 -> 1 seed and no fruit
+== N: short grass: a hand break can yield the jar's 2% seed; shears never do ==
+  hand breaks: 25 of 25 landed, 3 datura seed(s), 0 dropped grass
+  shears breaks: 25 of 25 landed, 24 dropped grass, 0 datura seed(s)
+```
+
+(L's own line in the final run: `before the assertions: fruit=1 seeds=3 (state
+occultism:datura[age=0])` — the fruit and the seeds are both there, from the carried table.)
+
+The harvest's seed count varies with the engine's `apply_bonus` read (1..6 measured on a bare hand);
+the assertion is the rule (a ripe crop yields exactly one fruit and at least one seed, a young one
+only a seed), not a fixed bonus. The grass round observed a seed in earlier runs of this scenario
+(1 seed in 25 aimed hand breaks, twice, and 2 in 50); this run rolled none, which is why the positive
+side is not asserted statistically — see the gap below.
+
+### Measured behaviours of this pin (recorded, not worked around silently)
+
+1. **An explosion's loot reaches `loot_drops` with no block**: 432 grass blocks destroyed by 12 TNTs
+   produced 0 rolls (`context.block` is None — the blast merges loot before the hook), so the 2%
+   modifier can only fire on a player's or mob's break. The e2e's positive leg therefore breaks grass
+   by hand.
+2. **`ctl break` mines what the crosshair covers.** Without a `look-at-block` per block only the
+   blocks in view land (measured 10 of 25, and 0 of 25 after a teleport); aimed *and* teleported
+   beside the block (`mine`) the first round at a fresh patch lands 25 of 25 — later rounds in the
+   same spot stop landing (33 of 400 over 16 rounds), which is why each patch is used once.
+3. **A control launch in the same `HORIZON_HOME` destabilises the long legs**: the main game then has
+   no `logs/latest.log` of its own and stops landing breaks after ~100. The control is its own
+   invocation (`GAME=$CONTROL_GAME CONTROL_GAME=`), which is what `e2e-control-0.2.3.log` is;
+   `CONTROL_LEG=1` keeps the old in-run shape.
+4. **Random ticks off while the ages are read back**: at the default `random_tick_speed` a freshly
+   planted crop can read age 1 (measured), so K sets 0 and L/M rely on that.
+5. **The crop's survival needs hydrated farmland**: the patches are laid with water at both ends and
+   the growth loop re-fills `farmland[moisture=7]` each round (a dry farmland turns to dirt and takes
+   the crop with it).
+6. **`LevelRef::block_drops` can return `None` in the click scope** (it draws the level's random, a
+   write). `harvest` therefore **leaves the crop ripe when the roll is refused** instead of resetting
+   it without a yield — a later click rolls again — and the e2e retries the click while the crop still
+   reads age 7. One run read `0 fruit` with the table's seeds present (a roll that saw the post-write
+   state); the drop counts are now printed before the assertion so the next occurrence is diagnosable.
+
+### Parity coverage (0.2.3)
+
+| family | state |
+|---|---|
+| `occultism:datura` (crop block, ages 0..7, no block item) | **tested** — K (all eight ages read back) |
+| `occultism:datura_seeds` (plants the crop on farmland, not on stone) | **tested** — K (planted `age=0`; the stone click left air) |
+| crop growth by random tick | **tested** — K (`0` keeps age 0 for 200 ticks, `400` ripens to 7) |
+| the crop's carried loot table, both branches | **tested** — M (age 7 → 1 fruit + seeds, age 0 → 1 seed, no fruit) |
+| the replant harvest (right click at age 7, age 0 left, drops at the block) | **tested** — L (1 fruit + seeds; a young crop untouched) |
+| the seed source: `short_grass`/`tall_grass` without shears | **tested (differential) + observed positive, not asserted** — N: 25 aimed hand breaks landed and yielded 3 seeds (earlier runs: 1, 1 and 2 in the same scenario); 25 shears breaks each rolled the grass's own loot (24 dropped grass) and yielded 0 seeds, which is the modifier's inversion. The 2% rule itself is `runtime::tests::the_seed_roll_is_upstreams_two_percent` + `a_hand_break_of_grass_is_a_seed_source` (red then green). A *statistical* in-game assertion stays `blocked(harness-break-reliability)`: the client lands the first round of 25 aimed breaks at a fresh patch and then stops landing them (measured 33 of 400 over 16 rounds, 12 of 400 in another), so a 400-roll proof (~0.03% for an absent hook) cannot be reproduced on demand. The hand round is therefore a reported measurement, not an assertion; the shears half is the asserted differential |
+| the harvest's food exhaustion | **not asserted** — `add_exhaustion` is called, but a 0.005 exhaustion is under the food bar's rounding; the call is the code path, not evidence |
+| `/occultism info`, `/occultism recipes`, spirit fire, 26 conversion recipes, chalk, spectator guard | **tested** — the 0.2.2 phases A..J, unchanged |
+
+### Upstream defects fixed
+
+None found in this slice. The jar's `datura` loot table, the two loot modifiers and the harvest rule
+are consistent with each other and with the blockstate's 8 ages; nothing was corrected.
+
+### Deviations (deliberate, and why)
+
+| Area | Upstream | This port |
+|---|---|---|
+| arm swing on harvest | `player.swing(hand)` | none: the pin has no swing helper (`player_arm_swing` is a listen hook), so the arm does not move |
+| harvest with an empty hand | `useItemOn` is called with the empty stack and harvests | same (the hook carries `Option<&ItemStack>`; `None` harvests) |
+| `#c:tools/shear` | a tag | `minecraft:shears`, the tag's only member at 26.3 (no item-tag read at the pin) |
+| the seed chance's source | `random_chance` 0.02 in the loot modifier | the level random through `LevelRef::with_random`, `next_float() < 0.02` |
+| the `datura` item | `SpiritHealingItem` food, grants Third Eye | still a plain stack-64 item (unchanged from 0.2.2; the food effect is a later slice) |
+
+### Next slices from this point
+
+The seed source closes the loop: a player can now break grass → plant → harvest → light the fire.
+The rest of the gap list is unchanged (pentacle rituals, spirits/AI, GeckoLib, Otherworld,
+Modonomicon, Curios, the spirit-job recipes), plus the four older carried loot tables
+(`otherstone`/`otherrock`/`otherflower`/`otherworld_sapling_natural`), which are still unexercised in
+game and are the cheapest next slice (no code: place, break, assert the drop).
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
