@@ -292,7 +292,6 @@ pub fn info_line(
 }
 
 /// A player's game mode, as the click guard needs it.
-///
 /// A mirror of the game's four modes rather than the SDK's `GameMode`: this
 /// module carries no `mod_api` type, so the glue maps one to the other.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -312,6 +311,30 @@ impl Mode {
     /// spectator changes nothing and loses nothing.
     pub fn may_change(self) -> bool {
         !matches!(self, Self::Spectator)
+    }
+}
+
+/// The hand a click arrived on.
+///
+/// Horizon calls `right_click_block` once per hand (the hook's own doc says
+/// "once per hand"), where vanilla calls the block's `useItemOn` for the main
+/// hand and only tries the off hand when the main hand's action did not consume
+/// the click. The crop harvest **changes the block**, so it may run once per
+/// click: the off hand's turn would harvest the crop the main hand just
+/// replanted, because the hand pair is dispatched from one click. A mirror of the
+/// SDK's `Hand`, so this module stays free of `mod_api` types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClickHand {
+    /// The main hand: the click vanilla performs.
+    Main,
+    /// The off hand: reached only when the main hand's action failed.
+    Off,
+}
+
+impl ClickHand {
+    /// Whether a click on this hand may harvest the crop: the main hand only.
+    pub fn may_harvest(self) -> bool {
+        matches!(self, Self::Main)
     }
 }
 
@@ -644,6 +667,20 @@ mod tests {
     }
 
     #[test]
+    fn only_the_main_hand_harvests_a_crop() {
+        // Horizon calls the hook once per hand; vanilla calls `useItemOn` for the
+        // main hand and only tries the off hand when the main hand failed. The
+        // harvest writes the block, so a second hand's turn harvests the crop the
+        // first just replanted: measured in game as 2 fruit and 6 seeds for one
+        // click (2026-11-21, phase L).
+        assert!(ClickHand::Main.may_harvest(), "the main hand harvests");
+        assert!(
+            !ClickHand::Off.may_harvest(),
+            "the off hand's turn must not harvest the crop the main hand replanted"
+        );
+    }
+
+    #[test]
     fn a_ripe_datura_is_harvested_and_a_young_one_is_not() {
         // `ReplantableCropsBlock.useItemOn` -> `IReplantableCrops.onHarvest`: only a
         // crop at its last age is harvested; a young one falls through to the game.
@@ -701,6 +738,77 @@ mod tests {
         for outside in [0.02, 0.5, 0.999_999] {
             assert!(!seed_rolls(outside), "draw {outside} is not below it");
         }
+    }
+
+    /// The crafting recipes this port carries, as the package ships them. The
+    /// 26.3 loader reads an ingredient as a bare `"id"`, a `"#tag"` or a list of
+    /// those strings; a 1.21.1 `{"item": …}` / `{"tag": …}` object is dropped
+    /// without a word (the `compactmachines` / `enderio` finding, 2026-11-18),
+    /// and a list of such objects is dropped with it.
+    const CRAFTING: [(&str, &str); 2] = [
+        (
+            "demons_dream_essence_from_fruit_or_seed",
+            include_str!(
+                "../data/occultism/recipe/crafting/demons_dream_essence_from_fruit_or_seed.json"
+            ),
+        ),
+        (
+            "book_of_binding_empty",
+            include_str!("../data/occultism/recipe/crafting/book_of_binding_empty.json"),
+        ),
+    ];
+
+    #[test]
+    fn the_carried_crafting_recipes_are_in_the_26_3_dialect() {
+        // The defect class this pins: the jar's own files are 1.21.1 objects, and
+        // carrying them byte for byte makes the game register no recipe at all —
+        // the grid then yields nothing, silently.
+        for (name, text) in CRAFTING {
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{name} carries the 1.21.1 object-form ingredient {object_form}, \
+                     which the 26.3 loader drops: {text}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_carried_crafting_recipes_name_their_declared_references() {
+        // The two recipes whose result and every ingredient this package (or
+        // vanilla) already provides. Their references are the slice's contract.
+        let (_, essence) = CRAFTING[0];
+        for reference in [
+            "\"#c:crops/datura\"",
+            "\"#c:seeds/datura\"",
+            "\"occultism:demons_dream_essence\"",
+        ] {
+            assert!(
+                essence.contains(reference),
+                "the essence recipe lost {reference}: {essence}"
+            );
+        }
+        assert!(
+            essence.contains("\"minecraft:crafting_shaped\""),
+            "the essence recipe is the jar's shaped 3x3: {essence}"
+        );
+        let (_, book) = CRAFTING[1];
+        for reference in [
+            "\"occultism:awakened_feather\"",
+            "\"occultism:purified_ink\"",
+            "\"occultism:taboo_book\"",
+            "\"occultism:book_of_binding_empty\"",
+        ] {
+            assert!(
+                book.contains(reference),
+                "the book recipe lost {reference}: {book}"
+            );
+        }
+        assert!(
+            book.contains("\"minecraft:crafting_shapeless\""),
+            "the book recipe is the jar's shapeless one: {book}"
+        );
     }
 
     #[test]

@@ -173,3 +173,66 @@ again). Every step in a `ports/tools/build-slot.sh` lease with `BUILD_LOCAL=1` a
 The in-game phases K..N and the measured pin behaviours (an explosion's loot has no block context,
 `ctl break` mines the crosshair, the control-leg/HORIZON_HOME interaction, random ticks during the age
 read-back) are in `notes.md` under "Slice 2 (0.2.3, 2026-11-21)".
+
+## 7. SDK 0.2.4 (the four carried block loot tables proven in game), pin `0a875da`
+
+Every step in a `ports/tools/build-slot.sh` lease with `BUILD_LOCAL=1` and `CARGO_INCREMENTAL=0`;
+no `--target-dir`, no private slots. Evidence in `../_shared/evidence/occultism/` (ladder) and
+`../_shared/evidence/occultism-e2e/` (game legs). The four tables, their block files and the pickaxe
+tag are **unchanged** from 0.2.3: the package's only byte change is the version. There is no product
+red; the red was in the new leg and in two 0.2.3 harness phases (both fixed, quoted in `notes.md`).
+
+| Step | Command | Result |
+|---|---|---|
+| the leg's first honest run (0.2.3 bytes) | `LOOT_ONLY=1 bash tools/e2e.sh` | **PASS** + `EXIT:0` — the shipped data already behaved as specified — `e2e-loot-only-0.2.3-package.log` |
+| tests | `cargo test --offline` | **33 passed, 0 failed** — `sdk-test.log` |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **byte-identical**: 124,955 B, sha256 `f49ee35df9fc22d00217e611440573c6c771151b8cda963d252f46e7761ca3cd` — `sdk-build-0.2.4.log`, `sdk-build-second-0.2.4.log`, `sdk-reproducible-0.2.4.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | 124,955 B, `f49ee35d…ca3cd`, **202 entries**, no packed `Cargo.lock`, declares **0.2.4** — `sdk-artifact-0.2.4.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed) | exit 0, `occultism 0.2.4 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da` (sha printed) | `0a875da  made for`, exit 0 — `sdk-fits.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8a` (sha printed) | `0b14f8a  fits`, exit 0 — `sdk-fits-next.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** |
+| game build | `launcher-game.sh build occultism` | `Compiling occultism (1 of 1)`, tag `native-0a875da-3f170bd8dd15`, exported manifest `version = "0.2.4"` — `launcher-build-0.2.4.log` |
+| in game (modded) | `launcher-game.sh run occultism` | **PASS** + `EXIT:0` — `e2e-default-0.2.4.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME= bash tools/e2e.sh` | **FAIL** + `EXIT:1` (`the datura item did not register`) — `e2e-control-0.2.4.log` |
+| fail-capability (scenario) | `SELFTEST=1` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) — `e2e-selftest-0.2.4.log` |
+| fail-capability (the loot family) | `LOOT_ONLY=1 LOOT_NEGATIVE=1` | **FAIL** + `EXIT:1` (`negative: occultism:otherstone dropped 1 with a wooden pickaxe`) — `e2e-negative-loot-0.2.4.log` |
+| harness diagnostics | `probe-l.sh`, `probe-n.sh` (temporary, deleted after the runs) | `probe-l-0.2.4.log` (a harvest's seeds picked up at 2 blocks), `probe-n-0.2.4.log` (25/25 hand, 25/25 shears after `mine_patch`) |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | 17 logs, 17 ok, 0 missing-exit, 0 bad-exit |
+
+## 8. SDK 0.2.5 (the two carried crafting recipes, and the one-harvest fix), pin `0a875da`
+
+Every step in a `ports/tools/build-slot.sh` lease with `BUILD_LOCAL=1` and `CARGO_INCREMENTAL=0`;
+no `--target-dir`, no private slots. Evidence in `../_shared/evidence/occultism/` (ladder) and
+`../_shared/evidence/occultism-e2e/` (game legs). The slice carries two recipe JSONs in the 26.3
+dialect and fixes one port defect (the harvest ran once per hand); the enumeration of what was
+carried and what was not is in `notes.md`, §"Slice 4".
+
+| Step | Command | Result |
+|---|---|---|
+| red (unit, the dialect) | `cargo test --offline` with the jar's bytes carried verbatim | **33 passed; 2 failed** — `the_carried_crafting_recipes_are_in_the_26_3_dialect` ("… object-form ingredient \"tag\": …") — `sdk-test-red-0.2.5.log` |
+| red (unit, the harvest hand) | `cargo test --offline` with `may_harvest` permissive | **35 passed; 1 failed** — `only_the_main_hand_harvests_a_crop` — `sdk-test-red-hand-0.2.5.log` |
+| green (unit) | `cargo test --offline` | **36 passed, 0 failed** — `sdk-test.log` |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **`REPRODUCIBLE`**: 127,502 B — `sdk-build-0.2.5.log`, `sdk-build-second-0.2.5.log`, `sdk-reproducible-0.2.5.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | 127,502 B, `658ed0f7a8ae06c06ae6b786930ac3d4124027631b2935791e3506cdf315e4e4`, **204 entries**, no packed `Cargo.lock`, declares **0.2.5** — `sdk-artifact-0.2.5.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` | exit 0, `occultism 0.2.5 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da` | `0a875da  made for`, exit 0 — `sdk-fits.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8a` | `0b14f8a  fits`, exit 0 — `sdk-fits-next.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** |
+| game build | `launcher-game.sh build occultism` (stale export + version folder removed) | `Compiling occultism (1 of 1)`, tag `native-0a875da-81d30b2bded4` — `launcher-build-0.2.5.log` |
+| red (in game, the family) | `CRAFT_ONLY=1 bash tools/e2e.sh` against the **0.2.4** export | **FAIL** + `EXIT:1` (`the 3x3 fruit grid made None x0`) — `e2e-craft-red-0.2.4-package.log` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen) | **PASS** + `EXIT:0` — `e2e-default-0.2.5.log` |
+| in game (crafting leg) | `CRAFT_ONLY=1` | **PASS** + `EXIT:0` — `e2e-craft-0.2.5.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME= bash tools/e2e.sh` | **FAIL** + `EXIT:1` — `e2e-control-0.2.5.log` |
+| fail-capability (scenario) | `SELFTEST=1` | **FAIL** + `EXIT:1` — `e2e-selftest-0.2.5.log` |
+| fail-capability (this family) | `CRAFT_ONLY=1 CRAFT_NEGATIVE=1` | **FAIL** + `EXIT:1` — `e2e-negative-craft-0.2.5.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | 23 logs, 23 ok, 0 missing-exit, 0 bad-exit |
+
+The phase-P transcript, the enumeration of the 166 jar crafting recipes (2 carried, 17 impure
+chalks and the 38-recipe otherstone/otherrock family excluded), and the harness behaviours this
+slice measured (offscreen for menus, the death screen during phase N, the swallowed break
+diagnostics, the planting-click retry) are in `notes.md` under "Slice 4 (0.2.5, 2026-11-21)".

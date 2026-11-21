@@ -19,9 +19,9 @@ use std::sync::{LazyLock, Mutex};
 
 use mod_api::{
     BlockClick, BlockUpdateFlags, Command, CommandArgumentValue, EntityRef,
-    EntityTickListenedEvent, EntityTickPostEvent, Flow, GameMode, Host, HostBlockStates, HostSide,
-    Identifier, InteractionResult, ItemStack, LevelRef, LootDropsEvent, RandomSource, Recipe,
-    RightClickBlockEvent, RunModCommandEvent, ServerHost, Text,
+    EntityTickListenedEvent, EntityTickPostEvent, Flow, GameMode, Hand, Host, HostBlockStates,
+    HostSide, Identifier, InteractionResult, ItemStack, LevelRef, LootDropsEvent, RandomSource,
+    Recipe, RightClickBlockEvent, RunModCommandEvent, ServerHost, Text,
 };
 
 use crate::runtime::{
@@ -159,8 +159,18 @@ fn replaceable(host: &dyn Host, level: LevelRef, pos: [i32; 3]) -> bool {
         .unwrap_or(false)
 }
 
+/// The hand a click arrived on, as the harvest guard needs it. Horizon calls
+/// `right_click_block` once per hand; vanilla's block `useItemOn` runs for the
+/// main hand and only reaches the off hand when the main hand's action did not
+/// consume the click, so a click that writes the block must act on one hand.
+fn hand(hand: Hand) -> runtime::ClickHand {
+    match hand {
+        Hand::Main => runtime::ClickHand::Main,
+        Hand::Off => runtime::ClickHand::Off,
+    }
+}
+
 /// The mode the clicking player is in, or `None` when the game cannot name it.
-///
 /// The click guard **fails closed**: a click whose player or mode is unknown
 /// changes nothing, because an unauthorised write is worse than a lost click.
 fn click_mode(host: &dyn Host, player: u128) -> Option<Mode> {
@@ -208,6 +218,14 @@ pub fn right_click(host: HostSide<'_>, event: &mut RightClickBlockEvent<'_>) -> 
         .as_deref()
         .and_then(|age| runtime::harvest_age(&clicked, age))
     {
+        // The hook is called once per hand and the harvest writes the block, so
+        // the off hand's turn would harvest the crop the main hand just
+        // replanted (measured in game: one click dropped 2 fruit and 6 seeds,
+        // 2026-11-21). Vanilla never reaches the off hand after a main-hand
+        // success; the guard makes this path equivalent.
+        if !hand(click.hand).may_harvest() {
+            return Flow::Continue;
+        }
         if !harvest(&mut *server, level, pos, click, harvest_age) {
             // The loot roll was refused: nothing changed, so the click is not claimed.
             return Flow::Continue;

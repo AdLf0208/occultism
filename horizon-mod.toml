@@ -1,6 +1,6 @@
 id = "occultism"
 name = "Occultism"
-version = "0.2.3"
+version = "0.2.5"
 description = """A port of Occultism 1.225.0 for Horizon: the spirit-fire conversion loop and the datura it
 is lit with. A datura (Demon's Dream Fruit) struck with flint and steel or a fire charge lights
 occultism:spirit_fire; any item entity standing in that fire which one of the carried
@@ -13,7 +13,11 @@ The datura crop grows from occultism:datura_seeds on farmland by random tick (th
 0-7), is harvested by right-click at its last age (the loot table's fruit and seeds, replanted at age 0),
 and breaks by hand into its loot table; breaking short or tall grass without shears has the jar's 2%
 chance of a seed. The package carries the crop block, 42 items, 5 loot tables (the crop's and the four
-carried blocks'), 27 recipes, 9 tags and the models, textures and lang they need. The pentacle rituals,
+carried blocks'), 27 spirit-fire recipes, 2 crafting-table recipes, 9 tags and the models, textures and
+lang they need. The crafting recipes are the ones whose result and every ingredient the package already
+provides: a 3x3 grid of the datura fruit or the datura seed (the #c:crops/datura / #c:seeds/datura
+alternative) makes one Demon's Dream Essence, and the shapeless awakened feather + purified ink + taboo
+book makes the Book of Binding - both obtainable in survival for the first time. The pentacle rituals,
 the summoned spirits and their AI, the GeckoLib models, the Otherworld dimension, the guide book, Curios
 slots and the spirit-job recipes are not ported yet."""
 authors = ["klikli-dev", "AdLf0208"]

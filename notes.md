@@ -14,7 +14,12 @@ the mod. **0.2.0 (2026-11-18):** the same slice republished as the flat
 SDK `.hmod` (mod API 0.2) after the `.hnmod` retirement; see
 [`## Migration to the SDK format`](#migration-to-the-sdk-format-020-2026-11-18).
 **0.2.3 (2026-11-21):** the crop, its seeds and the 2% grass seed source, at the
-new pin.
+new pin. **0.2.4 (2026-11-21):** the four carried block loot tables
+(`otherstone`, `otherrock`, `otherflower`, `otherworld_sapling_natural`) placed,
+broken and asserted in game — the parity-ruling gap the 0.2.3 record left.
+**0.2.5 (2026-11-21):** the two crafting-table recipes the package can carry
+(`demons_dream_essence` from the datura fruit or seed, `book_of_binding_empty`),
+plus the one-click/one-harvest fix the full run found (§"Slice 4").
 
 ## Class + tier and the approach
 
@@ -534,7 +539,7 @@ Every family this slice ships, and where it is exercised. `tested` names the pha
 | `/occultism info` readout | **tested** — J (operator reads; non-fire answers `not a spirit fire`; level-0 guest refused, no readout leaked) |
 | `/occultism recipes` readout | **tested** — B (host), J (level-0 guest) |
 | spectator click guard | **tested** — I (chalk, lighter + datura, then the survival differential) |
-| the four carried loot tables | **not tested** — they belong to `otherstone`/`otherrock`/`otherflower`/`otherworld_sapling`, which are outside the conversion loop and have no in-game assertion yet; recorded as a gap for the next slice |
+| the four carried loot tables | **not tested** — they belong to `otherstone`/`otherrock`/`otherflower`/`otherworld_sapling`, which are outside the conversion loop and have no in-game assertion yet; recorded as a gap for the next slice — **closed in 0.2.4** (see §"Slice 3" below) |
 | pentacle rituals, spirits/AI, GeckoLib models, Otherworld, guide book, Curios, machine recipes, datura crop | **not ported** — see the gap list above (unchanged) |
 
 Skills: superpowers/using-superpowers,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
@@ -722,3 +727,341 @@ game and are the cheapest next slice (no code: place, break, assert the drop).
 
 Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
 
+## Slice 3 (0.2.4, 2026-11-21) — the four carried block loot tables, proven in game
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). Class
+**content**, tier **deep** (ledger row 345). Licence **MIT**, ours on `main` → an
+`Update occultism 0.2.4` publication.
+
+**Gap line it comes from:** the coverage table above — *"the four carried loot tables — **not
+tested** … recorded as a gap for the next slice"* — and §"Next slices from this point", which names
+place/break/assert the drop as the cheapest next slice. The 2026-11-20 parity ruling makes an
+unexercised carried family a gap in the work.
+
+**Shape:** the data half of a `deep` mod. The four blocks (`data/occultism/horizon/block/*.json`),
+their block items (auto-created; no `item` file is needed), the four loot tables
+(`data/occultism/loot_table/blocks/*.json`, 26.3's singular typed `"condition"`) and the
+`minecraft:mineable/pickaxe` tag already shipped in 0.2.0–0.2.3 and are **unchanged**. No runtime
+rule, no glue, no block entity: the engine rolls the table on a player break. The slice's
+deliverable is the **in-game assertion**, the coverage rows and the republished version — the
+package's only byte change is `version = "0.2.4"` in `horizon-mod.toml`/`Cargo.toml`.
+
+### The rule under test
+
+| block | template | `requires_tool` | table (26.3 dialect) |
+|---|---|---|---|
+| `occultism:otherstone` | `minecraft:stone` | **true** | 1 `occultism:otherstone`, `survives_explosion` |
+| `occultism:otherrock` | `minecraft:stone` | **true** | 1 `occultism:otherrock`, `survives_explosion` |
+| `occultism:otherflower` | `minecraft:poppy` | false | 1 `occultism:otherflower`, `survives_explosion` |
+| `occultism:otherworld_sapling_natural` | `minecraft:short_grass` | false | 1 of itself, `survives_explosion` |
+
+The fail-capable pair for the two stone blocks is the tool: the engine's `harvest` is
+`!requires_tool || correct_for_drops(held, block)` (`game.rs:6982`), so a **hand** break breaks the
+block and rolls nothing, and a **wooden pickaxe** break drops exactly one. Without the
+`requires_tool` gate both would drop, and the hand assertion fails. `LOOT_NEGATIVE=1` inverts the
+pickaxe assertion (must be 0) and the run must exit 1: that is this family's counterfactual. The two
+plants have `requires_tool: false` and drop one of themselves to a bare hand.
+
+### Red → green
+
+**There is no product red, and the report says so instead of inventing one.** The new leg's first
+honest run — `LOOT_ONLY=1` against the **0.2.3** export, before any product change —
+is green: `e2e-loot-only-0.2.3-package.log`, `PASS` + `EXIT:0`, with
+`occultism:otherstone by hand: {"drops":{}}`, `… with a wooden pickaxe: {"drops":{"occultism:otherstone":1}}`,
+and one each for `otherrock`, `otherflower`, `otherworld_sapling_natural`. The carried data was
+already correct; the parity gap was the missing assertion.
+
+The red this slice did produce was in the **leg**, three runs, each diagnosed to its root cause and
+fixed (no product change):
+
+1. `jq: parse error: Unmatched '}' at line 1, column 183` /
+   `FAIL: line 382: 'jq -r '[(.drops // {})[]] | add // 0' <<< "${1:-{\}}"' exited 5` — a **bash
+   parse trap**: a `drops_total` defined *inside* `phase_loot` with `<<<"${1:-{\}}"` hands jq
+   `<json>}` (the default's `\}` is not honoured there), so jq parses the reply and then errors on
+   the stray brace. Fixed by a plain `local reply=${1:-}` + `[ -n … ] || reply='{}'` and a here-string
+   of `"$reply"`; `drops_of` lost its `2>/dev/null || echo 0`, which had been masking exactly this.
+2. `FAIL: cannot hand-break occultism:otherstone` with the reply
+   `{"error":"the player died","pos":[232,101,30]}` and the game log
+   `Player85937 was slain by Enderman` — the End has no sky light, so hostile mobs spawn on the
+   fresh stone floor. Phase O now sets `difficulty peaceful` and re-kills non-players first.
+3. The full run then exposed **two harness flakes in the 0.2.3 phases** (both fixed, see "Harness
+   defects fixed" below): phase L read `fruit=0 seeds=3`, and phase N landed `0 of 25` / `3 of 25`
+   breaks.
+
+### In game (phase O, verbatim from `e2e-default-0.2.4.log`)
+
+```
+== O: the four carried block loot tables ==
+  placed occultism:otherstone at x=232
+  occultism:otherstone by hand: {"block_before":"occultism:otherstone","block":"minecraft:air","drops":{}}
+  occultism:otherstone with a wooden pickaxe: {"block_before":"occultism:otherstone","block":"minecraft:air","drops":{"occultism:otherstone":1}}
+  placed occultism:otherrock at x=234
+  occultism:otherrock by hand: {"block_before":"occultism:otherrock","block":"minecraft:air","drops":{}}
+  occultism:otherrock with a wooden pickaxe: {"block_before":"occultism:otherrock","block":"minecraft:air","drops":{"occultism:otherrock":1}}
+  placed occultism:otherflower at x=236 (on dirt)
+  occultism:otherflower by hand: {"block_before":"occultism:otherflower","block":"minecraft:air","drops":{"occultism:otherflower":1}}
+  placed occultism:otherworld_sapling_natural[uncovered=false] at x=238 (on dirt)
+  occultism:otherworld_sapling_natural by hand: {"block_before":"occultism:otherworld_sapling_natural[uncovered=false]","block":"minecraft:air","drops":{"occultism:otherworld_sapling_natural":1}}
+  otherstone/otherrock: hand 0, wooden pickaxe 1 each; otherflower and the natural sapling: hand 1 each
+```
+
+The control leg also asserts all four ids are **unknown** without the package (`setblock` leaves air),
+so the phase proves the package and not the engine. `LOOT_ONLY=1` is the fast red/green leg for this
+family (launch + arena + O); `LOOT_NEGATIVE=1` is its counterfactual.
+
+### Ladder
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests | `cargo test --offline` | `sdk-test.log` | **33 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.4.log`, `sdk-build-second-0.2.4.log`, `sdk-reproducible-0.2.4.txt` | **byte-identical**, 124,955 B, `f49ee35d…ca3cd` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | `sdk-artifact-0.2.4.txt` | 124,955 B, `f49ee35df9fc22d00217e611440573c6c771151b8cda963d252f46e7761ca3cd`, **202 entries**, no packed `Cargo.lock`, declares **0.2.4** |
+| package check | `cargo horizon-mod check occultism.hmod` (sha in the log) | `sdk-check.log` | exit 0, `occultism 0.2.4 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da` (sha in the log) | `sdk-fits.log` | `0a875da  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8a` (sha in the log) | `sdk-fits-next.log` | **`0b14f8a  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | — | **1/1** |
+| game build | `launcher-game.sh build occultism` | `launcher-build-0.2.4.log` | **`Compiling occultism (1 of 1)`** (a cached package would have run the 0.2.3 bytes); exported `native-0a875da-3f170bd8dd15`, manifest `version = "0.2.4"` |
+| in game (modded) | `launcher-game.sh run occultism` | `e2e-default-0.2.4.log` | **PASS** + `EXIT:0` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME= bash tools/e2e.sh` | `e2e-control-0.2.4.log` | **FAIL** + `EXIT:1` (`the datura item did not register`) |
+| fail-capability (scenario) | `SELFTEST=1` | `e2e-selftest-0.2.4.log` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) |
+| fail-capability (this family) | `LOOT_ONLY=1 LOOT_NEGATIVE=1` | `e2e-negative-loot-0.2.4.log` | **FAIL** + `EXIT:1` (`negative: occultism:otherstone dropped 1 with a wooden pickaxe`) |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | 17 logs, 17 ok, 0 missing-exit, 0 bad-exit |
+
+### Harness defects fixed (and why the product did not change)
+
+Both were found by this slice's full run; each is in `tools/e2e.sh`, proved by the run above.
+
+1. **The harvest's drops were counted in two snapshots that could both miss an item.** Phase L read
+   `fruit=0 seeds=3`: the fruit had been picked up between `ctl inventory` (read first) and
+   `ctl entities` (read second), so it was in neither. `count_items` is now read **first** and the
+   inventory second (a pickup between them is still counted in the world), `click_block` stands
+   three blocks away (outside the pickup box), and the "before the assertions" line prints the
+   inventory and the item entities so the next occurrence is diagnosable. Evidence of the pickup
+   itself: `probe-l-0.2.4.log` (round 2's seeds moved into the inventory at 2 blocks).
+2. **`ctl break` was aimed from a stale client position.** The old `mine` teleported the player to
+   `x+1` in the *same row* — inside the next grass block — and phase N stopped landing breaks
+   (`0 of 25` shears, then `3 of 25` hand; the reply stream is what `mine` swallowed). `mine_patch`
+   now stands two rows south of the patch (outside it, or on a row already broken), waits for the
+   client to report the teleport (`wait_near`), aims, and re-teleports + re-aims up to three times.
+   `probe-n-0.2.4.log`: **25 of 25** hand and **25 of 25** shears; the full run then read
+   `hand breaks: 25 of 25 landed … shears breaks: 25 of 25 landed, 25 dropped grass`.
+
+### Parity coverage (0.2.4)
+
+| family | state |
+|---|---|
+| `occultism:otherstone` + its table | **tested** — O (state read back, hand 0, wooden pickaxe 1, block becomes air); the control game does not know the id |
+| `occultism:otherrock` + its table | **tested** — O (same pair) |
+| `occultism:otherflower` + its table | **tested** — O (placed on dirt, hand break 1) |
+| `occultism:otherworld_sapling_natural` + its table | **tested** — O (placed on dirt as `[uncovered=false]`, hand break 1). Deviation: upstream drops `minecraft:oak_sapling` unless `uncovered=true`, a state this port declares but never sets; dropping itself keeps the item obtainable (recorded in the deviation table) |
+| `minecraft:mineable/pickaxe` for the two stone blocks | **tested** — the pickaxe break drops and the hand break does not (the gate reads the block's tag) |
+| spirit fire, the 26 conversion recipes, the crop, the seed source, the readouts, the spectator guard | **tested** — phases A..N, unchanged except the two harness fixes above |
+| pentacle rituals, spirits/AI, GeckoLib models, Otherworld, guide book, Curios, machine recipes | **not ported** — the gap list above (unchanged) |
+
+### Measured behaviours of this pin (added by this slice)
+
+1. **`requires_tool` gates the drop, not the break**: a hand break of `otherstone` removes the block
+   and rolls nothing, so a table without the gate would be *worse*, not just different — the pair is
+   the assertion.
+2. **Phase O must set `difficulty peaceful`**: the End's arena floor has no sky light and hostile
+   mobs spawn on it (an Enderman killed the player 4 s into the first run).
+3. **A `ctl break` reply can fail fast** (`{"error": …}`, non-zero exit) when the client's position
+   is stale or the crosshair misses; a retry that re-teleports and re-aims is needed, and the error
+   JSON must be printed — swallowing it is how 22 of 25 breaks vanished silently.
+4. **`${1:-{\}}` as a here-string is unsafe inside a function defined inside a function**: bash hands
+   jq the value plus a stray `}`. Use a plain local variable.
+5. The 0.2.3 findings stand: an explosion's loot reaches `loot_drops` with no block at this pin, so
+   these tables (and the 2% grass seed) are only provable by a player break.
+
+### Upstream defects fixed
+
+None. The four jar tables, the block properties and the pickaxe tag are consistent; the one
+divergence (the natural sapling's `uncovered` branch) is the port's recorded deviation, not a jar
+defect.
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+
+
+## Slice 4 (0.2.5, 2026-11-21) — the two crafting-table recipes, and the double harvest
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). Class
+**content**, tier **deep** (ledger row 345). Licence **MIT**, ours on `main` → an
+`Update occultism 0.2.5` publication.
+
+**Gap line it comes from:** `FINDINGS.md` "Out (recorded gaps)" names the obtainability gap the
+0.2.3 coverage row records — *"the carried items are creative-only except the crop chain"* — and
+the 0.2.4 report's `## Next slice` named the anchor: `demons_dream_essence_from_fruit_or_seed`
+makes `occultism:demons_dream_essence` obtainable **for the first time** now that slice 2 carried
+the crop and its `#c:crops/datura` / `#c:seeds/datura` tags. This is a behaviour change (new
+obtainable items), so it is a real version rather than the evidence-only 0.2.4 (ruling 2026-11-21,
+`AGENTS.md`).
+
+### Which jar recipes qualify (enumerated, not guessed)
+
+The rule: **the result and every ingredient the package (or vanilla) already provides**. Measured
+against the jar's **166** `data/occultism/recipe/crafting/*.json`:
+
+| family | files | carried? | why |
+|---|---:|---|---|
+| `demons_dream_essence_from_fruit_or_seed` | 1 | **carried** | result is a carried item; the key is the alternative `#c:crops/datura` / `#c:seeds/datura`, both carried tags |
+| `book_of_binding_empty` | 1 | **carried** | shapeless `awakened_feather` + `purified_ink` + `taboo_book`, all carried items |
+| impure chalks (`chalk_*_impure`, white twice) | 18 | **not carried** | results are carried, but every one needs an ingredient the package does not carry (`chalk_white_impure` needs `#c:dusts/otherworld_wood` and `#occultism:dusts/chalk_base`, both empty here; the colour ones add `marid_essence`, `cruelty_essence`, `nature_paste`, `afrit_essence`, `demonic_meat`, `cursed_honey`, `gray_paste` or empty `c:dusts/*` tags) |
+| the `otherstone` / `otherrock` **storage (building) family** — slabs, stairs, walls, buttons, pressure plates, bricks, polished and chiseled variants, the two cobblestone families, frames, pedestals, tablets, sacrificial bowls, storage controllers | **38** | **not carried** | every ingredient is carried, but the **result** is not: this slice ships no `otherstone_slab`, `otherrock_bricks`, `polished_otherstone`, `othercobblestone`, `sacrificial_bowl`… item. A recipe whose result is unregistered is dead data, so the family stays a gap until those blocks are carried |
+| every other crafting file (silver/iesnium/tallow/netherite, candles, lamps, books of calling, wood family, dyes, …) | remainder | **not carried** | result and/or ingredients are metals, woods, pastes and lens items this port does not carry |
+
+So **two** of the 19 crafting recipes whose result is carried qualify, and the file set grows from
+202 to 204 entries. The two files are the jar's own shapes written in the **26.3 dialect**: an
+ingredient is a bare `"occultism:…"` / `"#c:…"` string, an alternative is a **list of strings**, and
+a key's value is never a `{"item": …}` / `{"tag": …}` object. That is not cosmetic — the 26.3
+loader's `Ingredient::parse` drops an object without a `type` (`horizon/crates/horizon-client/src/
+crafting.rs:1421`), so a byte-for-byte carry registers **no recipe at all** (the
+`compactmachines`/`enderio` finding of 2026-11-18). The trap is pinned by a unit test.
+
+### The one-click/one-harvest fix (a port defect the full run found)
+
+The slice's first full run failed phase L with `fruit=2 seeds=6` for one click: the crop harvest ran
+**twice**. `Hooks::right_click_block` is called **once per hand** (its own doc says so), where
+vanilla calls the block's `useItemOn` for the main hand and reaches the off hand only when the main
+hand's action did not consume the click. The harvest writes the block, so the off hand's turn
+harvested the crop the main hand had just replanted — one click, two loot rolls, two seeds stacks.
+The guard is `runtime::ClickHand::may_harvest` (main hand only), mapped from `mod_api::Hand` in
+`support::hand`. It was a **port** defect (present since the harvest landed in 0.2.3), not an
+upstream one; without it a player could farm the crop at double yield.
+
+### Red → green
+
+**Unit red 1 — the dialect** (`sdk-test-red-0.2.5.log`), with the jar's bytes carried verbatim:
+
+```
+---- runtime::tests::the_carried_crafting_recipes_are_in_the_26_3_dialect stdout ----
+thread 'runtime::tests::the_carried_crafting_recipes_are_in_the_26_3_dialect' (645252) panicked at src/runtime.rs:731:17:
+demons_dream_essence_from_fruit_or_seed carries the 1.21.1 object-form ingredient "tag":, which the 26.3 loader drops: {
+  "type": "minecraft:crafting_shaped",
+…
+test result: FAILED. 33 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+Green after the dialect rewrite: **35 passed** (the two recipe tests + the 33 from 0.2.4).
+
+**Unit red 2 — the harvest hand** (`sdk-test-red-hand-0.2.5.log`), written with today's
+`may_harvest` returning `true` for both hands so the defect is an assertion, not a compile error:
+
+```
+---- runtime::tests::only_the_main_hand_harvests_a_crop stdout ----
+thread 'runtime::tests::only_the_main_hand_harvests_a_crop' (2402044) panicked at src/runtime.rs:677:9:
+the off hand's turn must not harvest the crop the main hand replanted
+test result: FAILED. 35 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+Green after the guard: **36 passed, 0 failed** (`sdk-test.log`).
+
+**In-game red — the family** (`e2e-craft-red-0.2.4-package.log`, the **0.2.4** export, `CRAFT_ONLY=1`):
+
+```
+== P: the two carried crafting recipes in a real crafting table ==
+  survival, table at 222,101,38
+CRAFT FAIL: the 3x3 fruit grid made None x0, expected occultism:demons_dream_essence x1
+FAIL: the crafting recipe check failed (see the CRAFT FAIL line above)
+EXIT:1
+```
+
+The 0.2.4 package has the item but no recipe, so the grid yields nothing — the exact behaviour the
+slice changes. The 0.2.5 package, same leg: `PASS` + `EXIT:0` (`e2e-craft-0.2.5.log`).
+
+**In-game red — the double harvest** was the first full 0.2.5 run
+(`ports/_shared/evidence/occultism-e2e/`, the run that ended `FAIL: the ripe crop dropped 2 fruit
+(and 6 seeds), expected exactly 1`); the green line after the guard is
+`before the assertions: fruit=1 seeds=3` in `e2e-default-0.2.5.log`.
+
+### In game (phase P, verbatim from `e2e-craft-0.2.5.log`)
+
+```
+== P: the two carried crafting recipes in a real crafting table ==
+  survival, table at 222,101,38
+  the 3x3 fruit grid: the result slot reads occultism:demons_dream_essence x1
+  the essence: taken into the hotbar (inventory {"occultism:demons_dream_essence": 1})
+  the fruit grid: every ingredient was consumed ({"occultism:demons_dream_essence": 1})
+  the 3x3 seed grid: the result slot reads occultism:demons_dream_essence x1
+  the seed-grid essence: taken into the hotbar (inventory {"occultism:demons_dream_essence": 1})
+  the seed grid: every ingredient was consumed ({"occultism:demons_dream_essence": 1})
+  the mixed 5 fruit + 4 seed grid: the result slot reads occultism:demons_dream_essence x1
+  the mixed-grid essence: taken into the hotbar (inventory {"occultism:demons_dream_essence": 1})
+  the mixed grid: every ingredient was consumed ({"occultism:demons_dream_essence": 1})
+  nine dirt: the result slot stayed empty
+  eight fruit with one dirt in the last cell: the result slot stayed empty
+  the shapeless book: the result slot reads occultism:book_of_binding_empty x1
+  the book: taken into the hotbar (inventory {"occultism:book_of_binding_empty": 1})
+  the book recipe: every ingredient was consumed ({"occultism:book_of_binding_empty": 1})
+```
+
+The driver (`tools/craft_recipes.py`) opens a **real** crafting table (`ctl interact`), fills the
+3x3 grid one item per cell through the screen's slots (`100..108`, result `200`), reads the result,
+takes it, and reads the inventory back; the player is in **survival** so consumption is the vanilla
+rule. The differential is two-sided: nine dirt make nothing **and** eight fruit with one dirt in the
+ninth cell make nothing, so the result is the recipe and not "any 3x3". `CRAFT_NEGATIVE=1` inverts
+the fruit assertion and the run must fail (`e2e-negative-craft-0.2.5.log`:
+`CRAFT FAIL: negative: the 3x3 fruit grid made occultism:demons_dream_essence x1, expected nothing`,
+`EXIT:1`).
+
+### Ladder
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests | `cargo test --offline` | `sdk-test.log` | **36 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.5.log`, `sdk-build-second-0.2.5.log`, `sdk-reproducible-0.2.5.txt` | **`REPRODUCIBLE`**, 127,502 B |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | `sdk-artifact-0.2.5.txt` | 127,502 B, `658ed0f7a8ae06c06ae6b786930ac3d4124027631b2935791e3506cdf315e4e4`, **204 entries** (both recipes packed), no packed `Cargo.lock`, declares **0.2.5** |
+| runtime inside/outside | `unzip -p … src/runtime.rs \| sha256sum` vs `sha256sum src/runtime.rs` | `sdk-artifact-0.2.5.txt` | identical, `e6fca922217b…` |
+| package check | `cargo horizon-mod check occultism.hmod` | `sdk-check.log` | exit 0, `occultism 0.2.5 (native-mod, …/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da` | `sdk-fits.log` | `0a875da  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8a` | `sdk-fits-next.log` | **`0b14f8a  fits`**, exit 0 (first attempt hit a GitHub `Connection reset by peer`, exit 2; the retry is the recorded line) |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | — | **1/1** |
+| game build | `launcher-game.sh build occultism` | `launcher-build-0.2.5.log` | **`Compiling occultism (1 of 1)`** after removing the stale `native-0a875da-…` folder and export (the cached-package trap), tag `native-0a875da-81d30b2bded4`, manifest `version = "0.2.5"` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen, launcher-built game) | `e2e-default-0.2.5.log` | **PASS** + `EXIT:0` (A..P, including the harvest at 1 fruit and phase P) |
+| in game (crafting leg) | `CRAFT_ONLY=1` | `e2e-craft-0.2.5.log` | **PASS** + `EXIT:0` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | `e2e-control-0.2.5.log` | **FAIL** + `EXIT:1` (`the datura item did not register`) |
+| fail-capability (scenario) | `SELFTEST=1` | `e2e-selftest-0.2.5.log` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) |
+| fail-capability (this family) | `CRAFT_ONLY=1 CRAFT_NEGATIVE=1` | `e2e-negative-craft-0.2.5.log` | **FAIL** + `EXIT:1` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | 23 logs, 23 ok, 0 missing-exit, 0 bad-exit |
+
+### Parity coverage (0.2.5)
+
+| family | state |
+|---|---|
+| `demons_dream_essence_from_fruit_or_seed` | **tested** — P (3x3 fruit, 3x3 seed, 5 fruit + 4 seeds each make exactly 1 `occultism:demons_dream_essence`, every ingredient consumed; 9 dirt and 8 fruit + 1 dirt make nothing) |
+| `book_of_binding_empty` (shapeless) | **tested** — P (1 book, its three items consumed) |
+| the 17 impure-chalk craftings and the 38-recipe otherstone/otherrock building family | **not carried** — results or ingredients are not in the package (table above); a gap for a slice that carries those items |
+| the datura harvest (one click, one roll) | **tested** — L (`before the assertions: fruit=1 seeds=3`); the double harvest it caught is fixed and pinned by `only_the_main_hand_harvests_a_crop` |
+| spirit fire, the 26 conversion recipes, the crop, the seed source, the readouts, the spectator guard, the four loot tables | **tested** — phases A..O, unchanged |
+| pentacle rituals, spirits/AI, GeckoLib models, Otherworld, guide book, Curios, machine recipes | **not ported** — the gap list above (unchanged) |
+
+### Measured behaviours of this pin (added by this slice)
+
+1. **A crafting-menu phase needs `--offscreen`, not `--headless`.** Under `--headless` there is no
+   renderer, so `ctl screen` never answers and `ctl click-slot` answers "no renderer yet"; the first
+   phase-P run timed out on `screen` (measured 2026-11-21). The whole leg now launches offscreen;
+   phases A..O are unchanged by it.
+2. **The End's arena floor breeds hostile mobs during a long survival phase.** Two rounds of 25
+   aimed breaks take minutes, and an Enderman killed the player mid-phase-N, leaving the **death
+   screen** open: every later `ctl break` answered `{"error":"the dead screen is open; close it
+   first"}`, so 9 and 11 of 25 landed (measured twice). Phase N now sets `difficulty peaceful`,
+   kills non-players per patch and closes a stale screen; both rounds then landed 25 of 25.
+3. **Phase N's diagnostics were being swallowed.** `reply=$(mine_patch … 2>/dev/null)` discarded the
+   failure reply, which is how the death screen stayed invisible for two runs and how the e2e guard
+   saw 900 s of silence and killed the leg. stderr now passes through, and each round takes up to
+   three **fresh** patches (the client drops aimed breaks as a session goes on) — the 20-of-25
+   landing threshold is unchanged.
+4. **A phase that opens a menu must close it before any block action**, and a lost planting click
+   needs a retry: phase K's plant now retries while the block still reads air (one run read
+   `the seeds planted 'minecraft:air'` under load).
+
+### Upstream defects fixed
+
+None found. The 26.3 dialect rewrite is a *platform* translation (the jar's files are valid 1.21.1),
+and the double harvest was a **port** defect (above), not a jar one.
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices

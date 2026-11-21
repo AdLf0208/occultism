@@ -55,9 +55,35 @@
 #                     itself and no seed — the differential for the modifier's
 #                     shears condition.
 #
+# The two carried crafting-table recipes (0.2.5) craft at a real table south of
+# the farm stations (phase P): the jar's 3x3 `ppp/ppp/ppp` whose key is the
+# alternative `#c:crops/datura` / `#c:seeds/datura` makes `occultism:demons_dream_essence`
+# (nine fruit, nine seeds, then a mixed five-fruit/four-seed grid), and the
+# shapeless awakened feather + purified ink + taboo book makes
+# `occultism:book_of_binding_empty`. Nine dirt, and eight fruit with one dirt, make
+# nothing - the differential. Each run fills the grid one item per cell, reads the
+# result slot, takes it and reads the inventory back (ingredients consumed).
+# CRAFT_NEGATIVE=1 inverts the fruit assertion, so the run must FAIL.
+# CRAFT_ONLY=1 launches, lays the arena and runs only phase P.
+#
+# The four carried block loot tables (0.2.4) are a row beyond the crop stations:
+#   x=232,234, z=30  otherstone and otherrock (`requires_tool: true`): a hand
+#                    break drops nothing, a wooden pickaxe break drops exactly
+#                    one of the block — the pair is the fail-capable check;
+#   x=236,238, z=30  otherflower and otherworld_sapling_natural on dirt: a bare
+#                    hand drops exactly one. Each block is placed, its state read
+#                    back, broken in survival, and the `ctl break` reply's
+#                    `.drops` asserted.
+#
 # SELFTEST=1 flips the count assertion (3 awakened feathers -> 2): it must FAIL,
 # proving the scenario can fail. NEGATIVE=1 flips the ripe-crop harvest's
-# assertion (a ripe crop must drop a fruit) the same way.
+# assertion (a ripe crop must drop a fruit) the same way; LOOT_NEGATIVE=1 is the
+# loot family's own counterfactual (a pickaxe break of otherstone must drop
+# nothing, so it must FAIL).
+#
+# LOOT_ONLY=1 launches, lays the arena and runs only phase O — the red/green leg
+# for the loot family. Every scratch path honours `E2E_TMP` (the campaign's
+# `/tmp` is a 7.5 GB tmpfs).
 set -Eeuo pipefail
 export LC_ALL=C
 [ -z "${OCC_DEBUG:-}" ] || set -x
@@ -68,10 +94,25 @@ GAME=${GAME:-}
 CTL=${CTL:-$PORT/target/launcher/horizon-ctl}
 CONTROL_GAME=${CONTROL_GAME:-}
 RES=${RES:-${HORIZON_RES:-/home/adlf/Desktop/horizon/.local/horizon-client/26.3}}
-SOCK=${SOCK:-/tmp/opencode/occultism-e2e.sock}
-GSOCK=${GSOCK:-/tmp/opencode/occultism-e2e-guest.sock}
+# The campaign's /tmp is a 7.5 GB tmpfs; `launcher-game.sh env` exports E2E_TMP
+# under ~/.cache, so every scratch path here follows it.
+TMP=${E2E_TMP:-/tmp/opencode}
+SOCK=${SOCK:-$TMP/occultism-e2e.sock}
+GSOCK=${GSOCK:-$TMP/occultism-e2e-guest.sock}
 SELFTEST=${SELFTEST:-0}
 NEGATIVE=${NEGATIVE:-0}
+# The loot family's own counterfactual: the pickaxe break must drop nothing, so
+# this run MUST fail (see phase O).
+LOOT_NEGATIVE=${LOOT_NEGATIVE:-0}
+# `LOOT_ONLY=1` launches and runs only the four-loot-table phase (the red/green
+# leg for that family), then exits 0.
+LOOT_ONLY=${LOOT_ONLY:-0}
+# The crafting family's own counterfactual: a 3x3 grid of datura fruit must make
+# nothing, so this run MUST fail (see phase P).
+CRAFT_NEGATIVE=${CRAFT_NEGATIVE:-0}
+# `CRAFT_ONLY=1` launches and runs only the crafting phase (the red/green leg for
+# that family), then exits 0.
+CRAFT_ONLY=${CRAFT_ONLY:-0}
 # `CONTROL_LEG=1` runs the packaged leg first on the same socket, as 0.2.0/0.2.2 did.
 # The default is a *separate* invocation (`GAME=$CONTROL_GAME`), because a control
 # launch in the same HORIZON_HOME leaves the main game without its log file and the
@@ -98,6 +139,12 @@ CROP=occultism:datura
 SEEDS=occultism:datura_seeds
 STATE_RIPE="${CROP}[age=7]"
 STATE_YOUNG="${CROP}[age=0]"
+# The loot-table row (phase O): solid blocks at x=232/234 on the stone floor,
+# the flower and the sapling at x=236/238 on their own dirt.
+BLOCK_Z=30
+# The crafting station (phase P): a table on the stone floor, south of the crops.
+CRAFT_X=222
+CRAFT_Z=38
 
 if [ -z "$GAME" ]; then
     echo "GAME is unset: pass a game built by 'horizon-launcher native-build .'" >&2
@@ -109,7 +156,7 @@ fi
 [ -x "$GAME" ] || { echo "missing horizon-client: $GAME" >&2; exit 1; }
 [ -d "$RES/assets" ] || { echo "missing prepared resources: $RES" >&2; exit 1; }
 
-SCRATCH=$(mktemp -d /tmp/opencode/occultism-home.XXXXXX)
+SCRATCH=$(mktemp -d "$TMP/occultism-home.XXXXXX")
 export HORIZON_HOME=$SCRATCH/game
 export HORIZON_LAUNCHER_HOME=$SCRATCH/launcher
 export XDG_DATA_HOME=$SCRATCH/data
@@ -144,8 +191,14 @@ launch() { # launch GAME WORLD
     cd "$SCRATCH"
     # A native SDK package carries its code and its content in the one `.hmod`;
     # the launcher-built game already has it, so there is no `--dev-mod`.
+    # `--offscreen`, not `--headless`: the crafting phase (P) opens a
+    # crafting-table menu and clicks its grid slots, and a slot click needs the
+    # screen's rendered layout (`horizon-ctl click-slot` answers "no renderer
+    # yet", and `screen` times out, under `--headless` — measured 2026-11-21 in
+    # this port's first phase-P run). Nothing else in the scenario depends on
+    # the renderer.
     "$CTL" --socket "$SOCK" launch --game "$game" --world "$world" --seed 20261105 \
-        --creative --headless --wait --resources "$RES" >>"$SCRATCH/launch-$world.log" 2>&1
+        --creative --offscreen --wait --resources "$RES" >>"$SCRATCH/launch-$world.log" 2>&1
     ctl wait-ready 120
     ctl wait 40
 }
@@ -177,8 +230,9 @@ arena() {
         fi
     done
     [ "$loaded" = true ] || fail "the End arena chunk never loaded"
-    # Big enough for the fire stations (z -12..8) and the crop family
-    # (x 214..233, z 0..40), with clear air above both.
+    # Big enough for the fire stations (z -12..8), the crop family
+    # (x 214..233, z 0..40) and the loot row (x 232..238, z 30), with clear air
+    # above both.
     ctl command "execute in minecraft:the_end run fill 196 100 -16 242 100 44 minecraft:stone" >/dev/null
     ctl wait 6 >/dev/null
     ctl command "execute in minecraft:the_end run fill 196 101 -16 242 108 44 minecraft:air" >/dev/null
@@ -197,7 +251,11 @@ arena() {
 end() { ctl command "execute in minecraft:the_end run $*" >/dev/null; }
 state_at() { ctl block "$1" "$2" "$3" | jq -r '.state // "minecraft:air"'; }
 inv_count() { ctl inventory | jq -r --arg i "$1" '.counts[$i] // 0'; }
-drops_of() { jq -r --arg i "$2" '.drops[$i] // 0' <<<"${1:-{\}}" 2>/dev/null || echo 0; }
+drops_of() { # drops_of REPLY ITEM -> that item's count in the break reply
+    local reply=${1:-}
+    [ -n "$reply" ] || reply='{}'
+    jq -r --arg i "$2" '(.drops // {})[$i] // 0' <<<"$reply"
+}
 age_at() { state_at "$1" "$2" "$3" | sed -nE 's/.*age=([0-9]+).*/\1/p'; }
 
 # Mine one block from one block away (a crop's outline is a cross: from two
@@ -213,11 +271,29 @@ mine() { # mine X Y Z -> the ctl break reply
     ctl break "$1" "$2" "$3"
 }
 
-# Right-click a block with whatever the hand holds, from two blocks away so
-# nothing dropped is picked up (vanilla's pickup box is inflated by one block).
+# Middle ground: mine a block from two blocks away, so the drop lands outside the
+# player's pickup box (vanilla's is inflated by one block) before the reply
+# collects it, and retry once — the client occasionally misses the first swing on
+# a fresh target.
+break_at() { # break_at X Y Z -> the ctl break reply (the last attempt's, only)
+    local x=$1 y=$2 z=$3 reply
+    ctl command "execute in minecraft:the_end run tp @s $((x)).5 101 $((z + 2)).5" >/dev/null
+    ctl wait 4 >/dev/null
+    ctl look-at-block "$x" "$y" "$z" up >/dev/null
+    ctl wait 2 >/dev/null
+    reply=$(ctl break "$x" "$y" "$z" 2>/dev/null) && { echo "$reply"; return 0; }
+    ctl look-at-block "$x" "$y" "$z" up >/dev/null
+    ctl wait 3 >/dev/null
+    ctl break "$x" "$y" "$z"
+}
+
+# Right-click a block with whatever the hand holds, from three blocks away: within
+# reach (4.5), and outside the item pickup box, so a harvest's drops stay on the
+# ground for the count (`ctl entities`) instead of moving into the inventory
+# between two snapshots (that race read `fruit=0` once, 2026-11-21).
 click_block() { # click_block X Z
     local x=$1 z=$2
-    ctl tp "$((x)).5" 101 "$((z + 2)).5" >/dev/null
+    ctl tp "$((x)).5" 101 "$((z + 3)).5" >/dev/null
     ctl wait 5 >/dev/null
     ctl look-at-block "$x" 101 "$z" up >/dev/null
     ctl wait 2 >/dev/null
@@ -285,13 +361,172 @@ control_leg() {
     name=$(block_name "$X0" 101 0)
     [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so the crop id was known"
     echo "  without the package: no datura item, no datura seeds, neither the fire nor the crop block"
+    # The four loot-table blocks (0.2.4) must be unknown too.
+    for id in occultism:otherstone occultism:otherrock occultism:otherflower \
+              occultism:otherworld_sapling_natural; do
+        ctl command "execute in minecraft:the_end run setblock $X0 101 0 $id" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        name=$(block_name "$X0" 101 0)
+        [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
+    done
+    echo "  without the package: none of the four loot-table blocks either"
     ctl quit >/dev/null 2>&1 || true
+}
+
+# The four carried block loot tables (0.2.4). Each block is placed, its state read
+# back, broken in survival and the `ctl break` reply's `.drops` asserted:
+#   * otherstone and otherrock are `requires_tool: true` (stone template), so the
+#     fail-capable pair is: a hand break breaks the block and drops NOTHING, a
+#     wooden pickaxe break drops exactly one of it. Without the `requires_tool`
+#     gate both would drop, and the hand assertion would fail;
+#   * otherflower and otherworld_sapling_natural are `requires_tool: false` and
+#     drop exactly one of themselves to a bare hand.
+# LOOT_NEGATIVE=1 flips the pickaxe assertion to "drops nothing", so the run must
+# FAIL: the counterfactual for this family.
+phase_loot() {
+    echo "== O: the four carried block loot tables =="
+    end "gamerule random_tick_speed 0"
+    # The End has no sky light, so hostile mobs spawn on the arena floor; an
+    # Enderman killed the player 4 s into the first run of this phase (measured,
+    # 2026-11-21). Peaceful removes them and keeps them away without touching what
+    # a break rolls.
+    end "difficulty peaceful"
+    end "kill @e[type=!player]"
+    ctl wait 20 >/dev/null
+    local player
+    player=$(ctl status | jq -r '.server.name // empty')
+    [ -n "$player" ] || fail "cannot name the local player"
+    ctl command "gamemode survival @s" >/dev/null
+    for _ in $(seq 1 40); do
+        [ "$(ctl status | jq -r '.server.game_mode // ""')" = 0 ] && break
+        ctl wait 1 >/dev/null
+    done
+    [ "$(ctl status | jq -r '.server.game_mode // ""')" = 0 ] \
+        || fail "the loot phase needs a survival player, game_mode is $(ctl status | jq -r '.server.game_mode // ""')"
+    # Place BLOCK at (X,101,BLOCK_Z), optionally laying GROUND at (X,100,BLOCK_Z).
+    place() { # place X BLOCK [GROUND]
+        local x=$1 block=$2 ground=${3:-}
+        [ -z "$ground" ] || end "setblock $x 100 $BLOCK_Z $ground"
+        end "setblock $x 101 $BLOCK_Z $block"
+        ctl wait 4 >/dev/null
+    }
+    # The total of a break reply's `.drops` (every entry, whatever its id). A
+    # plain variable, not `${1:-{\}}` as a here-string: bash parses that default
+    # inside a nested function as `$1` followed by a stray `}`, so jq saw
+    # `<json>}` and exited 5 with "Unmatched '}'" (measured, 2026-11-21).
+    drops_total() {
+        local reply=${1:-}
+        [ -n "$reply" ] || reply='{}'
+        jq -r '[(.drops // {})[]] | add // 0' <<<"$reply"
+    }
+
+    # The stone pair: hand breaks nothing, a wooden pickaxe drops one.
+    for spec in "occultism:otherstone 232" "occultism:otherrock 234"; do
+        read -r id x <<<"$spec"
+        place "$x" "$id"
+        got=$(state_at "$x" 101 "$BLOCK_Z")
+        case "$got" in
+            "$id"*) ;;
+            *) fail "$id did not place: '$got'" ;;
+        esac
+        echo "  placed $got at x=$x"
+        # 1. A bare hand: the block breaks and the table must not roll.
+        ctl command "clear @s" >/dev/null
+        ctl wait 4 >/dev/null
+        REPLY=$(break_at "$x" 101 "$BLOCK_Z") || fail "cannot hand-break $id"
+        echo "  $id by hand: $(jq -c '{block_before,block,drops}' <<<"$REPLY")"
+        [ "$(jq -r '.block' <<<"$REPLY")" = "minecraft:air" ] \
+            || fail "the hand break left $(jq -r '.block' <<<"$REPLY") at x=$x"
+        HAND=$(drops_of "$REPLY" "$id")
+        HAND_TOTAL=$(drops_total "$REPLY")
+        [ "$HAND" = 0 ] || fail "a hand break of $id dropped $HAND of it (requires_tool must gate the table)"
+        [ "$HAND_TOTAL" = 0 ] || fail "a hand break of $id dropped $HAND_TOTAL items (requires_tool must gate the table)"
+        # 2. A wooden pickaxe: exactly one of the block.
+        hold 1 minecraft:wooden_pickaxe
+        place "$x" "$id"
+        got=$(state_at "$x" 101 "$BLOCK_Z")
+        case "$got" in
+            "$id"*) ;;
+            *) fail "$id did not place again: '$got'" ;;
+        esac
+        REPLY=$(break_at "$x" 101 "$BLOCK_Z") || fail "cannot mine $id with a wooden pickaxe"
+        echo "  $id with a wooden pickaxe: $(jq -c '{block_before,block,drops}' <<<"$REPLY")"
+        [ "$(jq -r '.block' <<<"$REPLY")" = "minecraft:air" ] \
+            || fail "the pickaxe break left $(jq -r '.block' <<<"$REPLY") at x=$x"
+        TOOL=$(drops_of "$REPLY" "$id")
+        TOOL_TOTAL=$(drops_total "$REPLY")
+        if [ "$LOOT_NEGATIVE" = 1 ]; then
+            echo "(negative: asserting the pickaxe break of $id drops nothing)"
+            [ "$TOOL" = 0 ] || fail "negative: $id dropped $TOOL with a wooden pickaxe (this run must fail)"
+        else
+            [ "$TOOL" = 1 ] || fail "a wooden pickaxe dropped $TOOL $id, expected exactly 1 ($(jq -c '.drops' <<<"$REPLY"))"
+            [ "$TOOL_TOTAL" = 1 ] || fail "the pickaxe break dropped $TOOL_TOTAL items in total, expected exactly 1"
+        fi
+    done
+
+    # The two plants: a bare hand drops exactly one of itself.
+    for spec in "occultism:otherflower 236" "occultism:otherworld_sapling_natural 238"; do
+        read -r id x <<<"$spec"
+        place "$x" "$id" minecraft:dirt
+        got=$(state_at "$x" 101 "$BLOCK_Z")
+        case "$got" in
+            "$id"*) ;;
+            *) fail "$id did not place on dirt: '$got'" ;;
+        esac
+        echo "  placed $got at x=$x (on dirt)"
+        ctl command "clear @s" >/dev/null
+        ctl wait 4 >/dev/null
+        REPLY=$(break_at "$x" 101 "$BLOCK_Z") || fail "cannot hand-break $id"
+        echo "  $id by hand: $(jq -c '{block_before,block,drops}' <<<"$REPLY")"
+        [ "$(jq -r '.block' <<<"$REPLY")" = "minecraft:air" ] \
+            || fail "the hand break left $(jq -r '.block' <<<"$REPLY") at x=$x"
+        GOT=$(drops_of "$REPLY" "$id")
+        GOT_TOTAL=$(drops_total "$REPLY")
+        [ "$GOT" = 1 ] || fail "a hand break of $id dropped $GOT of it, expected exactly 1 ($(jq -c '.drops' <<<"$REPLY"))"
+        [ "$GOT_TOTAL" = 1 ] || fail "a hand break of $id dropped $GOT_TOTAL items in total, expected exactly 1"
+    done
+    echo "  otherstone/otherrock: hand 0, wooden pickaxe 1 each; otherflower and the natural sapling: hand 1 each"
+}
+
+# The two carried crafting-table recipes (0.2.5). The driver opens a real table,
+# fills the 3x3 grid one item per cell, reads the result slot, takes it and reads
+# the inventory back; the recipe files are the jar's own shapes translated to the
+# 26.3 dialect (a bare id / `#tag`, and an alternative list of those strings).
+# CRAFT_NEGATIVE=1 inverts the fruit assertion so the run must FAIL.
+phase_craft() {
+    echo "== P: the two carried crafting recipes in a real crafting table =="
+    end "gamerule random_tick_speed 0"
+    # Standing still over the dark End floor: peaceful keeps hostile spawns away.
+    end "difficulty peaceful"
+    end "kill @e[type=!player]"
+    ctl wait 20 >/dev/null
+    end "setblock $CRAFT_X 100 $CRAFT_Z minecraft:stone"
+    ctl wait 4 >/dev/null
+    CRAFT_NEGATIVE=$CRAFT_NEGATIVE python3 "$PORT/tools/craft_recipes.py" \
+        "$SOCK" "$CTL" "$CRAFT_X" 101 "$CRAFT_Z" \
+        || fail "the crafting recipe check failed (see the CRAFT FAIL line above)"
+    echo "  the 3x3 fruit grid, the 3x3 seed grid and the mixed grid each made one occultism:demons_dream_essence;"
+    echo "  nine dirt and eight fruit + one dirt made nothing; the shapeless book recipe made one occultism:book_of_binding_empty"
 }
 
 echo "== launch (The End arena, launcher-built game with the package) =="
 if [ "$CONTROL_LEG" = 1 ] && [ -n "$CONTROL_GAME" ]; then control_leg; fi
 launch "$GAME" "$WORLD"
 arena
+
+# The red/green leg for the loot family: launch, arena, phase O only.
+if [ "$LOOT_ONLY" = 1 ]; then
+    phase_loot
+    echo "PASS: the four carried block loot tables: otherstone and otherrock drop nothing to a bare hand and exactly one of themselves to a wooden pickaxe, otherflower and otherworld_sapling_natural drop exactly one of themselves to a bare hand, each after being placed and read back in survival"
+    exit 0
+fi
+
+# The red/green leg for the crafting family: launch, arena, phase P only.
+if [ "$CRAFT_ONLY" = 1 ]; then
+    phase_craft
+    echo "PASS: the two carried crafting recipes craft at a real crafting table: a 3x3 grid of the datura fruit, of the datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless book recipe makes one occultism:book_of_binding_empty with its three items consumed"
+    exit 0
+fi
 
 echo "== A: the carried ids register (datura item and spirit_fire block) =="
 ctl command "item replace entity @s hotbar.0 with occultism:datura 1" >/dev/null
@@ -579,13 +814,23 @@ ctl give "$SEEDS" 4 >/dev/null || fail "cannot give $SEEDS"
 ctl wait 4 >/dev/null
 ctl select "$SEEDS" >/dev/null || fail "cannot select $SEEDS"
 PLANT_X=$((CROP_X0 + 8))
-ctl tp "$PLANT_X.5" 101 "$((CROP_Z + 3)).5" >/dev/null
-ctl wait 5 >/dev/null
-ctl look-at-block "$PLANT_X" 100 "$CROP_Z" up >/dev/null
-ctl wait 2 >/dev/null
-ctl interact "$PLANT_X" 100 "$CROP_Z" up >/dev/null
-ctl wait 6 >/dev/null
-PLANTED=$(state_at "$PLANT_X" 101 "$CROP_Z")
+# A click can be lost between the client's aim and the server's tick, and the
+# renderer holds the aim for a frame or two under load: retry while the block
+# still reads air (a planted crop cannot be planted twice).
+PLANTED=""
+for attempt in 1 2 3 4; do
+    ctl tp "$PLANT_X.5" 101 "$((CROP_Z + 3)).5" >/dev/null
+    ctl wait 4 >/dev/null
+    ctl look-at-block "$PLANT_X" 100 "$CROP_Z" up >/dev/null
+    ctl wait 3 >/dev/null
+    ctl interact "$PLANT_X" 100 "$CROP_Z" up >/dev/null
+    ctl wait 6 >/dev/null
+    PLANTED=$(state_at "$PLANT_X" 101 "$CROP_Z")
+    case "$PLANTED" in
+        "$CROP"*"age=0"*) break ;;
+    esac
+    echo "    planting attempt $attempt left '$PLANTED'" >&2
+done
 case "$PLANTED" in
     "$CROP"*"age=0"*) ;;
     *) fail "the seeds planted '$PLANTED', expected $STATE_YOUNG" ;;
@@ -655,11 +900,25 @@ case "$HARVESTED" in
 esac
 # The harvest's drops may be picked up while the player moves to the next probe,
 # so the count is the inventory's plus the world's (invariant under pickup).
-fruit_total() { echo $(( $(inv_count "$CROP") + $(count_items "$CROP" 6) )); }
-seed_total() { echo $(( $(inv_count "$SEEDS") + $(count_items "$SEEDS" 6) )); }
+# The harvest's drops may move into the inventory while a count runs, so the world
+# is read *first* and the inventory second: an item picked up between the two
+# snapshots is still counted (in the world), never in neither (measured: a run
+# read fruit=0 with the seeds present, 2026-11-21).
+fruit_total() {
+    local world
+    world=$(count_items "$CROP" 6)
+    echo $(( world + $(inv_count "$CROP") ))
+}
+seed_total() {
+    local world
+    world=$(count_items "$SEEDS" 6)
+    echo $(( world + $(inv_count "$SEEDS") ))
+}
 FRUIT=$(fruit_total)
 SEED_DROPS=$(seed_total)
 echo "  before the assertions: fruit=$FRUIT seeds=$SEED_DROPS (state $(state_at "$HARVEST_X" 101 "$CROP_Z"))"
+echo "  inventory: $(ctl inventory | jq -c '.counts')"
+echo "  item entities within 6: $(ctl entities 6 item | jq -c '[.entities[] | select(.kind == "item") | {item:.item.item,count:.item.count}]')"
 if [ "$NEGATIVE" = 1 ]; then
     echo "(negative: asserting a ripe crop drops no fruit)"
     [ "$FRUIT" = 0 ] || fail "negative: the ripe crop dropped $FRUIT fruit (this run must fail)"
@@ -717,38 +976,100 @@ echo "  the table's two branches: age 7 -> 1 fruit + $RIPE_SEEDS seeds, age 0 ->
 
 echo "== N: short grass: a hand break can yield the jar's 2% seed; shears never do =="
 # The jar's two loot modifiers: a 0.02 chance of one seed from short_grass (and
-# tall_grass), inverted on shears. Two fresh patches, one round each: the client
-# lands the first round of aimed breaks at a patch reliably and stops landing
-# after roughly 25 in one burst (measured 33 of 400 over 16 rounds), so a 200-roll
-# statistical assertion is not reproducible here. The *rule* is pinned by
-# runtime::tests (red then green) and the deterministic in-game proof is the
-# shears differential below: 25 breaks roll the grass's own loot and the seed is
-# suppressed. The hand round reports its seeds; a seed it observes is asserted.
+# tall_grass), inverted on shears. The client lands a fresh patch of aimed breaks
+# and drops them as the session goes on (measured: 33 of 400 over 16 rounds), so
+# a 200-roll statistical assertion is not reproducible here and each round takes
+# up to three *fresh* patches. The *rule* is pinned by runtime::tests (red then
+# green) and the deterministic in-game proof is the shears differential below:
+# the sheared breaks roll the grass's own loot and the seed is suppressed. The
+# hand round reports its seeds; a seed it observes is asserted.
 SEED_X=$((X0 + 16))
 SEED_Z=$((Z_SEED))
 SHEAR_Z=$((Z_SEED + 8))
 SEED_W=5
+# The End's arena floor has no sky light, so hostile mobs spawn on it: two rounds
+# of 25 aimed breaks take minutes, long enough for an Enderman to kill the
+# survival player and leave the death screen open, which makes every later
+# `ctl break` answer "the dead screen is open" (measured: 9 and 11 of 25 landed,
+# 2026-11-21). Peaceful keeps them away; the rounds still kill whatever is there.
+end "difficulty peaceful"
+end "kill @e[type=!player]"
+ctl wait 20 >/dev/null
+# Mine one block of the grass patch, standing two rows south of it in the End:
+# outside the patch, or on a row this loop has already broken, so the player is
+# never teleported *into* a solid block (the old `mine` teleported to x+1 in the
+# same row, inside the next grass block).
+#
+# The teleport is confirmed from the client before the aim: under load the client
+# learns `tp @s` a few ticks late, and a break aimed from the old position fails
+# fast ("no line of sight") — that is what turned a 25-of-25 round into 3 of 25
+# in a full run (measured, 2026-11-21). Each attempt re-teleports and re-aims.
+mine_patch() { # mine_patch X Z -> the last ctl break reply
+    local x=$1 z=$2 reply attempt
+    for attempt in 1 2 3 4; do
+        ctl command "execute in minecraft:the_end run tp @s $((x)).5 101 $((z - 2)).5" >/dev/null
+        wait_near "$((x)).5" 101 "$((z - 2)).5"
+        ctl look-at-block "$x" 101 "$z" up >/dev/null
+        ctl wait 3 >/dev/null
+        reply=$(ctl break "$x" 101 "$z" 2>/dev/null) && { echo "$reply"; return 0; }
+        echo "    break attempt $attempt at $x,101,$z failed: ${reply:-<no reply>}" >&2
+    done
+    return 1
+}
+
+# Wait until the client reports the position a `tp @s` put it at (the client learns
+# a server teleport a tick or two late), up to TICKS polls. Not fatal on its own:
+# the aim and the break below are what the phase asserts.
+wait_near() { # wait_near X Y Z [TICKS]
+    local x=$1 y=$2 z=$3 polls=${4:-20} pos
+    for _ in $(seq 1 "$polls"); do
+        pos=$(ctl state 2>/dev/null | jq -r '.player.position | @csv' 2>/dev/null || true)
+        if [ -n "$pos" ] && awk -F, -v x="$x" -v y="$y" -v z="$z" \
+            'BEGIN { exit !((($1-x)^2 + ($2-y)^2 + ($3-z)^2) < 0.36) }' <<<"$pos"; then
+            return 0
+        fi
+        ctl wait 2 >/dev/null
+    done
+    return 0
+}
+
 hand_round() { # hand_round X Z ITEM -> "<landed> <seeds> <grass drops>"
-    local x=$1 z=$2 item=$3 landed=0 seeds=0 grass=0 reply
+    local x=$1 z=$2 item=$3 landed=0 seeds=0 grass=0 reply patch pz
     ctl command "gamemode survival @s" >/dev/null
+    # A death screen left from a previous round blocks every ctl action.
+    ctl close >/dev/null 2>&1 || true
     ctl command "clear @s" >/dev/null
     if [ -n "$item" ]; then hold 1 "$item"; fi
-    end "fill $x 100 $z $((x + SEED_W - 1)) 100 $((z + SEED_W - 1)) minecraft:dirt"
-    end "fill $x 101 $z $((x + SEED_W - 1)) 101 $((z + SEED_W - 1)) minecraft:short_grass"
-    ctl wait 6 >/dev/null
-    if [ "$(block_name $((x + 1)) 101 $((z + 1)))" != "minecraft:short_grass" ]; then
-        echo "0 0 0"
-        return
-    fi
-    for dx in 0 1 2 3 4; do
-        for dz in 0 1 2 3 4; do
-            reply=$(mine "$((x + dx))" 101 "$((z + dz))" 2>/dev/null) || reply=""
-            case "$reply" in
-                *'"block_before"'*)
-                    landed=$((landed + 1))
-                    [ "$(drops_of "$reply" minecraft:short_grass)" -ge 1 ] && grass=$((grass + 1)) ;;
-            esac
+    # Up to three *fresh* patches, each used once: the client lands the first
+    # patch of aimed breaks and stops landing them as the session goes on under
+    # load (measured 25 of 25 on the first round and 9 of 25 on the second at
+    # load average 13, 2026-11-21; 33 of 400 over 16 rounds on 2026-11-21 too).
+    # The round still has to land 20 of its 25 aims, so this adapts to the load
+    # without weakening what the round proves.
+    for patch in 0 1 2; do
+        pz=$((z + patch * 6))
+        end "kill @e[type=!player]"
+        ctl wait 10 >/dev/null
+        end "fill $x 100 $pz $((x + SEED_W - 1)) 100 $((pz + SEED_W - 1)) minecraft:dirt"
+        end "fill $x 101 $pz $((x + SEED_W - 1)) 101 $((pz + SEED_W - 1)) minecraft:short_grass"
+        ctl wait 6 >/dev/null
+        if [ "$(block_name $((x + 1)) 101 $((pz + 1)))" != "minecraft:short_grass" ]; then
+            continue
+        fi
+        for dx in 0 1 2 3 4; do
+            for dz in 0 1 2 3 4; do
+                # stderr passes through: a failed attempt names its reply in the
+                # log (and keeps the e2e guard's idle detector fed during a slow
+                # round), while stdout is the break reply itself.
+                reply=$(mine_patch "$((x + dx))" "$((pz + dz))") || reply=""
+                case "$reply" in
+                    *'"block_before"'*)
+                        landed=$((landed + 1))
+                        [ "$(drops_of "$reply" minecraft:short_grass)" -ge 1 ] && grass=$((grass + 1)) ;;
+                esac
+            done
         done
+        [ "$landed" -ge 20 ] && break
     done
     ctl wait 10 >/dev/null
     seeds=$(( $(inv_count "$SEEDS") + $(count_items "$SEEDS" 8) ))
@@ -772,4 +1093,8 @@ echo "  shears breaks: $SHEAR_LANDED of 25 landed, $SHEAR_GRASS dropped grass, $
 [ "$SHEAR_GRASS" -ge 1 ] \
     || fail "the shears breaks dropped no short_grass, so no loot rolled and the control proves nothing"
 
-echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed"
+phase_loot
+
+phase_craft
+
+echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand and exactly one to a wooden pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty"

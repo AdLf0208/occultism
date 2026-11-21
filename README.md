@@ -1,10 +1,11 @@
-# Occultism for Horizon — spirit fire (slice 1)
+# Occultism for Horizon — spirit fire, the datura crop and the carried crafting recipes
 
 A Horizon port of [Occultism](https://github.com/klikli-dev/occultism) 1.225.0
-(MIT) for Minecraft Java `26.3`, as a **native SDK package** (mod API 0.2). This
-is **slice 1**: the **spirit-fire conversion loop**, the gateway of Occultism's
-ritual chain, with the book-free data that loop reads (27
-`occultism:spirit_fire` recipes).
+(MIT) for Minecraft Java `26.3`, as a **native SDK package** (mod API 0.2). The
+delivered slices are the **spirit-fire conversion loop** (its gateway), the
+**datura crop** that lights it, the four carried **loot tables**, and the two
+**crafting-table recipes** the package can carry (`demons_dream_essence`,
+`book_of_binding_empty`).
 
 ## What works
 
@@ -18,19 +19,28 @@ ritual chain, with the book-free data that loop reads (27
   taboo book, the book of binding, the spirit-attuned gem, otherstone and
   otherrock.
 - **Painting it**: right-click the fire with a chalk to change its colour.
+- **Growing it**: `occultism:datura_seeds` plant the `occultism:datura` crop on
+  farmland (ages 0..7, the wheat template), it ripens by random tick, a right
+  click harvests the ripe crop (its loot table's fruit and seed, replanted), and
+  short or tall grass broken by hand has the jar's 2% chance of a seed.
+- **Crafting**: a 3x3 grid of Demon's Dream Fruit — or of the seeds, or a mix —
+  makes one `occultism:demons_dream_essence`; the shapeless awakened feather +
+  purified ink + taboo book makes the Book of Binding.
 - `/occultism info <x> <y> <z>` and `/occultism recipes` for a readout.
 
 ## What it does not do (yet)
 
 The pentacle rituals (158 recipes), the summoned spirits and their AI, the
-Otherworld dimension, the guide book and accessory slots. See
+Otherworld dimension, the guide book, accessory slots, and the crafting recipes
+whose result (the otherstone/otherrock building family, the impure chalks) or
+ingredients this package does not carry yet. See
 [`notes.md`](notes.md) for the full gap list and the reason for each.
 
 ## Installing and building
 
 One file: `occultism.hmod`. It is the whole mod — `horizon-mod.toml`,
 `src/lib.rs` + `src/support.rs` (the code), `src/runtime.rs` (the pure rules and
-their 19 tests), `assets/` and `data/` (the carried block, items, recipes, loot,
+their 36 tests), `assets/` and `data/` (the carried block, items, recipes, loot,
 tags and lang) and the licence notices.
 
 A native SDK package is built against the game by the launcher:
