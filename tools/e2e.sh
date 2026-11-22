@@ -75,6 +75,14 @@
 #                    back, broken in survival, and the `ctl break` reply's
 #                    `.drops` asserted.
 #
+# The six otherstone/otherrock building blocks (0.2.6) are phase Q: their six
+# recipes at the phase-P table (three stones in the middle row -> six slabs, the
+# stair step -> four, two rows -> six, plus a three-dirt differential), then each
+# block placed, its default state read back, a hand break (no drop) and a wooden
+# pickaxe break (exactly one), two walls connecting, and a double slab dropping
+# two. BUILDING_ONLY=1 is this family's red/green leg; BUILDING_NEGATIVE=1
+# inverts the slab assertion, so the run must FAIL.
+#
 # SELFTEST=1 flips the count assertion (3 awakened feathers -> 2): it must FAIL,
 # proving the scenario can fail. NEGATIVE=1 flips the ripe-crop harvest's
 # assertion (a ripe crop must drop a fruit) the same way; LOOT_NEGATIVE=1 is the
@@ -113,6 +121,12 @@ CRAFT_NEGATIVE=${CRAFT_NEGATIVE:-0}
 # `CRAFT_ONLY=1` launches and runs only the crafting phase (the red/green leg for
 # that family), then exits 0.
 CRAFT_ONLY=${CRAFT_ONLY:-0}
+# The building family's own counterfactual: a middle row of three stones must
+# make nothing, so this run MUST fail (see phase Q).
+BUILDING_NEGATIVE=${BUILDING_NEGATIVE:-0}
+# `BUILDING_ONLY=1` launches and runs only the six-building-block phase (the
+# red/green leg for that family), then exits 0.
+BUILDING_ONLY=${BUILDING_ONLY:-0}
 # `CONTROL_LEG=1` runs the packaged leg first on the same socket, as 0.2.0/0.2.2 did.
 # The default is a *separate* invocation (`GAME=$CONTROL_GAME`), because a control
 # launch in the same HORIZON_HOME leaves the main game without its log file and the
@@ -145,6 +159,10 @@ BLOCK_Z=30
 # The crafting station (phase P): a table on the stone floor, south of the crops.
 CRAFT_X=222
 CRAFT_Z=38
+# The building family (phase Q): six blocks in a row north of the crop stations,
+# the wall pair three blocks north of them. The six recipes craft at the phase-P
+# station, whose table the driver lays itself.
+BUILDING_Z=33
 
 if [ -z "$GAME" ]; then
     echo "GAME is unset: pass a game built by 'horizon-launcher native-build .'" >&2
@@ -370,6 +388,16 @@ control_leg() {
         [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
     done
     echo "  without the package: none of the four loot-table blocks either"
+    # The six building blocks (0.2.6) must be unknown too.
+    for id in occultism:otherstone_slab occultism:otherstone_stairs \
+              occultism:otherstone_wall occultism:otherrock_slab \
+              occultism:otherrock_stairs occultism:otherrock_wall; do
+        ctl command "execute in minecraft:the_end run setblock $X0 101 0 $id" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        name=$(block_name "$X0" 101 0)
+        [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
+    done
+    echo "  without the package: none of the six building blocks either"
     ctl quit >/dev/null 2>&1 || true
 }
 
@@ -509,6 +537,30 @@ phase_craft() {
     echo "  nine dirt and eight fruit + one dirt made nothing; the shapeless book recipe made one occultism:book_of_binding_empty"
 }
 
+# The six `otherstone`/`otherrock` building blocks (0.2.6): the slab, stair and
+# wall of each stone, in a real crafting table (three stones in the middle row
+# make six slabs, the stair step makes four, two rows make six), then each block
+# placed by `setblock`, its default state read back, a bare hand break (no drop:
+# `requires_tool`) and a wooden pickaxe break (exactly one). Two walls side by
+# side must connect, and a double slab drops the jar table's two.
+# BUILDING_NEGATIVE=1 inverts the slab assertion so the run must FAIL.
+phase_building() {
+    echo "== Q: the six otherstone/otherrock building blocks =="
+    end "gamerule random_tick_speed 0"
+    # Standing still over the dark End floor: peaceful keeps hostile spawns away.
+    end "difficulty peaceful"
+    end "kill @e[type=!player]"
+    ctl wait 20 >/dev/null
+    end "setblock $CRAFT_X 100 $CRAFT_Z minecraft:stone"
+    ctl wait 4 >/dev/null
+    BUILDING_NEGATIVE=$BUILDING_NEGATIVE python3 "$PORT/tools/building_recipes.py" \
+        "$SOCK" "$CTL" "$CRAFT_X" 101 "$CRAFT_Z" \
+        || fail "the building block check failed (see the BUILDING FAIL line above)"
+    echo "  the six building recipes craft their declared counts with every ingredient consumed;"
+    echo "  each block reads its template's default state, drops nothing to a hand and exactly one to a wooden pickaxe;"
+    echo "  two walls connect, and a double slab drops the jar table's two"
+}
+
 echo "== launch (The End arena, launcher-built game with the package) =="
 if [ "$CONTROL_LEG" = 1 ] && [ -n "$CONTROL_GAME" ]; then control_leg; fi
 launch "$GAME" "$WORLD"
@@ -525,6 +577,13 @@ fi
 if [ "$CRAFT_ONLY" = 1 ]; then
     phase_craft
     echo "PASS: the two carried crafting recipes craft at a real crafting table: a 3x3 grid of the datura fruit, of the datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless book recipe makes one occultism:book_of_binding_empty with its three items consumed"
+    exit 0
+fi
+
+# The red/green leg for the building family: launch, arena, phase Q only.
+if [ "$BUILDING_ONLY" = 1 ]; then
+    phase_building
+    echo "PASS: the six otherstone/otherrock building recipes craft at a real table (three stones in the middle row make six slabs, the stair step four stairs, two rows six walls, every ingredient consumed; three dirt make nothing), each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two"
     exit 0
 fi
 
@@ -1097,4 +1156,6 @@ phase_loot
 
 phase_craft
 
-echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand and exactly one to a wooden pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty"
+phase_building
+
+echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand and exactly one to a wooden pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two"

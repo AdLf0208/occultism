@@ -1,6 +1,6 @@
 id = "occultism"
 name = "Occultism"
-version = "0.2.5"
+version = "0.2.6"
 description = """A port of Occultism 1.225.0 for Horizon: the spirit-fire conversion loop and the datura it
 is lit with. A datura (Demon's Dream Fruit) struck with flint and steel or a fire charge lights
 occultism:spirit_fire; any item entity standing in that fire which one of the carried
@@ -12,14 +12,16 @@ scoped to the world, dimension and position). A spectator's click changes nothin
 The datura crop grows from occultism:datura_seeds on farmland by random tick (the wheat template, ages
 0-7), is harvested by right-click at its last age (the loot table's fruit and seeds, replanted at age 0),
 and breaks by hand into its loot table; breaking short or tall grass without shears has the jar's 2%
-chance of a seed. The package carries the crop block, 42 items, 5 loot tables (the crop's and the four
-carried blocks'), 27 spirit-fire recipes, 2 crafting-table recipes, 9 tags and the models, textures and
-lang they need. The crafting recipes are the ones whose result and every ingredient the package already
-provides: a 3x3 grid of the datura fruit or the datura seed (the #c:crops/datura / #c:seeds/datura
-alternative) makes one Demon's Dream Essence, and the shapeless awakened feather + purified ink + taboo
-book makes the Book of Binding - both obtainable in survival for the first time. The pentacle rituals,
-the summoned spirits and their AI, the GeckoLib models, the Otherworld dimension, the guide book, Curios
-slots and the spirit-job recipes are not ported yet."""
+chance of a seed. The package carries twelve blocks, 52 items, 11 loot tables (the crop's, the four
+carried blocks' and the six building blocks'), 27 spirit-fire recipes, 8 crafting-table recipes, 12 tags
+and the models, textures and lang they need. The crafting recipes are the ones whose result and every
+ingredient the package already provides: a 3x3 grid of the datura fruit or the datura seed (the
+#c:crops/datura / #c:seeds/datura alternative) makes one Demon's Dream Essence, the shapeless awakened
+feather + purified ink + taboo book makes the Book of Binding, and the six otherstone/otherrock building
+recipes make their slabs, stairs and walls (three stones in the middle row make six slabs, the stair step
+four stairs, two rows six walls) - the first blocks these stones build. The pentacle rituals, the summoned
+spirits and their AI, the GeckoLib models, the Otherworld dimension, the guide book, Curios slots and the
+spirit-job recipes are not ported yet."""
 authors = ["klikli-dev", "AdLf0208"]
 # The original's licence: MIT (klikli-dev/Occultism, tag release/v1.21.1-1.225.0); its text and
 # copyright notice travel inside the package as LICENSE / LICENSE-NOTICE.md.
@@ -31,8 +33,8 @@ api = "0.2"
 # single player's integrated server belongs to the client installation, so "both".
 side = "both"
 # The one shared value every manifest carries ("May add blocks, items, mob effects and entity
-# types"): the package declares the spirit-fire block, the datura crop, their 42 items and a
-# creative tab.
+# types"): the package declares the spirit-fire block, the datura crop, the six otherstone/otherrock
+# building blocks, their 48 items and a creative tab.
 capabilities = ["registries"]
 
 [native]

@@ -236,3 +236,41 @@ The phase-P transcript, the enumeration of the 166 jar crafting recipes (2 carri
 chalks and the 38-recipe otherstone/otherrock family excluded), and the harness behaviours this
 slice measured (offscreen for menus, the death screen during phase N, the swallowed break
 diagnostics, the planting-click retry) are in `notes.md` under "Slice 4 (0.2.5, 2026-11-21)".
+
+## 9. SDK 0.2.6 (the six `otherstone`/`otherrock` building blocks), pin `0a875da`
+
+Every step in a `ports/tools/build-slot.sh` lease with `CARGO_INCREMENTAL=0`; no `--target-dir`, no
+private slots. Evidence in `../_shared/evidence/occultism/` (ladder) and
+`../_shared/evidence/occultism-e2e/` (game legs). The slice adds six block declarations, six 26.3
+recipes, six loot tables (one of which the jar omits), sixteen block models, six blockstates, six
+item models, six lang keys, four block tags and sixteen creative-tab entries; the enumeration and
+the upstream defect are in `notes.md`, §"Slice 5".
+
+| Step | Command | Result |
+|---|---|---|
+| red 1 (unit, the dialect) | `cargo test --offline` with the jar's six recipes and five loot tables carried verbatim | **38 passed; 2 failed** — `the_building_recipes_are_the_jars_shapes_in_the_26_3_dialect` ("carries the 1.21.1 object-form ingredient \"item\":") and the loot table's `"function":` shape — `sdk-test-red-0.2.6.log` |
+| red 2 (unit, a test assertion) | same, after the dialect rewrite | **39 passed; 1 failed** — my first loot test demanded a `modifier` list in every table; 26.3 does not (fixed the assertion, no product change) — `sdk-test-red2-0.2.6.log` |
+| red 3 (unit, the upstream defect) | same, after the recipes | **39 passed; 1 failed** — `otherrock_slab.json: No such file or directory`: the table the jar does not ship — `sdk-test-red3-0.2.6.log` |
+| green (unit) | `cargo test --offline` | **40 passed, 0 failed** — `sdk-test.log` |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **`REPRODUCIBLE`**: 145,445 B, `7b382835…0992c` — `sdk-build-0.2.6.log`, `sdk-build-second-0.2.6.log` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | 145,445 B, `7b382835c0b9b7325809c4b542d803c47c0f617865b5d51168aefd828120992c`, **253 entries**, no packed `Cargo.lock`, declares **0.2.6**, `src/runtime.rs` inside = outside (`fea1d79d…`) — `sdk-artifact-0.2.6.txt` |
+| tree match | a third build from the final tree + `cmp occultism.hmod` | `PACKAGE_MATCHES_TREE` (the delivered file is the tree's build) — `sdk-artifact-0.2.6.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed) | exit 0, `occultism 0.2.6 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` | `0a875da  made for`, exit 0 — `sdk-fits.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` | `0b14f8a  fits`, exit 0 — `sdk-fits-next.log` (the short names needed GitHub's releases list, HTTP 403 on 2026-11-22; a full SHA resolves from `.horizon/cache/`) |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** |
+| game build | `launcher-game.sh build occultism` (stale export removed) | `Compiling occultism (1 of 1)`, tag `native-0a875da-726d4571fa66`, manifest `version = "0.2.6"` — `launcher-build-0.2.6.log` |
+| red (in game, the family) | `BUILDING_ONLY=1 bash tools/e2e.sh` against the **0.2.5** export | **FAIL** + `EXIT:1` (`the otherstone slab grid made None x0`) — `e2e-building-red-0.2.5-package.log` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen) | **PASS** + `EXIT:0` — `e2e-default-0.2.6.log` (A..Q) |
+| in game (building leg) | `BUILDING_ONLY=1` | **PASS** + `EXIT:0` — `e2e-building-0.2.6.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME= bash tools/e2e.sh` | **FAIL** + `EXIT:1` (`the datura item did not register`) — `e2e-control-0.2.6.log` |
+| in game (control ids) | `CONTROL_LEG=1 GAME=$CONTROL_GAME CONTROL_GAME=$CONTROL_GAME bash tools/e2e.sh` | **FAIL** + `EXIT:1`, after `none of the six building blocks either` — `e2e-control-ids-0.2.6.log` |
+| fail-capability (scenario) | `SELFTEST=1` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) — `e2e-selftest-0.2.6.log` |
+| fail-capability (this family) | `BUILDING_ONLY=1 BUILDING_NEGATIVE=1` | **FAIL** + `EXIT:1` (`negative: the slab grid made occultism:otherstone_slab x6, expected nothing`) — `e2e-negative-building-0.2.6.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | 30 logs, 30 ok, 0 missing-exit, 0 bad-exit |
+
+The phase-Q transcript (the six grids, each block's default state, the hand/pickaxe drop pair, the
+wall connection, the double slab dropping two), the brief-vs-artefact conflict on `requires_tool`,
+and the two loot engines in the tree are in `notes.md` under "Slice 5 (0.2.6, 2026-11-22)".

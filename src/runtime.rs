@@ -811,6 +811,204 @@ mod tests {
         );
     }
 
+    /// The six `otherstone`/`otherrock` building blocks this slice carries, with
+    /// the vanilla template each copies and the count its jar recipe makes.
+    const BUILDING: [(&str, &str, u32); 6] = [
+        ("otherstone_slab", "minecraft:stone_slab", 6),
+        ("otherstone_stairs", "minecraft:stone_stairs", 4),
+        ("otherstone_wall", "minecraft:cobblestone_wall", 6),
+        ("otherrock_slab", "minecraft:stone_slab", 6),
+        ("otherrock_stairs", "minecraft:stone_stairs", 4),
+        ("otherrock_wall", "minecraft:cobblestone_wall", 6),
+    ];
+
+    /// The port's own content tree, as `cargo test` sees it (the package is the
+    /// unit under test: a missing file is a data defect, not a build one).
+    fn content(relative: &str) -> String {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("data")
+            .join(relative);
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+    }
+
+    #[test]
+    fn the_building_recipes_are_the_jars_shapes_in_the_26_3_dialect() {
+        // The jar's six `building_blocks/crafting` recipes: three (or six) of the
+        // plain block in the middle row make six slabs, the jar's stair step makes
+        // four stairs, and two rows of three make six walls. The 26.3 loader reads
+        // an ingredient as a bare `"id"`; the jar's `{"item": …}` object is
+        // dropped without a word, and the grid then yields nothing (the 0.2.5
+        // finding, pinned there for the two carried table recipes).
+        for (name, _, count) in BUILDING {
+            let text = content(&format!("occultism/recipe/crafting/{name}.json"));
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{name} carries the 1.21.1 object-form ingredient {object_form}, \
+                     which the 26.3 loader drops: {text}"
+                );
+            }
+            assert!(
+                text.contains("\"minecraft:crafting_shaped\""),
+                "{name} is the jar's shaped recipe: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{name}\"")),
+                "{name} does not make itself: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"count\": {count}")),
+                "{name} does not make {count}: {text}"
+            );
+        }
+        // The jar's own patterns, cell by cell.
+        let slab = content("occultism/recipe/crafting/otherstone_slab.json");
+        assert!(
+            slab.contains("\"ooo\""),
+            "the slab recipe is one row of three: {slab}"
+        );
+        let stairs = content("occultism/recipe/crafting/otherrock_stairs.json");
+        for row in ["\"#  \"", "\"## \"", "\"###\""] {
+            assert!(
+                stairs.contains(row),
+                "the stair recipe lost {row}: {stairs}"
+            );
+        }
+        let wall = content("occultism/recipe/crafting/otherrock_wall.json");
+        assert_eq!(
+            wall.matches("\"ooo\"").count(),
+            2,
+            "the wall recipe is two rows of three: {wall}"
+        );
+        // Every ingredient is the plain block the slab/stairs/wall is made of.
+        for (name, _, _) in BUILDING {
+            let text = content(&format!("occultism/recipe/crafting/{name}.json"));
+            let block = if name.starts_with("otherstone") {
+                "occultism:otherstone"
+            } else {
+                "occultism:otherrock"
+            };
+            assert!(
+                text.contains(&format!("\"{block}\"")),
+                "{name} is not made of {block}: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_building_block_has_a_26_3_loot_table_that_drops_itself() {
+        // The rule the jar breaks: `data/occultism/loot_table/blocks/otherrock_slab.json`
+        // **does not exist** in Occultism 1.225.0 (the jar carries the other five
+        // building tables and not that one), so the block drops nothing at all.
+        // The port ships it; this test is the fail-capable pin.
+        for (name, _, _) in BUILDING {
+            let text = content(&format!("occultism/loot_table/blocks/{name}.json"));
+            for legacy in ["\"function\":", "\"functions\":"] {
+                assert!(
+                    !text.contains(legacy),
+                    "{name}'s loot table uses the 1.21.1 {legacy} shape, which the 26.3 \
+                     loader does not read (it reads `modifier`): {text}"
+                );
+            }
+            assert!(
+                text.contains(&format!("\"name\": \"occultism:{name}\"")),
+                "{name}'s loot table does not drop itself: {text}"
+            );
+        }
+        // A slab's table is the jar's: one when single, two when double. The
+        // branch is the 26.3 `match_block` condition on the `type=double` state.
+        for name in ["otherstone_slab", "otherrock_slab"] {
+            let text = content(&format!("occultism/loot_table/blocks/{name}.json"));
+            assert!(
+                text.contains("\"minecraft:match_block\"")
+                    && text.contains("\"type\": \"double\"")
+                    && text.contains("\"count\": 2"),
+                "{name}'s double-slab branch is missing: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_building_blocks_copy_the_upstream_stone_templates() {
+        // Upstream (`OccultismBlocks`): the slabs are `ofFullCopy(OTHERSTONE)`
+        // (hardness 1.5, resistance 30, `requiresCorrectToolForDrops`); the stairs
+        // and walls are `Properties.of().strength(1.5f).requiresCorrectToolForDrops()`
+        // (hardness and resistance 1.5). Every one of them needs a pickaxe, so a
+        // bare-hands break rolls nothing.
+        for (name, template, _) in BUILDING {
+            let text = content(&format!("occultism/horizon/block/{name}.json"));
+            assert!(
+                text.contains(&format!("\"template\": \"{template}\"")),
+                "{name} does not copy {template}: {text}"
+            );
+            assert!(
+                text.contains("\"requires_tool\": true"),
+                "{name} must be gated on a pickaxe as upstream gates it: {text}"
+            );
+            assert!(
+                text.contains("\"hardness\": 1.5"),
+                "{name} is not hardness 1.5: {text}"
+            );
+            let resistance = if name.contains("_slab") { 30.0 } else { 1.5 };
+            assert!(
+                text.contains(&format!("\"explosion_resistance\": {resistance}")),
+                "{name} is not resistance {resistance}: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_building_block_has_its_state_model_and_name() {
+        // A block with no blockstate renders as the missing model, an item with no
+        // model is a purple-black cube, and an id absent from `mineable/pickaxe`
+        // never drops to a pickaxe; a wall outside `minecraft:walls` does not
+        // connect to its neighbours. The tags are also how vanilla recipes find
+        // the blocks.
+        let pickaxe = content("minecraft/tags/block/mineable/pickaxe.json");
+        let walls = content("minecraft/tags/block/walls.json");
+        let slabs = content("minecraft/tags/block/slabs.json");
+        let stairs = content("minecraft/tags/block/stairs.json");
+        let lang = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("assets/occultism/lang/en_us.json"),
+        )
+        .expect("the package's lang file");
+        for (name, _, _) in BUILDING {
+            let id = format!("occultism:{name}");
+            assert!(
+                pickaxe.contains(&format!("\"{id}\"")),
+                "{id} is not in mineable/pickaxe"
+            );
+            let tag = if name.ends_with("_wall") {
+                &walls
+            } else if name.ends_with("_slab") {
+                &slabs
+            } else {
+                &stairs
+            };
+            assert!(
+                tag.contains(&format!("\"{id}\"")),
+                "{id} is missing from its tag"
+            );
+            assert!(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join(format!("assets/occultism/blockstates/{name}.json"))
+                    .is_file(),
+                "{id} has no blockstate"
+            );
+            assert!(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join(format!("assets/occultism/models/item/{name}.json"))
+                    .is_file(),
+                "{id} has no item model"
+            );
+            assert!(
+                lang.contains(&format!("\"block.occultism.{name}\"")),
+                "{id} has no lang entry"
+            );
+        }
+    }
+
     #[test]
     fn a_conversion_is_scoped_to_its_world_and_dimension() {
         let mut recent = Recent::default();

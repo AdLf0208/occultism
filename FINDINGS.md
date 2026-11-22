@@ -142,3 +142,9 @@ the `/occultism info|fires|recipes` readouts.
 | natural sapling | grows the Otherworld tree, `uncovered` reveals it | `short_grass` class (no growth, no feature), `uncovered` never set |
 | datura | edible (`SpiritHealingItem`), can grant Third Eye | a plain stack-64 item |
 | impure chalks | crafted from crushed materials | carried items; their recipes are slice 3 |
+
+## Upstream defects found (and fixed in the port)
+
+| Artefact | Defect | Proof | Port |
+|---|---|---|---|
+| `data/occultism/loot_table/blocks/otherrock_slab.json` | **absent** from Occultism 1.225.0, although `OccultismBlocks.OTHERROCK_SLAB` is `LootTableType.CUSTOM` (no generated table either), so the block would drop nothing | `unzip -l occultism-1.21.1-neoforge-1.225.0.jar \| grep loot_table/blocks \| grep slab` lists the otherstone / othercobblestone / otherplanks / otherstone_bricks / polished slabs and not this one; the unit test that every building block has a table fails on the path | the port ships `otherrock_slab.json` (the same table as `otherstone_slab`), proven in game by a wooden-pickaxe break dropping exactly one (0.2.6) |
