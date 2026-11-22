@@ -7,6 +7,18 @@
     "occultism:otherstone_wall",
     "occultism:otherrock_slab",
     "occultism:otherrock_stairs",
-    "occultism:otherrock_wall"
+    "occultism:otherrock_wall",
+    "occultism:otherstone_bricks",
+    "occultism:chiseled_otherstone_bricks",
+    "occultism:cracked_otherstone_bricks",
+    "occultism:otherrock_bricks",
+    "occultism:chiseled_otherrock_bricks",
+    "occultism:cracked_otherrock_bricks",
+    "occultism:otherstone_bricks_slab",
+    "occultism:otherrock_bricks_slab",
+    "occultism:otherstone_bricks_stairs",
+    "occultism:otherrock_bricks_stairs",
+    "occultism:otherstone_bricks_wall",
+    "occultism:otherrock_bricks_wall"
   ]
 }

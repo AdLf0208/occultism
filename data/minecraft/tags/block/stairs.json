@@ -1,6 +1,8 @@
 {
   "values": [
     "occultism:otherstone_stairs",
-    "occultism:otherrock_stairs"
+    "occultism:otherrock_stairs",
+    "occultism:otherstone_bricks_stairs",
+    "occultism:otherrock_bricks_stairs"
   ]
 }

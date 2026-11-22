@@ -1,0 +1,32 @@
+{
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "modifier": [
+            {
+              "condition": {
+                "blocks": "occultism:otherstone_bricks_slab",
+                "state": {
+                  "type": "double"
+                },
+                "type": "minecraft:match_block"
+              },
+              "count": 2,
+              "type": "minecraft:set_count"
+            },
+            {
+              "type": "minecraft:explosion_decay"
+            }
+          ],
+          "name": "occultism:otherstone_bricks_slab",
+          "type": "minecraft:item"
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "occultism:blocks/otherstone_bricks_slab",
+  "type": "minecraft:block"
+}

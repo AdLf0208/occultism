@@ -1,6 +1,8 @@
 {
   "values": [
     "occultism:otherstone_wall",
-    "occultism:otherrock_wall"
+    "occultism:otherrock_wall",
+    "occultism:otherstone_bricks_wall",
+    "occultism:otherrock_bricks_wall"
   ]
 }

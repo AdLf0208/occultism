@@ -23,6 +23,9 @@ plus the one-click/one-harvest fix the full run found (§"Slice 4").
 **0.2.6 (2026-11-22):** the first tier of the `otherstone`/`otherrock` building
 family — the six slabs, stairs and walls, with their recipes, loot tables,
 models, tags and the jar's missing `otherrock_slab` table (§"Slice 5").
+**0.2.7 (2026-11-22):** the bricks tier of the same family — the two brick
+blocks with their slab/stair/wall, the chiseled pair and the smelted cracked
+pair, and the jar's missing `otherrock_bricks_slab` table (§"Slice 6").
 
 ## Class + tier and the approach
 
@@ -1323,3 +1326,259 @@ pattern: craft each brick family, place it, read `occultism:otherstone_bricks` b
 wooden pickaxe and assert one in `.drops`; the `chiseled`/`cracked` pair additionally lets the slice
 prove a **two-step** chain (stone → bricks → chiseled) in one grid. Tier fits: still `data` inside a
 `deep` mod. Gap line: the same 0.2.5 coverage row, now 32 of 38 recipes left.
+
+## Slice 6 (0.2.7, 2026-11-22) — the bricks tier of the building family
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). Class
+**content**, tier **deep** (ledger row 345). Licence **MIT**, ours on `main` → an
+`Update occultism 0.2.7` publication.
+
+**Gap line it comes from:** the 0.2.5 coverage table — *"the 17 impure-chalk craftings and the
+38-recipe otherstone/otherrock building family — **not carried**"* — and the 0.2.6 parity row
+*"the 32 other building recipes (bricks, polished, chiseled, cobblestone families, frames, pedestals,
+tablets, sacrificial bowls, controllers) — **not carried** … the next tier of the family"*, whose
+`## Next slice` named this exact tier.
+
+**Shape:** the data half of a `deep` mod, exactly as slices 3–5. No runtime rule, no glue, no block
+entity: twelve blocks copy vanilla's stone/slab/stair/wall templates (states, placement, shapes and
+the `requires_tool` gate come from the template rows), the engine rolls the loot tables on a player
+break, the crafting table matches the ten grids and a vanilla furnace runs the two smelting recipes.
+
+### What was carried (and from where)
+
+| family | files | source |
+|---|---|---|
+| block declarations | 12 (`data/occultism/horizon/block/<name>.json`) | port-authored from `OccultismBlocks` (tag `release/v1.21.1-1.225.0`) |
+| crafting recipes | 10 (`.../recipe/crafting/<name>.json`) | the jar's `building_blocks/crafting/*` rewritten to the 26.3 dialect |
+| smelting recipes | 2 (`.../recipe/smelting/cracked_*.json`) | the jar's `smelting/cracked_*` in the 26.3 dialect |
+| loot tables | 12 (`.../loot_table/blocks/<name>.json`) | the jar's eleven + **the one the jar does not have** (`otherrock_bricks_slab`) |
+| blockstates | 12 | the jar's (unchanged format) |
+| block models | 22 | the jar's (bricks, slab + slab_top, stairs + inner + outer, wall post + side + side_tall, chiseled, cracked, per stone) |
+| item models | 12 | the jar's |
+| textures | 6 | the jar's `block/{otherstone,otherrock,chiseled_*,cracked_*}_bricks.png` |
+| lang | 12 keys | the jar's `en_us` (`Otherstone Bricks`, `Cracked Otherrock Bricks`, …) |
+| tags | `minecraft:mineable/pickaxe` (+10), `walls`/`slabs`/`stairs` (+2 each) | the jar's datagen output |
+| creative tab | 12 entries | after the six 0.2.6 building blocks, in the jar's family order |
+
+### The rule under test
+
+| block | template | hardness / resistance | `requires_tool` | recipe |
+|---|---|---|---|---|
+| `otherstone_bricks`, `chiseled_*`, `cracked_*` | `minecraft:stone` | 1.5 / 30 | **true** | bricks `oo`/`oo` → 4; chiseled two brick slabs → 1; cracked by smelting |
+| `otherstone_bricks_slab` | `minecraft:stone_slab` | 1.5 / 30 | **true** | `ooo` (middle row) → 6 |
+| `otherstone_bricks_stairs` | `minecraft:stone_stairs` | 1.5 / 1.5 | **true** | `#  `/`## `/`###` → 4 |
+| `otherstone_bricks_wall` | `minecraft:cobblestone_wall` | 1.5 / 1.5 | **true** | `ooo`/`ooo` → 6 |
+| `otherrock_*` | the same templates | the same | **true** | the same, `otherrock` |
+
+Upstream (`OccultismBlocks.java:190-246`): the bricks, chiseled and cracked blocks are
+`ofFullCopy(OTHERSTONE)` (hardness 1.5, resistance 30, `requiresCorrectToolForDrops`), the slab
+`ofFullCopy(OTHERSTONE_BRICKS)`, the stair and wall `of().strength(1.5f).requiresCorrectToolForDrops()`.
+All twelve are pickaxe-gated, so a hand break breaks them and rolls nothing — the same fail-capable
+pair slice 3 used for `otherstone`, measured again here for all twelve.
+
+Source read: `klikli-dev/occultism` at tag `release/v1.21.1-1.225.0`
+(commit `91de0d2a46e05ce315cc5afd292d266d4f46e7ab`, 2026-11-02), files
+`registry/OccultismBlocks.java` (the twelve declarations and their properties),
+`datagen/recipe/OccultismRecipeProvider.java` (the grid shapes and the chiseled-pair source) and
+`datagen/tags/OccultismBlockTagProvider.java` (which tag each block joins). The clone was deleted after
+these findings; the jar stays in `../_shared/licence-cache/` as the licence/asset evidence.
+
+The chiseled pair is **two `otherstone_bricks_slab` stacked**, not a bricks 2x2: the jar's own recipe
+(`chiseled_otherstone_bricks.json`, pattern `["o","o"]`). That is what makes this tier a chain
+(stones → bricks → slab → chiseled) rather than twelve independent grids, and the e2e proves it in one
+opened table.
+
+### Upstream defect fixed (the second instance of the 0.2.6 omission)
+
+**`otherrock_bricks_slab` has no loot table in Occultism 1.225.0 either.** The jar carries eleven of
+these twelve tables and omits the otherrock brick slab, while `OccultismBlocks.OTHERROCK_BRICKS_SLAB`
+is registered `LootTableType.CUSTOM` (so nothing generates a default). `unzip -l … | grep
+loot_table/blocks | grep slab` lists `othercobblestone_slab`, `otherstone_slab`, `otherplanks_slab`,
+`otherstone_bricks_slab` and `polished_otherstone_slab` — every slab of the family **except** the two
+otherrock ones; 0.2.6 shipped `otherrock_slab`, this slice ships its brick sibling.
+
+- **Proved** by the jar listing and by the red run (`otherrock_bricks_slab.json: No such file or
+  directory` when the unit test reads it).
+- **Fixed** minimally: `ports/occultism/data/occultism/loot_table/blocks/otherrock_bricks_slab.json`,
+  the same table as `otherstone_bricks_slab` (with its `type=double` → 2 branch).
+- **Proved fixed in game**: the wooden-pickaxe break drops exactly one `occultism:otherrock_bricks_slab`
+  (with no table it would drop nothing — the hand/pickaxe pair would both be 0).
+- **User-visible**: the slab is obtainable instead of vanishing on break.
+
+Worth an upstream report (the same one-file datagen omission as 0.2.6's); not filed — the campaign
+files one only on request.
+
+### Red → green
+
+**Unit red 1 — the dialect** (`sdk-test-red-0.2.7.log`), with the jar's ten grids and eleven tables
+carried **byte for byte** first:
+
+```
+---- runtime::tests::the_brick_recipes_are_the_jars_shapes_in_the_26_3_dialect stdout ----
+thread 'runtime::tests::the_brick_recipes_are_the_jars_shapes_in_the_26_3_dialect' (3762475) panicked at src/runtime.rs:1045:17:
+otherstone_bricks carries the 1.21.1 object-form ingredient "item":, which the 26.3 loader drops: {
+  "type": "minecraft:crafting_shaped",
+…
+test result: FAILED. 40 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+(The other four failures in that run are the files this slice had not written yet: the twelve block
+declarations, the smelting pair's dialect, the missing loot table and the tag/lang entries. Captured
+rather than staged away — the test set was written first, as 0.2.6 did.)
+
+**Unit red 2 — in the test, not the product** (`sdk-test-red2-0.2.7.log`): after the dialect rewrite
+the chiseled assertion counted `"o"` occurrences and its own key is one of them:
+
+```
+thread 'runtime::tests::the_brick_recipes_are_the_jars_shapes_in_the_26_3_dialect' (3769361) panicked at src/runtime.rs:1111:13:
+assertion `left == right` failed: the chiseled recipe is two stacked slabs: {
+  left: 3
+ right: 2
+test result: FAILED. 44 passed; 1 failed; …
+```
+
+Fixed the assertion (pin the `pattern` array itself, not a substring count), no product change.
+Green: **45 passed, 0 failed** (`sdk-test.log`).
+
+**In-game red — the family** (`e2e-bricks-red-0.2.6-package.log`, the **0.2.6** export,
+`BRICKS_ONLY=1`):
+
+```
+== R: the twelve bricks-tier otherstone/otherrock blocks ==
+  survival, table at 222,101,38
+BRICKS FAIL: the otherstone_bricks grid made None x0, expected occultism:otherstone_bricks x4
+FAIL: the bricks check failed (see the BRICKS FAIL line above)
+EXIT:1
+```
+
+The 0.2.6 package has the ingredients but no brick results, so the grid yields nothing: the exact
+behaviour this slice changes. The 0.2.7 package, same leg: `PASS` + `EXIT:0`
+(`e2e-bricks-0.2.7.log`).
+
+### In game (phase R, verbatim from `e2e-bricks-0.2.7.log`, abridged)
+
+```
+== R: the twelve bricks-tier otherstone/otherrock blocks ==
+  survival, table at 222,101,38
+  the otherstone_bricks grid: the result slot reads occultism:otherstone_bricks x4
+  the otherstone_bricks recipe: every ingredient was consumed ({"occultism:otherstone_bricks": 4})
+  … the otherstone_bricks_slab x6, _stairs x4, _wall x6, chiseled_otherstone_bricks x1 …
+  … and the same five for otherrock …
+  four dirt in the 2x2: the result slot stayed empty
+  three otherstone, one cell short of the 2x2: the result slot stayed empty
+== the chain in one opened table: 12 otherstone -> bricks -> stairs/slabs -> chiseled ==
+  chain step 1.2: the 2x2 of stones: the result slot reads occultism:otherstone_bricks x4
+  chain step 1.2: four bricks: taken into slot 1 (inventory {"occultism:otherstone_bricks": 12})
+  chain step 1: the twelve stones: every ingredient was consumed ({"occultism:otherstone_bricks": 12})
+  chain step 2: six bricks: the result slot reads occultism:otherstone_bricks_stairs x4
+  chain step 2: the bricks it used: every ingredient was consumed ({"occultism:otherstone_bricks": 6, "occultism:otherstone_bricks_stairs": 4})
+  chain step 3: three bricks: the result slot reads occultism:otherstone_bricks_slab x6
+  chain step 3: the bricks it used: every ingredient was consumed ({"occultism:otherstone_bricks": 3, "occultism:otherstone_bricks_slab": 6, "occultism:otherstone_bricks_stairs": 4})
+  chain step 4: two brick slabs: the result slot reads occultism:chiseled_otherstone_bricks x1
+  chain step 4: the slabs it used: every ingredient was consumed ({"occultism:chiseled_otherstone_bricks": 1, "occultism:otherstone_bricks": 3, "occultism:otherstone_bricks_slab": 4, "occultism:otherstone_bricks_stairs": 4})
+== the cracked pair in a real furnace, and the same bricks with no fuel ==
+  furnace with coal: [null, null, {"count": 1, "item": "occultism:cracked_otherstone_bricks"}]
+  otherstone_bricks + coal -> occultism:cracked_otherstone_bricks (the input is gone)
+  furnace with coal: [null, null, {"count": 1, "item": "occultism:cracked_otherrock_bricks"}]
+  otherrock_bricks + coal -> occultism:cracked_otherrock_bricks (the input is gone)
+  furnace without fuel: [{"count": 1, "item": "occultism:otherstone_bricks"}, null, null]
+  no fuel: the output stayed empty and the input stayed put
+== the twelve blocks: default state, hand 0, wooden pickaxe 1 ==
+  placed occultism:otherstone_bricks at x=214
+  occultism:otherstone_bricks by hand: {"block_before": "occultism:otherstone_bricks", "block": "minecraft:air", "drops": {}}
+  occultism:otherstone_bricks with a wooden pickaxe: {"…", "drops": {"occultism:otherstone_bricks": 1}}
+  … the same pair for all twelve (slab [type=bottom,waterlogged=false], stairs [facing=north,…],
+      wall [east=none,…,up=true,…], chiseled and cracked plain) …
+  wall pair: occultism:otherstone_bricks_wall[east=low,…] / occultism:otherstone_bricks_wall[…,west=low]
+  double brick slab: the pickaxe break dropped 2 (the jar table's double branch)
+```
+
+The driver is `tools/bricks_recipes.py`. It opens a **real** table (`ctl interact`), fills the grid one
+item per cell, and for the chain keeps the table **open** across the four steps, so the second grid's
+bricks are the first grid's output (the inventory line proves it: 12 → 6 → 3). Each furnace leg uses
+`ctl container` to load the input and the fuel and reads the block entity's slots back
+(`[null, null, {cracked: 1}]`). Differentials: four dirt in the same 2x2 and three stones one cell
+short make nothing; a furnace with the bricks but no coal never cooks. `BRICKS_NEGATIVE=1` asserts the
+bricks grid makes nothing, so the run must fail (`e2e-negative-bricks-0.2.7.log`:
+`BRICKS FAIL: negative: the bricks grid made occultism:otherstone_bricks x4, expected nothing`,
+`EXIT:1`).
+
+### Ladder
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests (red 1) | `cargo test --offline`, jar bytes carried verbatim | `sdk-test-red-0.2.7.log` | **40 passed, 5 failed** (`the_brick_recipes_are_the_jars_shapes_in_the_26_3_dialect`: `carries the 1.21.1 object-form ingredient "item":`) |
+| tests (red 2) | same, after the dialect rewrite | `sdk-test-red2-0.2.7.log` | **44 passed, 1 failed** — the chiseled assertion's own substring count; fixed the assertion |
+| tests | `cargo test --offline` | `sdk-test.log` | **45 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.7.log`, `sdk-build-second-0.2.7.log`, `sdk-reproducible-0.2.7.txt` | **`REPRODUCIBLE`**, 185,574 B, `b746bfac…44ff59` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | `sdk-artifact-0.2.7.txt` | 185,574 B, `b746bfac30f361eaf4693c83cf4aec016702f3f8b3567fbb4480d84cf044ff59`, **341 entries**, no packed `Cargo.lock`, declares **0.2.7**, `src/runtime.rs` inside = outside (`c08c8c8a…`) |
+| tree match | a third build from the final tree + `cmp` | `sdk-reproducible-0.2.7.txt` | **`PACKAGE_MATCHES_TREE`** — the delivered file is the tree's build |
+| package check | `cargo horizon-mod check occultism.hmod` | `sdk-check.log` (sha printed) | exit 0, `occultism 0.2.7 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` | `sdk-fits.log` (sha printed) | `0a875da  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` | `sdk-fits-next.log` (sha printed) | **`0b14f8a  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | — | **1/1** |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.6 tag and export removed first) | `launcher-build-0.2.7.log` | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-6ce2f48c7333`, manifest `version = "0.2.7"` |
+| in game (the family, red) | `BRICKS_ONLY=1` against the **0.2.6** export | `e2e-bricks-red-0.2.6-package.log` | **FAIL** + `EXIT:1` (`the otherstone_bricks grid made None x0`) |
+| in game (the family) | `BRICKS_ONLY=1` | `e2e-bricks-0.2.7.log` | **PASS** + `EXIT:0` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen) | `e2e-default-0.2.7.log` | **PASS** + `EXIT:0` (A..R) |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | `e2e-control-0.2.7.log` | **FAIL** + `EXIT:1` (`the datura item did not register`) |
+| fail-capability (scenario) | `SELFTEST=1` | `e2e-selftest-0.2.7.log` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) |
+| fail-capability (this family) | `BRICKS_ONLY=1 BRICKS_NEGATIVE=1` | `e2e-negative-bricks-0.2.7.log` | **FAIL** + `EXIT:1` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | **36 logs, 36 ok**, 0 missing-exit, 0 bad-exit |
+
+### Parity coverage (0.2.7)
+
+| family | state |
+|---|---|
+| `otherstone_bricks`, `otherrock_bricks` + their recipes | **tested** — R (2x2 grid → exactly 4, ingredients consumed; four dirt and three stones one cell short make nothing; default state read back; hand 0 / pickaxe 1) |
+| `otherstone_bricks_slab`, `otherrock_bricks_slab` + recipes | **tested** — R (middle row → 6; `type=double` drops 2; `otherrock_bricks_slab`'s table is the port's fix for the jar's omission) |
+| `otherstone_bricks_stairs`, `otherrock_bricks_stairs` + recipes | **tested** — R (the stair step → 4; hand 0 / pickaxe 1) |
+| `otherstone_bricks_wall`, `otherrock_bricks_wall` + recipes | **tested** — R (two rows → 6; two brick walls connect `west=low`/`east=low`) |
+| `chiseled_*` + recipes | **tested** — R (two brick slabs → 1; the chain's last step consumes the slab the chain made) |
+| `cracked_*` + their smelting recipes | **tested** — R (a real furnace, 200 ticks: bricks + coal → exactly 1 cracked brick and the input gone; no fuel → nothing, input kept) |
+| the chain stones → bricks → stairs → slabs → chiseled | **tested** — R (one opened table; the inventory shows 12 → 6 → 3 bricks and 6 → 4 slabs) |
+| the remaining 22 building recipes (polished, cobblestone families, buttons, pressure plates, frames, pedestals, tablets, sacrificial bowls, storage controllers) | **not carried** — their results are still unregistered; the next tiers of the family |
+| the 17 impure-chalk craftings | **not carried** — ingredients missing (unchanged) |
+| spirit fire, the 26 conversion recipes, the crop, the seed source, the readouts, the spectator guard, the four loot tables, the two 0.2.5 recipes, the six 0.2.6 blocks | **tested** — phases A..Q, unchanged |
+| pentacle rituals, spirits/AI, GeckoLib models, Otherworld, guide book, Curios, machine recipes | **not ported** — the gap list above (unchanged) |
+
+### Measured behaviours of this pin (added by this slice)
+
+1. **The vanilla furnace is a block entity this pin ticks.** `ctl container` fills its three slots in
+   order (input, fuel, output), and a 200-tick smelting recipe finishes inside `ctl wait 240`. The
+   no-fuel leg is the differential: nothing cooks and the input stays.
+2. **A shaped recipe's grid cells must come from one stack of at least the pattern's count.** The
+   driver places one item per cell by right-clicking, so a second craft of the same item has to merge
+   into the same slot (the driver's `empty_or_same`) — two separate four-stacks cannot fill a six-cell
+   stair pattern, which is a vanilla rule, not a harness quirk.
+3. **A chain needs the table to stay open.** `reset_table()` closes and re-places the table; the chain
+   leg deliberately skips it between steps, which is also what a player does.
+4. The 0.2.4–0.2.6 findings stand (peaceful in the End, the break reply as the drop assertion, a fresh
+   table per grid, `--offscreen` for menu phases, the stale-export trap before a launcher build).
+
+### Deviations (deliberate, and why)
+
+| Area | Upstream | This port |
+|---|---|---|
+| map colour of the stairs and walls | `Properties.of()` leaves `MapColor.NONE` | the template's stone colour (as 0.2.6's) |
+| `otherrock_bricks_slab` table | missing from the jar | shipped (the upstream-defect fix above) |
+| the cracked pair's obtainability | smelting only | smelting only — no crafting shortcut is invented |
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+### Next slice
+
+The next tier of the same family, and the cheapest real step: the **polished pair**
+(`polished_otherstone`, `polished_otherrock`) with their slab/stair/wall, whose source is the jar's
+`smelting/polished_otherstone.json` / `polished_otherrock.json` (a furnace recipe from the raw stone,
+which this slice's furnace leg has just proved works) plus the six crafting grids. Gap line: the 0.2.7
+coverage row above — *"the remaining 22 building recipes (polished, cobblestone families, buttons,
+pressure plates, frames, pedestals, tablets, sacrificial bowls, storage controllers) — not carried"*.
+It fits the same `data`-inside-`deep` shape: nine results, one smelting pair, their loot tables,
+models, tags and lang, and the same in-game pattern (craft, place, read back, hand 0 / pickaxe 1) with
+the furnace leg already scripted. After that the **cobblestone families** (six results) and the
+**redstone pair** (buttons, pressure plates) close the "made from the stone" recipes; the frames,
+pedestals, tablets and bowls are the first results that are not plain building blocks (they carry
+shapes and, for the bowls, a block entity upstream) and belong in a slice of their own.

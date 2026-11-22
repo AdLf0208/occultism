@@ -83,6 +83,17 @@
 # two. BUILDING_ONLY=1 is this family's red/green leg; BUILDING_NEGATIVE=1
 # inverts the slab assertion, so the run must FAIL.
 #
+# The bricks tier (0.2.7) is phase R, on the row north of those blocks and at the
+# same table: the ten bricks-tier grids (a 2x2 of the stone -> four bricks, the
+# brick slab/stair/wall recipes, two brick slabs -> one chiseled), a chain in one
+# opened table (twelve stones -> bricks -> six bricks -> four stairs -> three
+# bricks -> six slabs -> two slabs -> one chiseled), the cracked pair smelting in
+# a real furnace with a no-fuel differential, then each of the twelve blocks
+# placed, its default state read back, a hand break (no drop) and a wooden
+# pickaxe break (exactly one), a brick wall pair connecting, and a double brick
+# slab dropping two. BRICKS_ONLY=1 is this family's red/green leg;
+# BRICKS_NEGATIVE=1 inverts the bricks-grid assertion, so the run must FAIL.
+#
 # SELFTEST=1 flips the count assertion (3 awakened feathers -> 2): it must FAIL,
 # proving the scenario can fail. NEGATIVE=1 flips the ripe-crop harvest's
 # assertion (a ripe crop must drop a fruit) the same way; LOOT_NEGATIVE=1 is the
@@ -127,6 +138,12 @@ BUILDING_NEGATIVE=${BUILDING_NEGATIVE:-0}
 # `BUILDING_ONLY=1` launches and runs only the six-building-block phase (the
 # red/green leg for that family), then exits 0.
 BUILDING_ONLY=${BUILDING_ONLY:-0}
+# The bricks tier's own counterfactual: a 2x2 of otherstone must make nothing, so
+# this run MUST fail (see phase R).
+BRICKS_NEGATIVE=${BRICKS_NEGATIVE:-0}
+# `BRICKS_ONLY=1` launches and runs only the bricks-tier phase (the red/green leg
+# for that family), then exits 0.
+BRICKS_ONLY=${BRICKS_ONLY:-0}
 # `CONTROL_LEG=1` runs the packaged leg first on the same socket, as 0.2.0/0.2.2 did.
 # The default is a *separate* invocation (`GAME=$CONTROL_GAME`), because a control
 # launch in the same HORIZON_HOME leaves the main game without its log file and the
@@ -249,11 +266,11 @@ arena() {
     done
     [ "$loaded" = true ] || fail "the End arena chunk never loaded"
     # Big enough for the fire stations (z -12..8), the crop family
-    # (x 214..233, z 0..40) and the loot row (x 232..238, z 30), with clear air
-    # above both.
-    ctl command "execute in minecraft:the_end run fill 196 100 -16 242 100 44 minecraft:stone" >/dev/null
+    # (x 214..233, z 0..40), the loot row (x 232..238, z 30) and the bricks row
+    # (x 214..236, z 46..50, phase R), with clear air above all of them.
+    ctl command "execute in minecraft:the_end run fill 196 100 -16 242 100 52 minecraft:stone" >/dev/null
     ctl wait 6 >/dev/null
-    ctl command "execute in minecraft:the_end run fill 196 101 -16 242 108 44 minecraft:air" >/dev/null
+    ctl command "execute in minecraft:the_end run fill 196 101 -16 242 108 52 minecraft:air" >/dev/null
     ctl wait 6 >/dev/null
     ctl command "execute in minecraft:the_end run kill @e[type=!player]" >/dev/null
     ctl wait 20 >/dev/null
@@ -561,6 +578,36 @@ phase_building() {
     echo "  two walls connect, and a double slab drops the jar table's two"
 }
 
+# The bricks tier (0.2.7): the ten bricks-tier grids in a real table (a 2x2 of
+# the stone makes four bricks, the brick slab/stair/wall recipes work from those
+# bricks, two brick slabs make the chiseled block), one opened table's chain
+# (twelve stones -> bricks -> stairs -> slabs -> chiseled, each step consuming
+# the previous output), the cracked pair in a real furnace with a no-fuel
+# differential, then each of the twelve blocks placed, its default state read
+# back, a bare hand break (no drop: `requires_tool`) and a wooden pickaxe break
+# (exactly one). A brick wall pair must connect, and a double brick slab drops
+# the jar table's two. BRICKS_NEGATIVE=1 inverts the bricks-grid assertion so the
+# run must FAIL.
+phase_bricks() {
+    echo "== R: the twelve bricks-tier otherstone/otherrock blocks =="
+    end "gamerule random_tick_speed 0"
+    # Standing still over the dark End floor: peaceful keeps hostile spawns away.
+    end "difficulty peaceful"
+    end "kill @e[type=!player]"
+    ctl wait 20 >/dev/null
+    end "setblock $CRAFT_X 100 $CRAFT_Z minecraft:stone"
+    ctl wait 4 >/dev/null
+    BRICKS_NEGATIVE=$BRICKS_NEGATIVE python3 "$PORT/tools/bricks_recipes.py" \
+        "$SOCK" "$CTL" "$CRAFT_X" 101 "$CRAFT_Z" \
+        || fail "the bricks check failed (see the BRICKS FAIL line above)"
+    echo "  the ten bricks-tier recipes craft their declared counts with every ingredient consumed;"
+    echo "  four dirt in the same 2x2 and three stones one cell short made nothing;"
+    echo "  the chain stones -> bricks -> stairs -> slabs -> chiseled consumed each previous output in one table;"
+    echo "  the cracked pair smelted in a real furnace while the fuel-less one stayed idle;"
+    echo "  each block reads its template's default state, drops nothing to a hand and exactly one to a wooden pickaxe;"
+    echo "  a brick wall pair connects, and a double brick slab drops two"
+}
+
 echo "== launch (The End arena, launcher-built game with the package) =="
 if [ "$CONTROL_LEG" = 1 ] && [ -n "$CONTROL_GAME" ]; then control_leg; fi
 launch "$GAME" "$WORLD"
@@ -584,6 +631,13 @@ fi
 if [ "$BUILDING_ONLY" = 1 ]; then
     phase_building
     echo "PASS: the six otherstone/otherrock building recipes craft at a real table (three stones in the middle row make six slabs, the stair step four stairs, two rows six walls, every ingredient consumed; three dirt make nothing), each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two"
+    exit 0
+fi
+
+# The red/green leg for the bricks tier: launch, arena, phase R only.
+if [ "$BRICKS_ONLY" = 1 ]; then
+    phase_bricks
+    echo "PASS: the ten bricks-tier otherstone/otherrock recipes craft at a real table with every ingredient consumed (a 2x2 of the stone makes four bricks, the brick slab/stair/wall recipes work from those bricks, two brick slabs make one chiseled block; four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, each of the twelve blocks reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two"
     exit 0
 fi
 
@@ -1158,4 +1212,6 @@ phase_craft
 
 phase_building
 
-echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand and exactly one to a wooden pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two"
+phase_bricks
+
+echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand and exactly one to a wooden pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two"

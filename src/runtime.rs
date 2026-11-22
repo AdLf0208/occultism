@@ -1009,6 +1009,263 @@ mod tests {
         }
     }
 
+    /// The twelve blocks of the bricks tier this slice carries, with the vanilla
+    /// template each copies and the count its jar recipe makes. The two cracked
+    /// blocks make nothing in a grid: their recipe is a furnace one.
+    const BRICKS: [(&str, &str, u32); 12] = [
+        ("otherstone_bricks", "minecraft:stone", 4),
+        ("otherstone_bricks_slab", "minecraft:stone_slab", 6),
+        ("otherstone_bricks_stairs", "minecraft:stone_stairs", 4),
+        ("otherstone_bricks_wall", "minecraft:cobblestone_wall", 6),
+        ("chiseled_otherstone_bricks", "minecraft:stone", 1),
+        ("cracked_otherstone_bricks", "minecraft:stone", 0),
+        ("otherrock_bricks", "minecraft:stone", 4),
+        ("otherrock_bricks_slab", "minecraft:stone_slab", 6),
+        ("otherrock_bricks_stairs", "minecraft:stone_stairs", 4),
+        ("otherrock_bricks_wall", "minecraft:cobblestone_wall", 6),
+        ("chiseled_otherrock_bricks", "minecraft:stone", 1),
+        ("cracked_otherrock_bricks", "minecraft:stone", 0),
+    ];
+
+    #[test]
+    fn the_brick_recipes_are_the_jars_shapes_in_the_26_3_dialect() {
+        // The jar's ten bricks-tier grids (`building_blocks/crafting`): a 2x2 of
+        // the plain stone makes four bricks, the slabs and the walls come out in
+        // sixes, the stair step in fours, and the chiseled pair is two of the
+        // brick **slab** stacked (upstream's own recipe, not a bricks 2x2). The
+        // 26.3 loader reads an ingredient as a bare `"id"`; the jar's
+        // `{"item": …}` object is dropped without a word (the 0.2.5/0.2.6
+        // finding), so a byte-for-byte carry yields nothing.
+        for (name, _, count) in BRICKS {
+            if count == 0 {
+                continue; // cracked: smelted, tested below
+            }
+            let text = content(&format!("occultism/recipe/crafting/{name}.json"));
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{name} carries the 1.21.1 object-form ingredient {object_form}, \
+                     which the 26.3 loader drops: {text}"
+                );
+            }
+            assert!(
+                text.contains("\"minecraft:crafting_shaped\""),
+                "{name} is the jar's shaped recipe: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{name}\"")),
+                "{name} does not make itself: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"count\": {count}")),
+                "{name} does not make {count}: {text}"
+            );
+        }
+        // The ingredient each recipe is made of, as the jar declares it: the
+        // bricks are the only ones made of the raw stone; their slabs, stairs
+        // and walls are made of the bricks; the chiseled pair of the brick slab.
+        for (stone, bricks) in [
+            ("otherstone", "otherstone_bricks"),
+            ("otherrock", "otherrock_bricks"),
+        ] {
+            let raw = format!("occultism:{stone}");
+            let made = format!("occultism:{bricks}");
+            let bricks_recipe = content(&format!("occultism/recipe/crafting/{bricks}.json"));
+            assert!(
+                bricks_recipe.contains(&format!("\"{raw}\"")),
+                "{bricks} is not made of {raw}: {bricks_recipe}"
+            );
+            assert_eq!(
+                bricks_recipe.matches("\"oo\"").count(),
+                2,
+                "the bricks recipe is the jar's 2x2: {bricks_recipe}"
+            );
+            let slab = content(&format!("occultism/recipe/crafting/{bricks}_slab.json"));
+            assert!(
+                slab.contains(&format!("\"{made}\"")) && slab.contains("\"ooo\""),
+                "the brick slab recipe is one row of three bricks: {slab}"
+            );
+            let stairs = content(&format!("occultism/recipe/crafting/{bricks}_stairs.json"));
+            for row in ["\"#  \"", "\"## \"", "\"###\""] {
+                assert!(
+                    stairs.contains(row),
+                    "the brick stair recipe lost {row}: {stairs}"
+                );
+            }
+            assert!(
+                stairs.contains(&format!("\"{made}\"")),
+                "the brick stairs are not made of {made}: {stairs}"
+            );
+            let wall = content(&format!("occultism/recipe/crafting/{bricks}_wall.json"));
+            assert_eq!(
+                wall.matches("\"ooo\"").count(),
+                2,
+                "the brick wall recipe is two rows of three bricks: {wall}"
+            );
+            let chiseled = content(&format!("occultism/recipe/crafting/chiseled_{bricks}.json"));
+            assert!(
+                chiseled.contains(&format!("\"occultism:{bricks}_slab\"")),
+                "the chiseled recipe is not two brick slabs: {chiseled}"
+            );
+            assert!(
+                chiseled.contains("\"pattern\": [\n    \"o\",\n    \"o\"\n  ]"),
+                "the chiseled recipe is two stacked slabs: {chiseled}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_cracked_bricks_are_smelted_from_the_bricks() {
+        // The jar's only recipe for the cracked pair: a furnace one, 200 ticks,
+        // 0.3 experience, from the plain bricks. 26.3 reads the ingredient as a
+        // bare string and the result as `{id, count}`.
+        for stone in ["otherstone", "otherrock"] {
+            let bricks = format!("{stone}_bricks");
+            let cracked = format!("cracked_{bricks}");
+            let text = content(&format!("occultism/recipe/smelting/{cracked}.json"));
+            assert!(
+                text.contains("\"type\": \"minecraft:smelting\""),
+                "{cracked} is not a furnace recipe: {text}"
+            );
+            assert!(
+                !text.contains("\"item\":") && !text.contains("\"tag\":"),
+                "{cracked} carries a 1.21.1 object-form ingredient: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"ingredient\": \"occultism:{bricks}\"")),
+                "{cracked} is not smelted from {bricks}: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{cracked}\"")),
+                "{cracked} does not smelt into itself: {text}"
+            );
+            assert!(
+                text.contains("\"cookingtime\": 200") && text.contains("\"experience\": 0.3"),
+                "{cracked} lost the jar's 200 ticks / 0.3 xp: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_brick_block_has_a_26_3_loot_table_that_drops_itself() {
+        // The rule the jar breaks twice: `otherrock_slab.json` (0.2.6) and
+        // `otherrock_bricks_slab.json` (this slice) are the only slab tables the
+        // jar does not ship, although both blocks are registered
+        // `LootTableType.CUSTOM`, so nothing generates a default. A missing
+        // table means the block drops nothing at all; the port ships it.
+        for (name, _, _) in BRICKS {
+            let text = content(&format!("occultism/loot_table/blocks/{name}.json"));
+            for legacy in ["\"function\":", "\"functions\":"] {
+                assert!(
+                    !text.contains(legacy),
+                    "{name}'s loot table uses the 1.21.1 {legacy} shape, which the 26.3 \
+                     loader does not read (it reads `modifier`): {text}"
+                );
+            }
+            assert!(
+                text.contains(&format!("\"name\": \"occultism:{name}\"")),
+                "{name}'s loot table does not drop itself: {text}"
+            );
+        }
+        // A brick slab's table is the jar's: one when single, two when double.
+        for name in ["otherstone_bricks_slab", "otherrock_bricks_slab"] {
+            let text = content(&format!("occultism/loot_table/blocks/{name}.json"));
+            assert!(
+                text.contains("\"minecraft:match_block\"")
+                    && text.contains("\"type\": \"double\"")
+                    && text.contains("\"count\": 2"),
+                "{name}'s double-slab branch is missing: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_brick_blocks_copy_the_upstream_stone_templates() {
+        // Upstream (`OccultismBlocks`): the bricks, chiseled and cracked blocks
+        // are `ofFullCopy(OTHERSTONE)` (hardness 1.5, resistance 30), the brick
+        // slab `ofFullCopy(OTHERSTONE_BRICKS)` (the same 30), the brick stairs
+        // and wall `of().strength(1.5f).requiresCorrectToolForDrops()` (1.5).
+        // Every one of them needs a pickaxe, so a bare hand rolls nothing.
+        for (name, template, _) in BRICKS {
+            let text = content(&format!("occultism/horizon/block/{name}.json"));
+            assert!(
+                text.contains(&format!("\"template\": \"{template}\"")),
+                "{name} does not copy {template}: {text}"
+            );
+            assert!(
+                text.contains("\"requires_tool\": true"),
+                "{name} must be gated on a pickaxe as upstream gates it: {text}"
+            );
+            assert!(
+                text.contains("\"hardness\": 1.5"),
+                "{name} is not hardness 1.5: {text}"
+            );
+            let resistance = if name.ends_with("_stairs") || name.ends_with("_wall") {
+                1.5
+            } else {
+                30.0
+            };
+            assert!(
+                text.contains(&format!("\"explosion_resistance\": {resistance}")),
+                "{name} is not resistance {resistance}: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_brick_block_has_its_state_model_and_name() {
+        // A block with no blockstate renders as the missing model, an item with
+        // no model is a purple-black cube, and an id absent from
+        // `mineable/pickaxe` never drops to a pickaxe; a wall outside
+        // `minecraft:walls` does not connect to its neighbours.
+        let pickaxe = content("minecraft/tags/block/mineable/pickaxe.json");
+        let walls = content("minecraft/tags/block/walls.json");
+        let slabs = content("minecraft/tags/block/slabs.json");
+        let stairs = content("minecraft/tags/block/stairs.json");
+        let lang = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("assets/occultism/lang/en_us.json"),
+        )
+        .expect("the package's lang file");
+        for (name, _, _) in BRICKS {
+            let id = format!("occultism:{name}");
+            assert!(
+                pickaxe.contains(&format!("\"{id}\"")),
+                "{id} is not in mineable/pickaxe"
+            );
+            let tag = if name.ends_with("_wall") {
+                &walls
+            } else if name.ends_with("_slab") {
+                &slabs
+            } else if name.ends_with("_stairs") {
+                &stairs
+            } else {
+                // The plain, chiseled and cracked blocks are in no shape tag.
+                &pickaxe
+            };
+            assert!(
+                tag.contains(&format!("\"{id}\"")),
+                "{id} is missing from its tag"
+            );
+            assert!(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join(format!("assets/occultism/blockstates/{name}.json"))
+                    .is_file(),
+                "{id} has no blockstate"
+            );
+            assert!(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join(format!("assets/occultism/models/item/{name}.json"))
+                    .is_file(),
+                "{id} has no item model"
+            );
+            assert!(
+                lang.contains(&format!("\"block.occultism.{name}\"")),
+                "{id} has no lang entry"
+            );
+        }
+    }
+
     #[test]
     fn a_conversion_is_scoped_to_its_world_and_dimension() {
         let mut recent = Recent::default();

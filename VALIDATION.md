@@ -274,3 +274,41 @@ the upstream defect are in `notes.md`, §"Slice 5".
 The phase-Q transcript (the six grids, each block's default state, the hand/pickaxe drop pair, the
 wall connection, the double slab dropping two), the brief-vs-artefact conflict on `requires_tool`,
 and the two loot engines in the tree are in `notes.md` under "Slice 5 (0.2.6, 2026-11-22)".
+
+## 10. SDK 0.2.7 (the bricks tier of the `otherstone`/`otherrock` family), pin `0a875da`
+
+Every step in a `ports/tools/build-slot.sh` lease (`BUILD_LOCAL=1` for the SDK ladder, as trap 10 of
+0.2.0 records), `CARGO_INCREMENTAL=0`, no `--target-dir`, no private slots. Evidence in
+`../_shared/evidence/occultism/` (ladder) and `../_shared/evidence/occultism-e2e/` (game legs). The
+slice adds twelve block declarations, ten 26.3 crafting recipes, two smelting recipes, twelve loot
+tables (one of which the jar omits), twelve blockstates, twenty-two block models, twelve item models,
+six textures, twelve lang keys, four block tags and twelve creative-tab entries; the enumeration, the
+chain and the upstream defect are in `notes.md`, §"Slice 6".
+
+| Step | Command | Result |
+|---|---|---|
+| red 1 (unit, the dialect) | `cargo test --offline` with the jar's ten grids and eleven tables carried verbatim | **40 passed; 5 failed** — `the_brick_recipes_are_the_jars_shapes_in_the_26_3_dialect` ("carries the 1.21.1 object-form ingredient \"item\":") plus the four families not yet written — `sdk-test-red-0.2.7.log` |
+| red 2 (unit, a test assertion) | same, after the dialect rewrite | **44 passed; 1 failed** — the chiseled assertion counted `"o"` and its own key is one; fixed the assertion, no product change — `sdk-test-red2-0.2.7.log` |
+| green (unit) | `cargo test --offline` | **45 passed, 0 failed** — `sdk-test.log` |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **`REPRODUCIBLE`**: 185,574 B, `b746bfac…44ff59` — `sdk-build-0.2.7.log`, `sdk-build-second-0.2.7.log`, `sdk-reproducible-0.2.7.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | 185,574 B, `b746bfac30f361eaf4693c83cf4aec016702f3f8b3567fbb4480d84cf044ff59`, **341 entries**, no packed `Cargo.lock`, declares **0.2.7**, `src/runtime.rs` inside = outside (`c08c8c8a…`) — `sdk-artifact-0.2.7.txt` |
+| tree match | a third build from the final tree + `cmp occultism.hmod` | `PACKAGE_MATCHES_TREE` (the delivered file is the tree's build) — `sdk-reproducible-0.2.7.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed) | exit 0, `occultism 0.2.7 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` (sha printed) | `0a875da  made for`, exit 0 — `sdk-fits.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` (sha printed) | `0b14f8a  fits`, exit 0 — `sdk-fits-next.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.6 tag + export removed first) | `Compiling occultism (1 of 1)`, tag `native-0a875da-6ce2f48c7333`, manifest `version = "0.2.7"` — `launcher-build-0.2.7.log` |
+| red (in game, the family) | `BRICKS_ONLY=1 bash tools/e2e.sh` against the **0.2.6** export | **FAIL** + `EXIT:1` (`the otherstone_bricks grid made None x0`) — `e2e-bricks-red-0.2.6-package.log` |
+| in game (the family) | `BRICKS_ONLY=1` | **PASS** + `EXIT:0` — `e2e-bricks-0.2.7.log` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen) | **PASS** + `EXIT:0` — `e2e-default-0.2.7.log` (A..R) |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME= bash tools/e2e.sh` | **FAIL** + `EXIT:1` (`the datura item did not register`) — `e2e-control-0.2.7.log` |
+| fail-capability (scenario) | `SELFTEST=1` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) — `e2e-selftest-0.2.7.log` |
+| fail-capability (this family) | `BRICKS_ONLY=1 BRICKS_NEGATIVE=1` | **FAIL** + `EXIT:1` (`negative: the bricks grid made occultism:otherstone_bricks x4, expected nothing`) — `e2e-negative-bricks-0.2.7.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | 36 logs, 36 ok, 0 missing-exit, 0 bad-exit |
+
+The phase-R transcript (the ten grids, the two differentials, the four-step chain in one opened table,
+the furnace pair with its no-fuel differential, the twelve default states with hand 0 / pickaxe 1, the
+brick wall connection and the double brick slab dropping two), the jar's second missing slab table and
+the two measured behaviours of the furnace/menu harness are in `notes.md` under "Slice 6".
