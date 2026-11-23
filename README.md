@@ -10,8 +10,9 @@ slabs, stairs and walls (0.2.6), the bricks tier — bricks, their slab, stair a
 wall, the chiseled pair and the cracked pair (0.2.7) — the polished tier: the
 smelted plain pair and their slabs, stairs and walls (0.2.8) — the cobblestone
 tier mined from the raw stones (0.2.9), the button and pressure-plate pair
-(0.2.10), the frames and pedestals (0.2.11), and the sacrificial bowls
-(0.2.12) — the tier's first block entity.
+(0.2.10), the frames and pedestals (0.2.11), the sacrificial bowls
+(0.2.12) — the tier's first block entity — and the 17 impure-chalk craftings
+(0.2.13) with the tags and items they need.
 
 ## What works
 
@@ -57,23 +58,32 @@ tier mined from the raw stones (0.2.9), the button and pressure-plate pair
   bowl and what it held. A non-golden bowl standing on a spirit fire converts what
   it holds, as the fire itself does; the golden pair stores and returns but does
   not convert.
+- **Impure chalks**: the 17 grids the jar ships — the 15 coloured ones (an impure
+  white chalk plus three materials, two for gray and green) and the two mirrored
+  shaped white grids. The white grids take the nested `#occultism:dusts/chalk_base`
+  tag (burnt otherstone/otherrock) and `#c:dusts/otherworld_wood` (otherworld
+  ashes); both burnt stones smelt from the carried polished pair. The 26 dust,
+  paste and essence items the grids name, and the 26 item tags they reach, are
+  carried so every cell resolves; the ingredients whose only source is the
+  unported crushing/ritual half are declared as items, not obtained.
 - `/occultism info <x> <y> <z>` and `/occultism recipes` for a readout (a bowl
   answers with the stack its block entity holds).
 
 ## What it does not do (yet)
 
 The pentacle rituals (158 recipes), the summoned spirits and their AI, the
-Otherworld dimension, the guide book, accessory slots, and the crafting recipes
-whose result (the rest of the otherstone/otherrock building family — the tablets,
-the storage controllers and their ritual-only bases — and the impure chalks)
-or ingredients this package does not carry yet. See
-[`notes.md`](notes.md) for the full gap list and the reason for each.
+Otherworld dimension, the guide book, accessory slots, the crushing/spirit-job
+recipes and the ritual results that source most of the impure chalks' colour
+materials, and the crafting recipes whose result (the rest of the
+otherstone/otherrock building family — the tablets and the storage controllers
+with their ritual-only bases) or ingredients this package does not carry yet.
+See [`notes.md`](notes.md) for the full gap list and the reason for each.
 
 ## Installing and building
 
 One file: `occultism.hmod`. It is the whole mod — `horizon-mod.toml`,
 `src/lib.rs` + `src/support.rs` (the code), `src/runtime.rs` (the pure rules and
-their 74 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
+their 79 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
 tags and lang) and the licence notices.
 
 A native SDK package is built against the game by the launcher:

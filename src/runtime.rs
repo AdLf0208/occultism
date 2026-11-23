@@ -2909,4 +2909,508 @@ mod tests {
             "Bowl at [10, 64, 0]: stored=occultism:datura x1"
         );
     }
+
+    // ---- the impure chalks (0.2.13) ---------------------------------------
+
+    /// The 17 impure-chalk crafting recipes the jar ships: 15 coloured shapeless
+    /// grids plus two shaped grids for `chalk_white_impure` (mirrored columns).
+    /// `(file, result, references)`, the references repeated as often as the
+    /// recipe declares them; every one must survive in the 26.3 file.
+    const IMPURE_CHALKS: [(&str, &str, &[&str]); 17] = [
+        (
+            "chalk_white_impure",
+            "chalk_white_impure",
+            &["#occultism:dusts/chalk_base", "#c:dusts/otherworld_wood"],
+        ),
+        (
+            "chalk_white_impure2",
+            "chalk_white_impure",
+            &["#c:dusts/otherworld_wood", "#occultism:dusts/chalk_base"],
+        ),
+        (
+            "chalk_pink_impure",
+            "chalk_pink_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "occultism:demonic_meat",
+                "occultism:demonic_meat",
+                "occultism:demonic_meat",
+            ],
+        ),
+        (
+            "chalk_brown_impure",
+            "chalk_brown_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "occultism:cruelty_essence",
+                "minecraft:cocoa_beans",
+                "minecraft:brown_mushroom",
+            ],
+        ),
+        (
+            "chalk_gray_impure",
+            "chalk_gray_impure",
+            &["occultism:chalk_white_impure", "occultism:gray_paste"],
+        ),
+        (
+            "chalk_cyan_impure",
+            "chalk_cyan_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "#c:dusts/iesnium",
+                "#c:dusts/echo",
+                "minecraft:glow_ink_sac",
+            ],
+        ),
+        (
+            "chalk_black_impure",
+            "chalk_black_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "#c:dusts/witherite",
+                "#c:dusts/witherite",
+                "#c:dusts/witherite",
+            ],
+        ),
+        (
+            "chalk_green_impure",
+            "chalk_green_impure",
+            &["occultism:chalk_white_impure", "occultism:nature_paste"],
+        ),
+        (
+            "chalk_light_blue_impure",
+            "chalk_light_blue_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "#c:dusts/ice",
+                "#c:dusts/packed_ice",
+                "#c:dusts/blue_ice",
+            ],
+        ),
+        (
+            "chalk_purple_impure",
+            "chalk_purple_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "#c:dusts/end_stone",
+                "#c:dusts/obsidian",
+                "#c:dusts/obsidian",
+            ],
+        ),
+        (
+            "chalk_light_gray_impure",
+            "chalk_light_gray_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "#c:dusts/silver",
+                "#c:dusts/iron",
+                "#c:dusts/calcite",
+            ],
+        ),
+        (
+            "chalk_lime_impure",
+            "chalk_lime_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "#c:dusts/research",
+                "#c:dusts/emerald",
+                "#c:slime_balls",
+            ],
+        ),
+        (
+            "chalk_orange_impure",
+            "chalk_orange_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "occultism:cursed_honey",
+                "minecraft:glow_berries",
+                "#c:dusts/blaze",
+            ],
+        ),
+        (
+            "chalk_yellow_impure",
+            "chalk_yellow_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "#c:dusts/glowstone",
+                "#c:dusts/gold",
+                "#c:dusts/gold",
+            ],
+        ),
+        (
+            "chalk_blue_impure",
+            "chalk_blue_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "occultism:marid_essence",
+                "#c:dusts/lapis",
+                "#c:tube_corals",
+            ],
+        ),
+        (
+            "chalk_magenta_impure",
+            "chalk_magenta_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "#c:dusts/dragonyst",
+                "#c:dusts/amethyst",
+                "minecraft:chorus_fruit",
+            ],
+        ),
+        (
+            "chalk_red_impure",
+            "chalk_red_impure",
+            &[
+                "occultism:chalk_white_impure",
+                "occultism:afrit_essence",
+                "minecraft:torchflower",
+                "#c:dusts/redstone",
+            ],
+        ),
+    ];
+
+    /// The 26 ingredient items the 17 grids name that this package did not yet
+    /// declare: nineteen dusts (fourteen of them crushing/ritual results, the
+    /// two burnt stones smelted from the carried polished pair) and the seven
+    /// essences/pastes.
+    const IMPURE_INGREDIENTS: [&str; 26] = [
+        "burnt_otherstone",
+        "burnt_otherrock",
+        "crushed_ice",
+        "crushed_packed_ice",
+        "crushed_blue_ice",
+        "crushed_end_stone",
+        "crushed_calcite",
+        "obsidian_dust",
+        "silver_dust",
+        "iron_dust",
+        "emerald_dust",
+        "gold_dust",
+        "lapis_dust",
+        "dragonyst_dust",
+        "amethyst_dust",
+        "witherite_dust",
+        "iesnium_dust",
+        "echo_dust",
+        "research_fragment_dust",
+        "demonic_meat",
+        "cruelty_essence",
+        "gray_paste",
+        "nature_paste",
+        "cursed_honey",
+        "marid_essence",
+        "afrit_essence",
+    ];
+
+    /// Every item tag the 17 grids reach, as the package must declare it: the
+    /// file under `data/` and its ordered member list. The member lists are the
+    /// jar's own `data/c/tags/item/…` files, except the three NeoForge-only tags
+    /// (`blaze`, `glowstone`, `redstone`, `slime_balls`, `tube_corals` — the jar
+    /// relies on the loader for those), which name vanilla's items the way this
+    /// port already declares `c:ingots/*`.
+    const IMPURE_TAGS: [(&str, &[&str]); 26] = [
+        (
+            "occultism/tags/item/dusts/chalk_base",
+            &["#c:dusts/otherstone", "#c:dusts/otherrock"],
+        ),
+        (
+            "c/tags/item/dusts/otherstone",
+            &["occultism:burnt_otherstone"],
+        ),
+        (
+            "c/tags/item/dusts/otherrock",
+            &["occultism:burnt_otherrock"],
+        ),
+        (
+            "c/tags/item/dusts/otherworld_wood",
+            &["occultism:otherworld_ashes"],
+        ),
+        ("c/tags/item/dusts/iesnium", &["occultism:iesnium_dust"]),
+        ("c/tags/item/dusts/echo", &["occultism:echo_dust"]),
+        ("c/tags/item/dusts/witherite", &["occultism:witherite_dust"]),
+        ("c/tags/item/dusts/ice", &["occultism:crushed_ice"]),
+        (
+            "c/tags/item/dusts/packed_ice",
+            &["occultism:crushed_packed_ice"],
+        ),
+        (
+            "c/tags/item/dusts/blue_ice",
+            &["occultism:crushed_blue_ice"],
+        ),
+        (
+            "c/tags/item/dusts/end_stone",
+            &["occultism:crushed_end_stone"],
+        ),
+        ("c/tags/item/dusts/obsidian", &["occultism:obsidian_dust"]),
+        ("c/tags/item/dusts/silver", &["occultism:silver_dust"]),
+        ("c/tags/item/dusts/iron", &["occultism:iron_dust"]),
+        ("c/tags/item/dusts/calcite", &["occultism:crushed_calcite"]),
+        (
+            "c/tags/item/dusts/research",
+            &["occultism:research_fragment_dust"],
+        ),
+        ("c/tags/item/dusts/emerald", &["occultism:emerald_dust"]),
+        ("c/tags/item/dusts/blaze", &["minecraft:blaze_powder"]),
+        ("c/tags/item/dusts/glowstone", &["minecraft:glowstone_dust"]),
+        ("c/tags/item/dusts/gold", &["occultism:gold_dust"]),
+        ("c/tags/item/dusts/lapis", &["occultism:lapis_dust"]),
+        ("c/tags/item/dusts/dragonyst", &["occultism:dragonyst_dust"]),
+        ("c/tags/item/dusts/amethyst", &["occultism:amethyst_dust"]),
+        ("c/tags/item/dusts/redstone", &["minecraft:redstone"]),
+        ("c/tags/item/slime_balls", &["minecraft:slime_ball"]),
+        (
+            "c/tags/item/tube_corals",
+            &["minecraft:tube_coral", "minecraft:tube_coral_fan"],
+        ),
+    ];
+
+    /// The vanilla items those tags may name (this port carries the rest).
+    const VANILLA_TAG_MEMBERS: [&str; 6] = [
+        "minecraft:blaze_powder",
+        "minecraft:glowstone_dust",
+        "minecraft:redstone",
+        "minecraft:slime_ball",
+        "minecraft:tube_coral",
+        "minecraft:tube_coral_fan",
+    ];
+
+    /// The members of one authored tag file, in file order.
+    fn tag_values(path: &str) -> Vec<String> {
+        let text = content(&format!("{path}.json"));
+        let values = text
+            .find("\"values\"")
+            .unwrap_or_else(|| panic!("{path} has no values: {text}"));
+        let rest = &text[values..];
+        let open = rest.find('[').expect("a values array");
+        let close = rest[open..].find(']').expect("a closed values array");
+        rest[open + 1..open + close]
+            .split(',')
+            .filter_map(|chunk| chunk.split('"').nth(1))
+            .map(str::to_owned)
+            .collect()
+    }
+
+    /// Every item a tag resolves to, following nested `#tag` members. A tag that
+    /// resolves to nothing is the `#c:cobblestones` failure mode: it loads as an
+    /// empty ingredient and the grid silently matches nothing.
+    fn resolve_tag(path: &str, seen: &mut Vec<String>) -> Vec<String> {
+        assert!(
+            !seen.contains(&path.to_owned()),
+            "tag cycle at {path}: {seen:?}"
+        );
+        seen.push(path.to_owned());
+        let mut members = Vec::new();
+        for value in tag_values(path) {
+            if let Some(nested) = value.strip_prefix('#') {
+                let (namespace, tag_path) =
+                    nested.split_once(':').expect("a tag is namespace:path");
+                members.extend(resolve_tag(
+                    &format!("{namespace}/tags/item/{tag_path}"),
+                    seen,
+                ));
+            } else {
+                members.push(value);
+            }
+        }
+        members
+    }
+
+    fn item_declared(id: &str) -> bool {
+        let name = id.strip_prefix("occultism:").unwrap_or(id);
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("data/occultism/horizon/item/{name}.json"))
+            .is_file()
+    }
+
+    #[test]
+    fn the_seventeen_impure_chalk_recipes_are_the_jars_shapes_in_the_26_3_dialect() {
+        // The jar's `data/occultism/recipe/crafting/chalk_*_impure*.json`: 15
+        // shapeless grids (impure white + three colour materials) and the two
+        // mirrored shaped white grids (`xy`/`xy`/`xy` of chalk base + otherworld
+        // wood). The 26.3 loader reads an ingredient as a bare `"id"` / `"#tag"`;
+        // the jar's `{"item": …}` / `{"tag": …}` objects are dropped without a
+        // word and the grid then yields nothing (the 0.2.5 finding).
+        for (file, result, references) in IMPURE_CHALKS {
+            let text = content(&format!("occultism/recipe/crafting/{file}.json"));
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{file} carries the 1.21.1 object-form ingredient {object_form}, \
+                     which the 26.3 loader drops: {text}"
+                );
+            }
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{result}\"")),
+                "{file} does not make occultism:{result}: {text}"
+            );
+            assert!(
+                text.contains("\"count\": 1"),
+                "{file} does not make one: {text}"
+            );
+            let shaped = file.starts_with("chalk_white_impure");
+            assert!(
+                text.contains(if shaped {
+                    "\"minecraft:crafting_shaped\""
+                } else {
+                    "\"minecraft:crafting_shapeless\""
+                }),
+                "{file} is not the jar's {} recipe: {text}",
+                if shaped { "shaped" } else { "shapeless" }
+            );
+            for reference in references {
+                let want = references.iter().filter(|r| *r == reference).count();
+                let got = text.matches(&format!("\"{reference}\"")).count();
+                assert_eq!(
+                    got, want,
+                    "{file} declares {got} x {reference}, the jar has {want}: {text}"
+                );
+            }
+        }
+        // The two white grids are mirrors: the same two keys in the opposite
+        // columns (`xy`/`xy`/`xy` both, but the key letters swap).
+        let first = content("occultism/recipe/crafting/chalk_white_impure.json");
+        let second = content("occultism/recipe/crafting/chalk_white_impure2.json");
+        assert!(first.contains("\"x\": \"#occultism:dusts/chalk_base\""));
+        assert!(first.contains("\"y\": \"#c:dusts/otherworld_wood\""));
+        assert!(second.contains("\"x\": \"#c:dusts/otherworld_wood\""));
+        assert!(second.contains("\"y\": \"#occultism:dusts/chalk_base\""));
+        for text in [first, second] {
+            for row in ["\"xy\"", "\"xy\"", "\"xy\""] {
+                assert!(
+                    text.contains(row),
+                    "a white grid lost the row {row}: {text}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_impure_chalk_tag_resolves_to_a_declared_item() {
+        // The 17 grids reach 26 tags, one of them nested (`chalk_base` ->
+        // `#c:dusts/otherstone` + `#c:dusts/otherrock`). A tag that resolves to
+        // nothing loads as an empty ingredient: the cell accepts nothing and the
+        // grid yields nothing, silently. Each declared member is either carried by
+        // this package (an `occultism:` item declaration) or a vanilla item this
+        // port names on purpose.
+        for (path, expected) in IMPURE_TAGS {
+            let got = tag_values(path);
+            assert_eq!(got, expected, "{path} is not the declared member list");
+        }
+        let mut resolved = Vec::new();
+        for (path, _) in IMPURE_TAGS {
+            let mut seen = Vec::new();
+            let members = resolve_tag(path, &mut seen);
+            assert!(
+                !members.is_empty(),
+                "{path} resolves to no item (the #c:cobblestones failure mode)"
+            );
+            resolved.extend(members);
+        }
+        for member in &resolved {
+            if let Some(name) = member.strip_prefix("occultism:") {
+                assert!(
+                    item_declared(member),
+                    "the tag member {member} has no item declaration \
+                     (data/occultism/horizon/item/{name}.json)"
+                );
+            } else {
+                assert!(
+                    VANILLA_TAG_MEMBERS.contains(&member.as_str()),
+                    "the tag member {member} is not a vanilla item this port knows"
+                );
+            }
+        }
+        // The nested base is the two burnt stones, one member each.
+        assert_eq!(
+            resolve_tag("occultism/tags/item/dusts/chalk_base", &mut Vec::new()),
+            vec![
+                "occultism:burnt_otherstone".to_owned(),
+                "occultism:burnt_otherrock".to_owned()
+            ]
+        );
+    }
+
+    #[test]
+    fn the_two_burnt_dusts_are_smelted_from_the_carried_polished_pair() {
+        // The only ingredient of the white grids whose source exists in this
+        // package: `smelting/burnt_otherstone.json` / `…otherrock.json` take the
+        // carried polished pair (200 ticks, 0.15 experience). Everything else the
+        // coloured grids name is a ritual/possession result or a crushing result,
+        // recorded in notes.md, and is carried as a declared item only.
+        for (name, polished) in [
+            ("burnt_otherstone", "occultism:polished_otherstone"),
+            ("burnt_otherrock", "occultism:polished_otherrock"),
+        ] {
+            let text = content(&format!("occultism/recipe/smelting/{name}.json"));
+            assert!(
+                text.contains("\"minecraft:smelting\""),
+                "{name} is not a smelting recipe: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"ingredient\": \"{polished}\"")),
+                "{name} is not smelted from {polished}: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{name}\"")),
+                "{name}'s recipe does not make it: {text}"
+            );
+            assert!(
+                text.contains("\"cookingtime\": 200"),
+                "{name} is not the jar's 200 ticks: {text}"
+            );
+            assert!(
+                text.contains("\"experience\": 0.15"),
+                "{name} is not the jar's 0.15 experience: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_impure_ingredient_is_declared_named_and_in_the_tab() {
+        // The 26 ingredient ids exist in the jar's item registry but not in this
+        // package. A recipe naming an undeclared id loads with an "invalid
+        // ingredient" and the cell refuses every item, so each one is declared,
+        // named in lang and shown in the creative tab beside the impure chalks.
+        let lang = asset_text("lang/en_us.json");
+        let tab = content("occultism/horizon/creative_tab/spirit_fire.json");
+        for name in IMPURE_INGREDIENTS {
+            let declaration = content(&format!("occultism/horizon/item/{name}.json"));
+            assert!(
+                declaration.contains("\"template\": \"minecraft:paper\""),
+                "{name} is not a plain carried item: {declaration}"
+            );
+            let id = format!("occultism:{name}");
+            assert!(
+                lang.contains(&format!("\"item.occultism.{name}\"")),
+                "{id} has no lang entry"
+            );
+            assert!(
+                tab.contains(&format!("\"{id}\"")),
+                "{id} is not in the creative tab"
+            );
+        }
+        // The 16 impure chalk results are already carried and shown.
+        for name in [
+            "chalk_white_impure",
+            "chalk_light_gray_impure",
+            "chalk_gray_impure",
+            "chalk_black_impure",
+            "chalk_brown_impure",
+            "chalk_red_impure",
+            "chalk_orange_impure",
+            "chalk_yellow_impure",
+            "chalk_lime_impure",
+            "chalk_green_impure",
+            "chalk_cyan_impure",
+            "chalk_light_blue_impure",
+            "chalk_blue_impure",
+            "chalk_purple_impure",
+            "chalk_magenta_impure",
+            "chalk_pink_impure",
+        ] {
+            let id = format!("occultism:{name}");
+            assert!(item_declared(&id), "{id} is not declared");
+            assert!(tab.contains(&format!("\"{id}\"")), "{id} is not in the tab");
+        }
+    }
 }

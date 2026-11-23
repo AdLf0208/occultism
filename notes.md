@@ -39,7 +39,10 @@ omission) and the tier's reverse smelt pair (§"Slice 9").
 **0.2.11 (2026-11-23):** the frames and pedestals — the two frame **items**, the
 two post-shaped pedestals with their grids and loot tables, and the brief's two
 premises it had to correct (the frame is not a block, the pedestal holds no
-stack) (§"Slice 10").
+stack) (§"Slice 10"). **0.2.12 (2026-11-23):** the six sacrificial bowls, the
+tier's first block entity (§"Slice 11"). **0.2.13 (2026-11-23):** the 17
+impure-chalk craftings, their 26 tags (the nested chalk base included), the 26
+ingredient items and the two burnt-dust smelting recipes (§"Slice 12").
 
 ## Class + tier and the approach
 
@@ -3038,3 +3041,248 @@ recipes' inputs only where they exist, and prove each grid at the table. Gap lin
 row *"the 17 impure-chalk craftings — not carried — ingredients missing"*, still open after six slices.
 The in-game assertion: fill each impure-chalk grid at the real table and read the result slot, with a
 wrong-ingredient grid as the differential; `check_recipe_keys.py` must stay at 0 blocked.
+
+## Slice 12 (0.2.13, 2026-11-23) — the 17 impure-chalk craftings
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). Class
+**content**, tier **deep** (ledger row 345). Licence **MIT**, ours on `main` → an
+`Update occultism 0.2.13` publication.
+
+**Gap line it comes from:** 0.2.11's `## Next slice` — *"The honest next family instead is the **17
+impure-chalk craftings** (`chalk_*_impure`), which need `#occultism:dusts/chalk_base` and the five
+essence/paste items … so the slice is a *data* one: enumerate the tags, carry the missing essences'
+spirit-fire recipes' inputs only where they exist, and prove each grid at the table. Gap line: the
+0.2.5 coverage row "the 17 impure-chalk craftings — not carried — ingredients missing" "* — and the
+0.2.12 parity row that still carried the same line. The storage actuator stays
+`blocked(ritual:craft_storage_controller_base)`, as 0.2.12 recorded.
+
+### The jar, read at `release/v1.21.1-1.225.0` (commit `91de0d2a…`)
+
+`unzip -l … | grep 'recipe/crafting/chalk_.*_impure'` gives **17 files**: 15 coloured shapeless
+grids (`chalk_{pink,brown,gray,cyan,black,green,light_blue,purple,light_gray,lime,orange,yellow,blue,magenta,red}_impure`)
+and **two shaped grids for the same `chalk_white_impure`** (`chalk_white_impure.json` and
+`chalk_white_impure2.json`, the second with the two keys in the opposite columns). The 16 impure
+chalk **items** were already carried (0.2.0); the recipes, their tags and every ingredient except
+`chalk_white_impure` were not.
+
+The tags the grids reach (all from the jar's own `data/c/tags/item/…` unless noted):
+
+| grid | tags, and the member each resolves to |
+|---|---|
+| `chalk_white_impure`, `…2` | `#occultism:dusts/chalk_base` → `#c:dusts/otherstone` → `occultism:burnt_otherstone` **and** `#c:dusts/otherrock` → `occultism:burnt_otherrock`; `#c:dusts/otherworld_wood` → `occultism:otherworld_ashes` |
+| cyan | `#c:dusts/iesnium` → `iesnium_dust`; `#c:dusts/echo` → `echo_dust` |
+| black | `#c:dusts/witherite` → `witherite_dust` ×3 |
+| light_blue | `#c:dusts/ice` → `crushed_ice`; `#c:dusts/packed_ice` → `crushed_packed_ice`; `#c:dusts/blue_ice` → `crushed_blue_ice` |
+| purple | `#c:dusts/end_stone` → `crushed_end_stone`; `#c:dusts/obsidian` → `obsidian_dust` ×2 |
+| light_gray | `#c:dusts/silver` → `silver_dust`; `#c:dusts/iron` → `iron_dust`; `#c:dusts/calcite` → `crushed_calcite` |
+| lime | `#c:dusts/research` → `research_fragment_dust`; `#c:dusts/emerald` → `emerald_dust`; `#c:slime_balls` → `minecraft:slime_ball` |
+| orange | `#c:dusts/blaze` → `minecraft:blaze_powder` |
+| yellow | `#c:dusts/glowstone` → `minecraft:glowstone_dust`; `#c:dusts/gold` → `gold_dust` ×2 |
+| blue | `#c:dusts/lapis` → `lapis_dust`; `#c:tube_corals` → `minecraft:tube_coral`/`_fan` |
+| magenta | `#c:dusts/dragonyst` → `dragonyst_dust`; `#c:dusts/amethyst` → `amethyst_dust` |
+| red | `#c:dusts/redstone` → `minecraft:redstone` |
+
+`#c:dusts/blaze`, `glowstone`, `redstone` and `c:slime_balls`/`tube_corals` are **not in the jar** —
+NeoForge supplies them — so the package declares them with vanilla's items, the same way it already
+declares `c:ingots/gold`.
+
+**Where each ingredient's source exists** (the brief's "carry it where it exists, say so per item"):
+
+| ingredient | the jar's only source | carried? |
+|---|---|---|
+| `burnt_otherstone`, `burnt_otherrock` | `smelting/burnt_*.json` from the **carried** polished pair (200 ticks, 0.15 xp) | **recipes carried** — obtainable |
+| `otherworld_ashes` | spirit fire over `#occultism:otherworld_logs` — the logs are not carried (the recipe is the one the table readout skips, 26 of 27) | item carried, source not |
+| `crushed_ice`/`_packed_`/`_blue_`, `crushed_end_stone`, `crushed_calcite`, `obsidian_dust`, `silver_dust`, `iron_dust`, `emerald_dust`, `gold_dust`, `lapis_dust`, `amethyst_dust`, `iesnium_dust`, `echo_dust` | `crushing/…` recipes (a crusher spirit — the unported machine tier; the outputs are tag results) | item carried, source not |
+| `research_fragment_dust`, `dragonyst_dust`, `witherite_dust` | `ritual/craft_*.json` | item carried, source blocked(rituals) |
+| `demonic_meat` | a possessed-mob drop (`tags/item/drop_from/possessed_*`) | item carried, source not |
+| `cruelty_essence`, `cursed_honey` | `ritual/possess_goat` / `possess_bee` | item carried, source blocked(rituals) |
+| `gray_paste`, `nature_paste` | `ritual/craft_*_paste` | item carried, source blocked(rituals) |
+| `marid_essence`, `afrit_essence` | `ritual/summon_unbound_*` | item carried, source blocked(rituals) |
+| `minecraft:cocoa_beans`, `brown_mushroom`, `glow_ink_sac`, `torchflower`, `chorus_fruit`, `glow_berries`, `glowstone_dust`, `redstone`, `slime_ball`, `tube_coral`, `blaze_powder` | vanilla | yes (vanilla) |
+
+The brief said the five essence/paste items were "spirit-fire results the package already carries";
+the artefact says otherwise: **none** of them is a spirit-fire result (seven items, not five; their
+sources are rituals and possessions), and `#occultism:otherworld_wood` in the brief is the jar's
+`#c:dusts/otherworld_wood` (the item `otherworld_ashes` **was** already carried). The artefact wins,
+and each item's real source is the table above.
+
+### What was carried
+
+| family | files | source |
+|---|---|---|
+| crafting recipes | 17 (`data/occultism/recipe/crafting/chalk_*_impure*.json`) | the jar's, rewritten to the 26.3 bare `"id"` / `"#tag"` ingredient |
+| smelting recipes | 2 (`…/recipe/smelting/burnt_other{stone,rock}.json`) | the jar's, from the carried polished pair |
+| item declarations | 26 (`data/occultism/horizon/item/<id>.json`, `minecraft:paper` template) | the jar's item registry |
+| item tags | 26 (`data/{c,occultism}/tags/item/…`) | the jar's 21, plus the 5 loader-provided ones naming vanilla's items |
+| lang | 26 keys | the jar's `en_us` |
+| creative tab | 26 entries | after the impure chalks (the port's family grouping) |
+
+Nothing else changed: no block, model, texture or code path. `runtime.rs` gained the four data
+tests below only; the product behaviour is the content.
+
+### The rule under test
+
+The two white grids are `xy`/`xy`/`xy`; `x` is `#occultism:dusts/chalk_base` and `y`
+`#c:dusts/otherworld_wood` (mirrored in `chalk_white_impure2`). The 15 coloured grids are shapeless
+and take one `chalk_white_impure` plus the materials above. Every result count is 1.
+
+Unit tests (in `runtime.rs`, before any file existed):
+
+- `the_seventeen_impure_chalk_recipes_are_the_jars_shapes_in_the_26_3_dialect` — each file is the
+  jar's type, result, count and exact ingredient multiplicity, with no 1.21.1 object form.
+- `every_impure_chalk_tag_resolves_to_a_declared_item` — walks every tag **recursively** (the nested
+  chalk base included), asserts the authored member list and that every `occultism:` member has an
+  item declaration (a tag that resolves to nothing is the `#c:cobblestones` failure).
+- `the_two_burnt_dusts_are_smelted_from_the_carried_polished_pair` — the two smelting recipes.
+- `every_impure_ingredient_is_declared_named_and_in_the_tab` — the 26 items' file, lang and tab row.
+
+### Red → green
+
+**Unit red** (`sdk-test-red-0.2.13.log`) — the four tests written first, all failing on the missing
+files (not on a compile error):
+
+```
+---- runtime::tests::every_impure_chalk_tag_resolves_to_a_declared_item stdout ----
+thread 'runtime::tests::every_impure_chalk_tag_resolves_to_a_declared_item' (529155) panicked at src/runtime.rs:936:59:
+/home/deepseek/atm10/ports/occultism/data/occultism/tags/item/dusts/chalk_base.json: No such file or directory (os error 2)
+…
+---- runtime::tests::the_seventeen_impure_chalk_recipes_are_the_jars_shapes_in_the_26_3_dialect stdout ----
+… data/occultism/recipe/crafting/chalk_white_impure.json: No such file or directory (os error 2)
+…
+test result: FAILED. 75 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+Green after the data: **79 passed, 0 failed** (`sdk-test.log`).
+
+### In game (phase X, verbatim from `e2e-default-0.2.13.log`, abridged to the assertions)
+
+```
+== X: the 17 impure-chalk craftings ==
+  survival, table at 222,101,38
+== the 17 impure-chalk grids ==
+  the chalk_white_impure grid -> chalk_white_impure: the result slot reads occultism:chalk_white_impure x1
+  the chalk_white_impure: taken into slot 0 (inventory {"occultism:chalk_white_impure": 1})
+  the chalk_white_impure recipe: every ingredient was consumed ({"occultism:chalk_white_impure": 1})
+  the chalk_white_impure recipe: the grid is empty
+  … the second white grid and the 15 coloured ones: the same four lines …
+  the chalk_red_impure grid -> chalk_red_impure: the result slot reads occultism:chalk_red_impure x1
+  the chalk_red_impure recipe: the grid is empty
+== the wrong grids: nothing ==
+  the pink grid with dirt for one demonic meat: the result slot stayed empty
+  two burnt-stone columns and no otherworld wood: the result slot stayed empty
+== the burnt pair in a real furnace, and the same stone with no fuel ==
+  furnace with coal: [null, null, {"count": 1, "item": "occultism:burnt_otherstone"}]
+  polished_otherstone + coal -> occultism:burnt_otherstone (the input is gone)
+  furnace with coal: [null, null, {"count": 1, "item": "occultism:burnt_otherrock"}]
+  polished_otherrock + coal -> occultism:burnt_otherrock (the input is gone)
+  furnace without fuel: [{"count": 1, "item": "occultism:polished_otherstone"}, null, null]
+  no fuel: the output stayed empty and the input stayed put
+  the game log has no 'invalid ingredient' line (every tag-keyed cell resolved)
+```
+
+The driver (`tools/chalk_recipes.py`) opens a **real** crafting table (`ctl interact`), fills the
+grid through the screen's slots (100..108, result 200), reads the result, takes it and reads the
+inventory and the grid back; the player is in survival, so consumption is the vanilla rule. The two
+white grids fill the nested `chalk_base` column with **both** members (two `burnt_otherstone`, one
+`burnt_otherrock` in the first; mirrored in the second), so a nested tag resolving to only one item
+fails. Every other tag-keyed cell is filled with the tag's own member. The game log is then grepped
+for `invalid ingredient` — the line a tag-keyed cell that did not resolve leaves behind — and the
+phase fails on any occurrence.
+
+`CHALK_SELFTEST=1` asserts the first white grid makes **two** and must FAIL
+(`e2e-selftest-chalk-0.2.13.log`, `CHALK FAIL: selftest: the chalk_white_impure grid … made
+occultism:chalk_white_impure x1, expected … x2`, `EXIT:1`). `CONTROL_LEG=1 CHALK_ONLY=1` proves the
+16 impure-chalk ids and five sampled ingredient ids unknown as items on a game without the package
+(`e2e-control-chalks-0.2.13.log`, `EXIT:0`), and `GAME=$CONTROL_GAME CHALK_ONLY=1` is the scenario's
+own control (`CHALK FAIL: missing ingredient occultism:burnt_otherstone`, `EXIT:1`).
+
+### Ladder
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests (red) | `cargo test --offline`, tests first | `sdk-test-red-0.2.13.log` | **75 passed, 4 failed** (files absent) |
+| tests | `cargo test --offline` | `sdk-test-0.2.13.log` (copied to `sdk-test.log`) | **79 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy-0.2.13.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt-0.2.13.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.13.log`, `sdk-build-second-0.2.13.log`, `sdk-reproducible-0.2.13.txt` | **`REPRODUCIBLE`**, 309,344 B |
+| package | `sha256sum`, `stat -c%s`, `unzip -Z1 \| wc -l` | `sdk-artifact-0.2.13.txt` | 309,344 B, `8dc4b0633c3ad413217ac673b085ff8f98fa880992eea8052c8c06f2d29bba09`, **629 entries**, 17 impure recipes packed, no packed `Cargo.lock`, declares **0.2.13**, 0 empty files |
+| package check | `cargo horizon-mod check occultism.hmod` | `sdk-check-0.2.13.log` | exit 0, `occultism 0.2.13 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` | `sdk-fits-0.2.13.log` | `0a875da  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` | `sdk-fits-next-0.2.13.log` | **`0b14f8a  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | `sdk-gate-0.2.13.txt` | **1/1** (79 tests, 0 clippy warnings, package = tree) |
+| recipe types | `python3 ports/tools/check-recipe-types.py occultism` | `check-recipe-types-0.2.13.log` | `occultism: ok`, exit 0 |
+| recipe keys | `python3 tools/check_recipe_keys.py` | `check-recipe-keys-0.2.13.log` | `69 recipe(s), 69 craftable, 0 blocked, 0 failure(s)`, exit 0 |
+| game build | `launcher-game.sh build occultism` | `launcher-build-0.2.13.log` | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-b7522f162df2` |
+| in game (the family) | `CHALK_ONLY=1` | `e2e-chalk-0.2.13.log` | **PASS** + `EXIT:0` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen) | `e2e-default-0.2.13.log` | **PASS** + `EXIT:0` (A..X) |
+| in game (control ids) | `CONTROL_LEG=1 CHALK_ONLY=1` | `e2e-control-chalks-0.2.13.log` | **PASS** + `EXIT:0` (16 chalk + 5 ingredient ids unknown) |
+| in game (control) | `GAME=$CONTROL_GAME CHALK_ONLY=1` | `e2e-control-0.2.13.log` | **FAIL** + `EXIT:1` (`missing ingredient occultism:burnt_otherstone`) |
+| fail-capability (this family) | `CHALK_ONLY=1 CHALK_SELFTEST=1` | `e2e-selftest-chalk-0.2.13.log` | **FAIL** + `EXIT:1` |
+| fail-capability (scenario) | `SELFTEST=1` | `e2e-selftest-0.2.12.log` | **FAIL** + `EXIT:1` (unchanged; the phase-A conversion) |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | **77 logs, 77 ok**, 0 missing-exit, 0 bad-exit |
+
+### Parity coverage (0.2.13)
+
+| family | state |
+|---|---|
+| the 17 impure-chalk crafting recipes | **tested** — X (each grid filled as declared, the result id and count read from the result slot, taken, the grid emptied and every ingredient's inventory count back to 0; the second white grid proves the mirrored shape) |
+| the nested `#occultism:dusts/chalk_base` tag | **tested** — X (both white grids fill its column with `burnt_otherstone` **and** `burnt_otherrock`; the unit test resolves the nesting) |
+| `#c:dusts/otherworld_wood` | **tested** — X (both white grids fill it with `otherworld_ashes`) |
+| the 20 other tag-keyed cells | **tested** — X (each filled with the tag's own member; the phase fails on any `invalid ingredient` line in the game log) |
+| the two burnt-dust smelting recipes | **tested** — X (the carried polished pair in a real furnace: 200 ticks, the input consumed, one burnt dust out; a fuel-less furnace leaves the input and makes nothing) |
+| the 26 ingredient items — declaration, lang, tab | **tested** — the unit test reads each file, the lang key and the tab row; in game each is `give`-able (the grids could not be filled otherwise) |
+| the wrong-ingredient / wrong-shape controls | **tested** — X (dirt for one demonic meat, and the two chalk-base columns with no otherworld wood, make nothing) |
+| the impure chalk items themselves | **tested** — X (each result taken into the inventory) and the 16 item ids already had their declarations/lang/tab rows from 0.2.0 |
+| the coloured grids' unobtainable ingredients (`demonic_meat`, the seven essences/pastes, the fourteen crushing dusts, `otherworld_ashes`) | **not obtainable in this package** — carried as declared items only; their sources are `blocked(rituals)` / the unported crusher spirit / the uncarried otherworld logs, named per item above |
+| the crude/crushing and spirit-job recipes that would source those dusts | **not ported** — machines tier (crusher spirit), the same gap 0.2.0 recorded |
+| the storage controllers and their bases, the tablets, the rest of the building family | **not carried** — unchanged (`blocked(ritual:craft_storage_controller_base)` for the controllers; the tablets are the next slice, below) |
+| spirit fire, the 26 conversion recipes, the crop, the seed source, the readouts, the loot tables, 0.2.5–0.2.12 families | **tested** — phases A..W, unchanged, re-run in this slice's full run |
+
+### Measured behaviours of this pin (added by this slice)
+
+1. **A nested item tag resolves at the 26.3 loader.** `#occultism:dusts/chalk_base` naming
+   `#c:dusts/otherstone` + `#c:dusts/otherrock` matched both `burnt_otherstone` and
+   `burnt_otherrock` in one grid — the first nested tag this port carries, and the one the
+   `#c:cobblestones` failure would have made silently empty.
+2. **An item id with no declaration is an `invalid ingredient` line**, not a load error: the recipe
+   still registers and the cell refuses every item. The 26 declarations are what turn those cells
+   into matches, which is why the phase greps the log instead of trusting the grid alone.
+3. **The 26.3 loader accepts a repeated ingredient string** in a shapeless grid (three
+   `"occultism:demonic_meat"` entries, three `"#c:dusts/witherite"` entries), and the craft consumed
+   all three.
+4. **A fixture/driver path is not the package's:** the two new smelting recipes are only in the
+   driver's furnace leg, not in phase S's, so `check_recipe_keys.py` moved from 50 to 69 recipes
+   (61 crafting + 8 smelting) with 0 blocked.
+5. The 0.2.4–0.2.12 findings stand (a fresh table per grid, survival for consumption,
+   `--offscreen` for menus, one `EXIT:` line per run from the script's trap plus the guard's).
+
+### Deviations (deliberate, and why)
+
+| Area | Upstream | This port |
+|---|---|---|
+| the 26 ingredient items' look | the jar's own item textures/models | the plain `minecraft:paper` template (the same shape the impure chalks and the book items already use); the slice is data + tables, not art |
+| the impure chalk items' textures | the jar's textures | already the paper template since 0.2.0 (unchanged) |
+| the coloured grids' ingredients | obtainable from crushing/rituals/possessions | declared but not obtained: the crusher spirit and the rituals are unported, and the otherworld logs are not carried. The grids are craftable wherever a pack or a later slice supplies those items |
+| the chalk's use on the spirit fire | a chalk right-clicked paints the fire and wears one durability | already carried since 0.2.0 (the 16 plain chalks); the impure chalks are ingredients, not painters (upstream's `ChalkItem` gates on the plain chalks) |
+
+### Upstream defects fixed
+
+None: the 17 recipes, the 26 tags and the 26 item ids are internally consistent with the jar's own
+registry. The one artefact-vs-brief correction is in this section's jar table (the essences are not
+spirit-fire results), recorded rather than "fixed".
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+### Next slice
+
+The **`otherstone_tablet`** is the next obtainable result and this slice is what unblocks it: the
+jar's two crafting recipes (`otherstone_tablet.json`, `otherstone_tablet2.json`) are `aga`/`gsg`/
+`aga` where `a` is `#c:dusts/otherworld_wood` (this slice's `otherworld_ashes`), `g` is
+`#c:ingots/gold` (already carried by 0.2.12) and `s` is `otherstone` or `otherrock`. Gap line:
+0.2.11's parity row — *"the remaining family: tablets (`otherstone_tablet`, needs
+`#c:dusts/otherworld_wood`)"* — now satisfiable. It fits the tier: two table recipes, one item, its
+model/texture/lang and a unit test; the in-game assertion is to fill each of the two grids at the
+real table (four ashes + four gold + one stone), read `occultism:otherstone_tablet x1`, take it,
+assert every ingredient consumed and the grid empty, with a wrong grid (three ashes) making nothing;
+`check_recipe_keys.py` must stay at 0 blocked. It is a real behaviour change (one obtainable item
+and two grids), so it is a version, not an evidence-only slice.

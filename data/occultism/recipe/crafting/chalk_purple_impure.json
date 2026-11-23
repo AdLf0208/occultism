@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "occultism:chalk_white_impure",
+    "#c:dusts/end_stone",
+    "#c:dusts/obsidian",
+    "#c:dusts/obsidian"
+  ],
+  "result": {
+    "count": 1,
+    "id": "occultism:chalk_purple_impure"
+  }
+}

@@ -508,3 +508,38 @@ jar's ten-table loot inventory for the family (all present), the brief's `requir
 
 Every leg above ran on the final 287,175 B artifact / tree. `E2E_TMP` (`~/.cache/horizon-e2e/scratch`)
 was used throughout; nothing was written under `/tmp` except the probe scripts.
+
+## 5. SDK 0.2.13 — the 17 impure-chalk craftings
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). The family,
+the tags and the in-game transcript are in `notes.md`, §"Slice 12". Every step ran in a
+`ports/tools/build-slot.sh` lease (the check/fits/build steps with `BUILD_LOCAL=1`: the far box has
+no `cargo-horizon-mod`), `CARGO_INCREMENTAL=0`, no `--target-dir`.
+
+| Step | Command | Result |
+|---|---|---|
+| red (unit) | `cargo test --offline`, the four family tests written before any file | **75 passed; 4 failed**, each on a missing file (`…chalk_base.json: No such file or directory`) — `sdk-test-red-0.2.13.log` |
+| green (unit) | `cargo test --offline` | **79 passed, 0 failed** — `sdk-test-0.2.13.log` (copied to `sdk-test.log`, which the gate reads) |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy-0.2.13.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt-0.2.13.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **`REPRODUCIBLE`**: 309,344 B, `8dc4b063…ba09` — `sdk-build-0.2.13.log`, `sdk-build-second-0.2.13.log`, `sdk-reproducible-0.2.13.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -Z1 \| wc -l` | 309,344 B, `8dc4b0633c3ad413217ac673b085ff8f98fa880992eea8052c8c06f2d29bba09`, **629 entries**, 17 impure recipes packed, no packed `Cargo.lock`, declares **0.2.13**, 0 empty files — `sdk-artifact-0.2.13.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` | exit 0, `occultism 0.2.13 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check-0.2.13.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` | `0a875da  made for`, exit 0 — `sdk-fits-0.2.13.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` | **`0b14f8a  fits`**, exit 0 — `sdk-fits-next-0.2.13.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** (79 tests, 0 clippy warnings, package = tree) — `sdk-gate-0.2.13.txt` |
+| recipe types | `python3 ports/tools/check-recipe-types.py occultism` | `occultism: ok`, exit 0 — `check-recipe-types-0.2.13.log` |
+| recipe keys | `python3 tools/check_recipe_keys.py` | `69 recipe(s), 69 craftable, 0 blocked, 0 failure(s)`, exit 0 — `check-recipe-keys-0.2.13.log` |
+| game build | `launcher-game.sh build occultism` | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-b7522f162df2` — `launcher-build-0.2.13.log` |
+| in game (the family) | `CHALK_ONLY=1` | **PASS** + `EXIT:0` (17 grids, the nested tag's both members, the two smelting recipes, no `invalid ingredient`) — `e2e-chalk-0.2.13.log` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen, launcher-built game) | **PASS** + `EXIT:0` (A..X) — `e2e-default-0.2.13.log` |
+| in game (control ids) | `CONTROL_LEG=1 CHALK_ONLY=1` | **PASS** + `EXIT:0` (16 chalk + 5 ingredient ids unknown as items) — `e2e-control-chalks-0.2.13.log` |
+| in game (control) | `GAME=$CONTROL_GAME CHALK_ONLY=1` | **FAIL** + `EXIT:1` (`CHALK FAIL: missing ingredient occultism:burnt_otherstone`) — `e2e-control-0.2.13.log` |
+| fail-capability (this family) | `CHALK_ONLY=1 CHALK_SELFTEST=1` | **FAIL** + `EXIT:1` (the first grid made x1, the flipped assertion wants x2) — `e2e-selftest-chalk-0.2.13.log` |
+| fail-capability (scenario) | `SELFTEST=1` | **FAIL** + `EXIT:1` (the 0.2.12 phase-A flip, unchanged) — `e2e-selftest-0.2.12.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | **77 logs, 77 ok**, 0 missing-exit, 0 bad-exit |
+
+Every leg above ran on the final 309,344 B artifact / tree. `E2E_TMP`
+(`~/.cache/horizon-e2e/scratch`) was used throughout; the only scratch file outside it is the
+one-off `/tmp/opencode/gen_impure_chalks.py` that translated the 17 jar recipes (not part of the
+port).
