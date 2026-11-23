@@ -291,6 +291,101 @@ pub fn info_line(
     )
 }
 
+/// The six sacrificial bowls this slice carries. Upstream registers ten
+/// (`OccultismBlocks.java:462-515`): the four `SacrificialBowlBlock`s and the two
+/// `GoldenSacrificialBowlBlock`s, plus the silver pair (whose crafting grid needs
+/// `#c:ingots/silver`, which this package has no member for) and the two iesnium
+/// bowls (pentacle-ritual results, `RitualRecipes.craft_iesnium_sacrificial_bowl`).
+/// The four uncarriable ones are recorded as gaps, not shipped as creative-only
+/// blocks.
+pub const BOWLS: [&str; 6] = [
+    "occultism:sacrificial_bowl",
+    "occultism:dark_sacrificial_bowl",
+    "occultism:copper_sacrificial_bowl",
+    "occultism:dark_copper_sacrificial_bowl",
+    "occultism:golden_sacrificial_bowl",
+    "occultism:dark_golden_sacrificial_bowl",
+];
+
+/// The two golden bowls: upstream's `GoldenSacrificialBowlBlock` is a plain
+/// `Block`, not a `SacrificialBowlBlock`, and its block entity overrides the
+/// contents change only to start a ritual — the spirit-fire conversion is skipped
+/// by an `instanceof GoldenSacrificialBowlBlockEntity` check.
+pub const GOLDEN_BOWLS: [&str; 2] = [
+    "occultism:golden_sacrificial_bowl",
+    "occultism:dark_golden_sacrificial_bowl",
+];
+
+/// The bowl's one slot holds one item:
+/// `SacrificialBowlBlockEntity.itemStackHandler.getSlotLimit → 1`.
+pub const BOWL_SLOT_LIMIT: u32 = 1;
+
+/// The most `extractItem(0, 64, false)` takes out of the bowl
+/// (`SacrificialBowlBlock.useItemOn`), which is the whole slot unless a hopper put
+/// more in — the engine's declared container has no per-slot cap.
+pub const BOWL_EXTRACT_LIMIT: u32 = 64;
+
+/// The one item the jar excludes from the bowl's over-fire conversion
+/// (`!recipeInput.item().is(OccultismBlocks.OTHERFLOWER.asItem())`): the flower's
+/// own spirit-fire recipe would otherwise burn it in a bowl.
+pub const OTHERFLOWER: &str = "occultism:otherflower";
+
+/// Whether `block` is one of the six bowls this slice carries.
+pub fn is_bowl(block: &str) -> bool {
+    BOWLS.contains(&block)
+}
+
+/// Whether `block` is one of the two golden bowls.
+pub fn is_golden_bowl(block: &str) -> bool {
+    GOLDEN_BOWLS.contains(&block)
+}
+
+/// Whether `block` is a bowl whose contents its block entity converts while it
+/// stands over a spirit fire: every bowl but the golden pair
+/// (`SacrificialBowlBlockEntity.onContentsChanged` skips `GoldenSacrificialBowlBlockEntity`).
+pub fn converts_in_bowl(block: &str) -> bool {
+    is_bowl(block) && !is_golden_bowl(block)
+}
+
+/// Whether `item` may be converted by a bowl: anything but the flower the jar
+/// excludes.
+pub fn bowl_converts_item(item: &str) -> bool {
+    item != OTHERFLOWER
+}
+
+/// What one right click puts in an empty bowl and what it leaves in the hand:
+/// `insertItem(0, held, false)` with a slot limit of one. `None` when the hand
+/// holds nothing.
+pub fn bowl_insert(held: u32) -> Option<(u32, u32)> {
+    (held > 0).then(|| (BOWL_SLOT_LIMIT.min(held), held - BOWL_SLOT_LIMIT.min(held)))
+}
+
+/// How much a take-out click removes from the bowl's slot:
+/// `extractItem(0, 64, false)`.
+pub fn bowl_take(stored: u32) -> u32 {
+    stored.min(BOWL_EXTRACT_LIMIT)
+}
+
+/// What a plain bowl turns a stored stack into while it stands over a spirit
+/// fire: upstream's `onContentsChanged` runs the stack through the loaded
+/// `occultism:spirit_fire` table, unless the bowl is golden or the item is the
+/// flower the jar excludes. The bowl's slot holds one item, so the count is one.
+pub fn bowl_conversion(table: &Table, block: &str, item: &str) -> Option<Conversion> {
+    if !converts_in_bowl(block) || !bowl_converts_item(item) {
+        return None;
+    }
+    table.convert(item, 1)
+}
+
+/// The `/occultism info` answer for a bowl: the stack its block entity holds, as
+/// read through the block entity's own slot.
+pub fn bowl_line(pos: [i32; 3], stored: Option<(&str, u32)>) -> String {
+    match stored {
+        None => format!("Bowl at {pos:?}: stored=empty"),
+        Some((item, count)) => format!("Bowl at {pos:?}: stored={item} x{count}"),
+    }
+}
+
 /// A player's game mode, as the click guard needs it.
 /// A mirror of the game's four modes rather than the SDK's `GameMode`: this
 /// module carries no `mod_api` type, so the glue maps one to the other.
@@ -334,6 +429,16 @@ pub enum ClickHand {
 impl ClickHand {
     /// Whether a click on this hand may harvest the crop: the main hand only.
     pub fn may_harvest(self) -> bool {
+        matches!(self, Self::Main)
+    }
+
+    /// Whether a click on this hand may fill or empty a sacrificial bowl: the
+    /// main hand only. Horizon dispatches a click's block Part once **per hand**
+    /// (measured in game: the main hand filled the bowl and the off hand emptied
+    /// it from the same click, 2026-11-23), where vanilla reaches the off hand
+    /// only after a main-hand failure. Upstream refuses the off hand for its own
+    /// golden-bowl activation for the same reason.
+    pub fn may_use_bowl(self) -> bool {
         matches!(self, Self::Main)
     }
 }
@@ -2359,5 +2464,449 @@ mod tests {
             "nether"
         );
         assert!(recent.last(2, "minecraft:overworld", [1, 64, 0]).is_none());
+    }
+
+    // ---- the sacrificial bowls (0.2.12) -----------------------------------
+
+    /// The six bowls this slice carries, by bare name (the product constant above
+    /// holds the full ids, which the readout and the click look up).
+    const CARRIED_BOWLS: [&str; 6] = [
+        "sacrificial_bowl",
+        "dark_sacrificial_bowl",
+        "copper_sacrificial_bowl",
+        "dark_copper_sacrificial_bowl",
+        "golden_sacrificial_bowl",
+        "dark_golden_sacrificial_bowl",
+    ];
+
+    /// The package's own assets tree, as `cargo test` sees it.
+    fn asset(relative: &str) -> Vec<u8> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("assets/occultism")
+            .join(relative);
+        std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+    }
+
+    fn asset_text(relative: &str) -> String {
+        String::from_utf8(asset(relative)).expect("utf-8 asset")
+    }
+
+    #[test]
+    fn the_six_bowl_recipes_are_the_jars_shapes_in_the_26_3_dialect() {
+        // The jar's `data/occultism/recipe/crafting/`: a 5-stone ring makes the plain
+        // or the dark bowl (`o o`/`ooo`), eight gold ingots around the bowl make the
+        // golden pair (`ggg`/`gbg`/`ggg`), and a shapeless bowl + copper ingot makes
+        // the copper pair. The 26.3 loader reads an ingredient as a bare `"id"` /
+        // `"#tag"`; the jar's `{"item": …}` object is dropped without a word and the
+        // grid then yields nothing (the 0.2.5 finding, pinned there first).
+        for name in CARRIED_BOWLS {
+            let text = content(&format!("occultism/recipe/crafting/{name}.json"));
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{name} carries the 1.21.1 object-form ingredient {object_form}, \
+                     which the 26.3 loader drops: {text}"
+                );
+            }
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{name}\"")),
+                "{name}'s recipe does not make it: {text}"
+            );
+            assert!(
+                text.contains("\"count\": 1"),
+                "{name}'s recipe does not make one: {text}"
+            );
+        }
+        for (name, stone) in [
+            ("sacrificial_bowl", "otherstone"),
+            ("dark_sacrificial_bowl", "otherrock"),
+        ] {
+            let text = content(&format!("occultism/recipe/crafting/{name}.json"));
+            assert!(
+                text.contains("\"minecraft:crafting_shaped\""),
+                "{name} is the jar's shaped ring: {text}"
+            );
+            for row in ["\"o o\"", "\"ooo\""] {
+                assert!(
+                    text.contains(row),
+                    "{name}'s ring still carries the row {row}: {text}"
+                );
+            }
+            assert!(
+                text.contains(&format!("\"occultism:{stone}\"")),
+                "{name} is not made of occultism:{stone}: {text}"
+            );
+        }
+        for (name, bowl) in [
+            ("golden_sacrificial_bowl", "sacrificial_bowl"),
+            ("dark_golden_sacrificial_bowl", "dark_sacrificial_bowl"),
+        ] {
+            let text = content(&format!("occultism/recipe/crafting/{name}.json"));
+            assert!(
+                text.contains("\"minecraft:crafting_shaped\""),
+                "{name} is the jar's shaped golden ring: {text}"
+            );
+            for row in ["\"ggg\"", "\"gbg\""] {
+                assert!(
+                    text.contains(row),
+                    "{name}'s ring still carries the row {row}: {text}"
+                );
+            }
+            assert!(
+                text.contains("\"#c:ingots/gold\""),
+                "{name} is not made of the gold tag: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"occultism:{bowl}\"")),
+                "{name} is not made around occultism:{bowl}: {text}"
+            );
+        }
+        for (name, bowl) in [
+            ("copper_sacrificial_bowl", "sacrificial_bowl"),
+            ("dark_copper_sacrificial_bowl", "dark_sacrificial_bowl"),
+        ] {
+            let text = content(&format!("occultism/recipe/crafting/{name}.json"));
+            assert!(
+                text.contains("\"minecraft:crafting_shapeless\""),
+                "{name} is the jar's shapeless recipe: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"occultism:{bowl}\"")),
+                "{name} is not made from occultism:{bowl}: {text}"
+            );
+            assert!(
+                text.contains("\"#c:ingots/copper\""),
+                "{name} is not made with the copper tag: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_bowl_has_a_26_3_loot_table_that_drops_itself() {
+        // The jar's `loot_table/blocks/<bowl>.json` in the 26.3 condition dialect:
+        // the 1.21.1 plural `"conditions"` list evaluates false at this pin and the
+        // block would drop nothing.
+        for name in CARRIED_BOWLS {
+            let text = content(&format!("occultism/loot_table/blocks/{name}.json"));
+            assert!(
+                text.contains(&format!("\"name\": \"occultism:{name}\"")),
+                "{name}'s loot table does not drop itself: {text}"
+            );
+            assert!(
+                text.contains("\"type\": \"minecraft:survives_explosion\""),
+                "{name} lost the jar's survives_explosion guard: {text}"
+            );
+            assert!(
+                text.contains("\"type\": \"minecraft:block\""),
+                "{name}'s loot table is not a block table: {text}"
+            );
+            assert!(
+                !text.contains("\"conditions\": ["),
+                "{name} carries the 1.21.1 plural condition list, read as false at 26.3: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_bowls_copy_the_upstream_properties_and_shape() {
+        // `OccultismBlocks.java:462-515`: every bowl is `Properties.of()`
+        // `.mapColor(STONE).sound(STONE).strength(1.5f, 30).noOcclusion()`, and
+        // **none** calls `requiresCorrectToolForDrops`, so `requires_tool` is
+        // false: a bare hand drops exactly one. The brief asks for this line to be
+        // measured, not inherited; `gameplay-facts.json` gives the `minecraft:stone`
+        // template `requires_tool: true`, so the declaration must override it.
+        for name in CARRIED_BOWLS {
+            let text = content(&format!("occultism/horizon/block/{name}.json"));
+            assert!(
+                text.contains("\"requires_tool\": false"),
+                "{name} must not gate its drops on a pickaxe (upstream has no \
+                 requiresCorrectToolForDrops): {text}"
+            );
+            assert!(
+                text.contains("\"hardness\": 1.5"),
+                "{name} is not hardness 1.5: {text}"
+            );
+            assert!(
+                text.contains("\"explosion_resistance\": 30.0"),
+                "{name} is not resistance 30: {text}"
+            );
+            assert!(
+                text.contains("\"map_color\": 11"),
+                "{name} is not MapColor.STONE: {text}"
+            );
+            assert!(
+                text.contains("\"occludes\": false"),
+                "{name} is not noOcclusion: {text}"
+            );
+            assert!(
+                text.contains("\"sounds\": \"minecraft:stone\""),
+                "{name} does not use the stone sounds: {text}"
+            );
+            assert!(
+                text.contains("\"template\": \"minecraft:stone\""),
+                "{name} does not copy the stone template: {text}"
+            );
+        }
+        // The golden bowls are `Block.box(3, 2, 3, 13, 8, 13)`, one box; the plain
+        // bowls are a bowl (`DirectionalBlockShape`'s upright shape, which the jar's
+        // model draws as a base plus a rim).
+        let golden = "[0.1875, 0.125, 0.1875, 0.8125, 0.5, 0.8125]";
+        let base = "[0.25, 0.0625, 0.25, 0.75, 0.3125, 0.75]";
+        for name in ["golden_sacrificial_bowl", "dark_golden_sacrificial_bowl"] {
+            let text = content(&format!("occultism/horizon/block/{name}.json"));
+            assert!(
+                text.contains(golden),
+                "{name} does not carry the jar's 3..13 / 2..8 box: {text}"
+            );
+            assert!(
+                !text.contains(base),
+                "{name} is a golden bowl, not the plain bowl's shape: {text}"
+            );
+        }
+        for name in [
+            "sacrificial_bowl",
+            "dark_sacrificial_bowl",
+            "copper_sacrificial_bowl",
+            "dark_copper_sacrificial_bowl",
+        ] {
+            let text = content(&format!("occultism/horizon/block/{name}.json"));
+            assert!(
+                text.contains(golden) && text.contains(base),
+                "{name} does not carry the bowl's base and rim: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_bowl_has_its_state_model_name_and_tag() {
+        // This port carries no `facing` state (the jar's `DirectionalBlock`
+        // placement is a content-API gap, recorded in notes.md), so each blockstate
+        // is one variant and the model is the jar's upright one.
+        let lang = asset_text("lang/en_us.json");
+        let tab = content("occultism/horizon/creative_tab/spirit_fire.json");
+        let pickaxe = content("minecraft/tags/block/mineable/pickaxe.json");
+        for name in CARRIED_BOWLS {
+            let state = asset_text(&format!("blockstates/{name}.json"));
+            assert!(
+                state.contains(&format!("\"model\": \"occultism:block/{name}\"")),
+                "{name}'s blockstate does not name its model: {state}"
+            );
+            assert!(
+                !state.contains("facing="),
+                "{name}'s blockstate still keys on a facing state this port does not carry: {state}"
+            );
+            let item_model = asset_text(&format!("models/item/{name}.json"));
+            assert!(
+                item_model.contains(&format!("\"occultism:block/{name}\"")),
+                "{name}'s item model does not parent its block model: {item_model}"
+            );
+            let id = format!("occultism:{name}");
+            assert!(
+                lang.contains(&format!("\"block.occultism.{name}\"")),
+                "{id} has no lang entry"
+            );
+            assert!(
+                tab.contains(&format!("\"{id}\"")),
+                "{id} is not in the creative tab"
+            );
+            assert!(
+                pickaxe.contains(&format!("\"{id}\"")),
+                "{id} is not in mineable/pickaxe (the jar's datagen output)"
+            );
+        }
+        // The six textures the models name, each a real PNG.
+        for texture in [
+            "sacrificial_bowl",
+            "dark_sacrificial_bowl",
+            "sacrificial_bowl_golden",
+            "dark_sacrificial_bowl_golden",
+            "sacrificial_bowl_copper",
+            "dark_sacrificial_bowl_copper",
+        ] {
+            let bytes = asset(&format!("textures/block/{texture}.png"));
+            assert!(
+                bytes.starts_with(b"\x89PNG"),
+                "textures/block/{texture}.png is not a PNG"
+            );
+        }
+    }
+
+    #[test]
+    fn the_ritual_and_silver_bowls_are_not_carried() {
+        // The silver pair's grid needs `#c:ingots/silver` (no member in this
+        // package) and the two iesnium bowls are pentacle-ritual results. A future
+        // jar that makes them obtainable must fail here instead of shipping a
+        // creative-only block.
+        for name in [
+            "silver_sacrificial_bowl",
+            "dark_silver_sacrificial_bowl",
+            "iesnium_sacrificial_bowl",
+            "dark_iesnium_sacrificial_bowl",
+        ] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join(format!("data/occultism/horizon/block/{name}.json"));
+            assert!(
+                !path.exists(),
+                "{name} is carried, but its recipe cannot be satisfied by this package"
+            );
+        }
+    }
+
+    #[test]
+    fn the_two_ingot_tags_hold_vanillas_metals() {
+        // The golden and copper grids name the jar's common tags; the engine ships
+        // no `c:` namespace, so the package declares them (as it does `c:feathers`).
+        let gold = content("c/tags/item/ingots/gold.json");
+        let copper = content("c/tags/item/ingots/copper.json");
+        assert!(
+            gold.contains("\"minecraft:gold_ingot\""),
+            "c:ingots/gold does not hold vanilla's gold ingot: {gold}"
+        );
+        assert!(
+            copper.contains("\"minecraft:copper_ingot\""),
+            "c:ingots/copper does not hold vanilla's copper ingot: {copper}"
+        );
+        assert!(
+            !gold.contains("occultism:") && !copper.contains("occultism:"),
+            "the two ingot tags must only name what exists: {gold} {copper}"
+        );
+    }
+
+    #[test]
+    fn the_bowl_slot_takes_one_and_gives_the_whole_slot() {
+        // `SacrificialBowlBlockEntity`: `ItemStackHandler(1)` with
+        // `getSlotLimit → 1`, used by `insertItem(0, held, false)` and
+        // `extractItem(0, 64, false)`.
+        assert_eq!(BOWL_SLOT_LIMIT, 1);
+        assert_eq!(bowl_insert(0), None);
+        assert_eq!(bowl_insert(1), Some((1, 0)));
+        assert_eq!(bowl_insert(16), Some((1, 15)));
+        assert_eq!(bowl_insert(64), Some((1, 63)));
+        assert_eq!(bowl_take(0), 0);
+        assert_eq!(bowl_take(1), 1);
+        assert_eq!(bowl_take(64), 64);
+        assert_eq!(
+            bowl_take(65),
+            64,
+            "extractItem asks for 64, so a hopper's over-full slot leaves the rest"
+        );
+    }
+
+    #[test]
+    fn only_the_plain_bowls_convert_over_spirit_fire() {
+        for name in CARRIED_BOWLS {
+            assert!(is_bowl(&format!("occultism:{name}")), "{name} is a bowl");
+        }
+        assert!(!is_bowl(SPIRIT_FIRE));
+        assert!(
+            !is_bowl("occultism:silver_sacrificial_bowl"),
+            "an uncarried bowl is not a bowl of this slice"
+        );
+        for name in [
+            "sacrificial_bowl",
+            "dark_sacrificial_bowl",
+            "copper_sacrificial_bowl",
+            "dark_copper_sacrificial_bowl",
+        ] {
+            assert!(
+                converts_in_bowl(&format!("occultism:{name}")),
+                "{name} converts its contents over a spirit fire"
+            );
+        }
+        for name in GOLDEN_BOWLS {
+            assert!(
+                is_bowl(name) && is_golden_bowl(name),
+                "{name} is the golden pair"
+            );
+            assert!(
+                !converts_in_bowl(name),
+                "{name}: upstream's GoldenSacrificialBowlBlockEntity skips the conversion"
+            );
+        }
+        assert!(bowl_converts_item("minecraft:feather"));
+        assert!(
+            !bowl_converts_item(OTHERFLOWER),
+            "the jar excludes otherflower from the bowl's conversion"
+        );
+    }
+
+    #[test]
+    fn only_the_main_hand_fills_a_bowl() {
+        // One click reaches the Part once per hand on this pin: acting on both
+        // hands made the main hand's insert and the off hand's take-out cancel out
+        // in the same click (measured in game, 2026-11-23).
+        assert!(ClickHand::Main.may_use_bowl());
+        assert!(
+            !ClickHand::Off.may_use_bowl(),
+            "the off hand's turn must not undo the main hand's click"
+        );
+        assert!(ClickHand::Main.may_harvest());
+        assert!(!ClickHand::Off.may_harvest());
+    }
+
+    #[test]
+    fn a_plain_bowl_converts_its_stored_item_and_a_golden_one_does_not() {
+        // `SacrificialBowlBlockEntity.onContentsChanged`: with a spirit fire below, a
+        // **non-golden** bowl replaces the stack it holds with the spirit-fire
+        // recipe's result, unless the item is `otherflower`. The count is the
+        // stack's own (one, the slot's limit).
+        let table = feather_table();
+        assert_eq!(
+            bowl_conversion(&table, "occultism:sacrificial_bowl", "minecraft:feather"),
+            Some(Conversion {
+                result: "occultism:awakened_feather".to_owned(),
+                count: 1,
+            })
+        );
+        assert_eq!(
+            bowl_conversion(
+                &table,
+                "occultism:dark_copper_sacrificial_bowl",
+                "minecraft:feather"
+            ),
+            Some(Conversion {
+                result: "occultism:awakened_feather".to_owned(),
+                count: 1,
+            })
+        );
+        assert_eq!(
+            bowl_conversion(
+                &table,
+                "occultism:golden_sacrificial_bowl",
+                "minecraft:feather"
+            ),
+            None,
+            "the golden bowl skips the conversion"
+        );
+        assert_eq!(
+            bowl_conversion(
+                &table,
+                "occultism:dark_golden_sacrificial_bowl",
+                "minecraft:feather"
+            ),
+            None
+        );
+        assert_eq!(
+            bowl_conversion(&table, "occultism:sacrificial_bowl", OTHERFLOWER),
+            None,
+            "the jar excludes otherflower"
+        );
+        assert_eq!(
+            bowl_conversion(&table, "occultism:sacrificial_bowl", "minecraft:dirt"),
+            None,
+            "an item no recipe accepts stays"
+        );
+    }
+
+    #[test]
+    fn the_bowl_readout_names_the_stored_stack() {
+        assert_eq!(
+            bowl_line([10, 64, 0], None),
+            "Bowl at [10, 64, 0]: stored=empty"
+        );
+        assert_eq!(
+            bowl_line([10, 64, 0], Some(("occultism:datura", 1))),
+            "Bowl at [10, 64, 0]: stored=occultism:datura x1"
+        );
     }
 }

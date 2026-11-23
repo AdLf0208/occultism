@@ -1,6 +1,6 @@
 id = "occultism"
 name = "Occultism"
-version = "0.2.11"
+version = "0.2.12"
 description = """A port of Occultism 1.225.0 for Horizon: the spirit-fire conversion loop and the datura it
 is lit with. A datura (Demon's Dream Fruit) struck with flint and steel or a fire charge lights
 occultism:spirit_fire; any item entity standing in that fire which one of the carried
@@ -12,11 +12,16 @@ scoped to the world, dimension and position). A spectator's click changes nothin
 The datura crop grows from occultism:datura_seeds on farmland by random tick (the wheat template, ages
 0-7), is harvested by right-click at its last age (the loot table's fruit and seeds, replanted at age 0),
 and breaks by hand into its loot table; breaking short or tall grass without shears has the jar's 2%
-chance of a seed. The package carries 46 blocks (with their item forms), 44 carried item declarations,
-45 loot tables (the crop's, the four carried blocks', the six stone building blocks', the twelve
-bricks-tier ones', the eight polished-tier ones', the eight cobblestone-tier ones' and the four redstone ones'), 27
-spirit-fire recipes, 38 crafting-table recipes, 6 smelting recipes, 15 tags and the models, textures and lang they
-need. The crafting
+chance of a seed. The sacrificial bowls are the tier's first block entity: a one-slot bowl (five
+otherstone or otherrock, and a copper-or-gold upgrade of either) takes one item from a right click,
+gives exactly that stack back to an empty hand, drops what it holds when broken, and -- the four
+non-golden ones -- converts what it holds while it stands on a spirit fire; the golden pair stores
+and returns but does not convert, and the pentacle ritual it would start is not ported. The package
+carries 52 blocks (with their item forms), 44 carried item declarations, 51 loot tables (the crop's,
+the four carried blocks', the six stone building blocks', the twelve bricks-tier ones', the eight
+polished-tier ones', the eight cobblestone-tier ones', the four redstone ones', the two pedestals'
+and the six bowls'), 27 spirit-fire recipes, 44 crafting-table recipes, 6 smelting recipes, 17 tags
+and the models, textures and lang they need. The crafting
 recipes are the ones whose result and every ingredient the package already provides: a 3x3 grid of
 the datura fruit or the datura seed (the #c:crops/datura / #c:seeds/datura alternative) makes one
 Demon's Dream Essence, the shapeless awakened feather + purified ink + taboo book makes the Book of
@@ -34,7 +39,8 @@ its template's press duration, and the frames and pedestals are the tier's ornam
 stones in a ring make one otherstone or otherrock frame (an item, used by rituals), and five slabs
 plus one stone make a pedestal (the otherrock one keeps the jar's old id
 occultism:otherstone_pedestal_silver) whose post-shaped, non-occluding block drops only to a
-pickaxe; a cobble block also smelts back into the stone. The pentacle rituals,
+pickaxe; a cobble block also smelts back into the stone, and the six bowls are a 5-stone ring, that
+bowl with a copper ingot (shapeless) or eight gold ingots around it, in both stones. The pentacle rituals,
 the summoned spirits and their AI, the GeckoLib models, the Otherworld dimension, the guide book, Curios
 slots and the spirit-job recipes are not ported yet."""
 authors = ["klikli-dev", "AdLf0208"]

@@ -2748,3 +2748,293 @@ bowl block. It needs the pin's `block_entity` + `block_entity_tick` Parts and a 
 itself stays `blocked(rituals)` — the bowl's *storage and return* is the part this campaign can prove.
 Tier fits: still `deep`, and the first slice that legitimately needs `native_block_entity*` glue —
 which the brief for this one assumed and the artefact did not.
+
+## Slice 11 (0.2.12, 2026-11-23) — the six sacrificial bowls
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). Class
+**content**, tier **deep** (ledger row 345). Licence **MIT**, ours on `main` → an
+`Update occultism 0.2.12` publication (the publisher appends to the retained PR #1763).
+
+**Gap line it comes from:** 0.2.11's parity row — *"the remaining family: … sacrificial bowls (block
+entity + ritual)"* — and 0.2.11's `## Next slice`, which named this family. It is a behaviour change
+(six new obtainable results, and the tier's first block entity), so it is a real version.
+
+### The jar, read at `release/v1.21.1-1.225.0` (commit `91de0d2a…`)
+
+| Question the brief asked | The artefact says | Where |
+|---|---|---|
+| the bowl's slot shape | **one slot, limit one**: `SacrificialBowlBlockEntity.itemStackHandler = new ItemStackHandler(1)` with `getSlotLimit → 1` | `common/blockentity/SacrificialBowlBlockEntity.java:45-52` |
+| the click | `useItemOn`: sneak = nothing; empty bowl + held → `insertItem(0, held, false)` (so one goes in and the rest stays in the hand); full bowl + empty hand → `setItemInHand(hand, extractItem(0, 64, false))`; full bowl + full hand → `ItemHandlerHelper.giveItemToPlayer(extract)`; **SUCCESS for every click**, changed or not | `common/block/SacrificialBowlBlock.java:93-119` |
+| what the golden variant changes | `GoldenSacrificialBowlBlockEntity extends SacrificialBowlBlockEntity` (same one-slot storage) and **skips the spirit-fire conversion** by an `instanceof` check; its own work is the pentacle ritual (`activate`) — in a world without the ritual registry it answers `false` and the inherited storage `useItemOn` runs | `…/GoldenSacrificialBowlBlockEntity.java:493-600`, `…/SacrificialBowlBlockEntity.java:59-69` |
+| does the offered stack survive a break | yes: `onRemove` → `StorageUtil.dropInventoryItems(blockEntity)`; in this port the declared container is what makes the engine spill it (`Containers.dropContents`), proven in game | `common/block/SacrificialBowlBlock.java:82-90` |
+| the conversion in a bowl | `onContentsChanged`: **non-golden** bowl, block below a spirit fire → replace the held stack with the spirit-fire recipe's result, unless the item is `otherflower` | `…/SacrificialBowlBlockEntity.java:52-75` |
+| `requires_tool` (**measured**, as the brief asked) | **false**: `Properties.of().mapColor(STONE).sound(STONE).strength(1.5f, 30).noOcclusion()`, and **no** `requiresCorrectToolForDrops()` — a bare hand drops one, and so does a pickaxe. The `minecraft:stone` template's fact (`requires_tool: true`) would have been wrong, so the declaration overrides it | `registry/OccultismBlocks.java:462-515` |
+
+### The jar's loot-table inventory for this family (enumerated first, as the last four slices did)
+
+`unzip -l occultism-1.21.1-neoforge-1.225.0.jar | grep loot_table/blocks | grep sacrificial`:
+
+```
+sacrificial_bowl.json         copper_sacrificial_bowl.json     silver_sacrificial_bowl.json
+golden_sacrificial_bowl.json  iesnium_sacrificial_bowl.json    dark_sacrificial_bowl.json
+dark_copper_sacrificial_bowl.json  dark_silver_sacrificial_bowl.json
+dark_golden_sacrificial_bowl.json  dark_iesnium_sacrificial_bowl.json
+```
+
+**All ten present — no omission this time**, so the `otherrock`-slab rule does not bite here (the
+four `otherrock`-family slabs and this family's tables are the whole pattern's extent: every table the
+jar has is carried for the six blocks this slice ships). The four not shipped are the silver pair
+(their grid needs `#c:ingots/silver`, which this package has no member for) and the two iesnium bowls
+(pentacle-ritual results, `RitualRecipes.craft_iesnium_sacrificial_bowl`); a unit test asserts their
+declarations are absent, so a future jar that makes them obtainable fails the run instead of shipping
+a creative-only block.
+
+### What was carried (and from where)
+
+| family | files | source |
+|---|---|---|
+| block declarations | 6 (`data/occultism/horizon/block/<bowl>.json`) | port-authored from `OccultismBlocks.java:462-515` |
+| crafting recipes | 6 (`.../recipe/crafting/<bowl>.json`) | the jar's grids, rewritten to the 26.3 dialect |
+| loot tables | 6 (`.../loot_table/blocks/<bowl>.json`) | the jar's six, in the 26.3 singular typed condition |
+| blockstates | 6 | the jar's, reduced to one variant (no `facing` state here) |
+| block models / item models | 6 / 6 | the jar's (the variants parent `occultism:block/sacrificial_bowl`) |
+| textures | 6 | the jar's (`sacrificial_bowl{,_golden,_copper}`, `dark_sacrificial_bowl{,_golden,_copper}`) |
+| lang | 6 keys | the jar's `en_us` (`Sacrificial Bowl`, `Golden Ritual Bowl`, …) |
+| tags | `minecraft:mineable/pickaxe` (+6), new `c:ingots/gold`, `c:ingots/copper` | the jar's datagen output; the ingot tags name vanilla's metals (the engine ships no `c:` namespace) |
+| creative tab | 6 entries | after the pedestals (the port's family grouping) |
+
+### The rule under test
+
+| block | template | hardness / resistance / map colour | `requires_tool` | shape | recipe |
+|---|---|---|---|---|---|
+| `sacrificial_bowl` | `minecraft:stone` | 1.5 / 30 / STONE (11) | **false** | base + rim | `o o`/`ooo` (5 `otherstone`) → 1 |
+| `dark_sacrificial_bowl` | the same | the same | **false** | base + rim | the same, 5 `otherrock` |
+| `golden_sacrificial_bowl` | the same | the same | **false** | `Block.box(3,2,3,13,8,13)` | `ggg`/`gbg`/`ggg` (8 `#c:ingots/gold` + 1 bowl) → 1 |
+| `dark_golden_sacrificial_bowl` | the same | the same | **false** | the golden box | the same around the dark bowl |
+| `copper_sacrificial_bowl` | the same | the same | **false** | base + rim | shapeless: bowl + `#c:ingots/copper` → 1 |
+| `dark_copper_sacrificial_bowl` | the same | the same | **false** | base + rim | shapeless: dark bowl + `#c:ingots/copper` → 1 |
+
+The block entity is **one** declared type over the six blocks (`block_entity_type("sacrificial_bowl")`),
+one Part (`Bowl`) answering `use_item_on` / `use_without_item` / `contents_changed` /
+`block_entity_ticks`, and one declared container per block (`ModContainer { slots: 1, every face both
+ways }`) — the container is what makes the engine spill the held stack on break and what
+`block_entity_item_slot` reads. Upstream declares two types (plain and golden); one type with the
+golden pair named in `runtime::GOLDEN_BOWLS` is the same behaviour with less registration, recorded as
+a shape choice, not a behaviour one.
+
+### Red → green
+
+**Unit red 1 — the family's data** (`sdk-test-red-0.2.12.log`), the tests written before any file:
+
+```
+---- runtime::tests::every_bowl_has_a_26_3_loot_table_that_drops_itself stdout ----
+thread 'runtime::tests::every_bowl_has_a_26_3_loot_table_that_drops_itself' (2815863) panicked at src/runtime.rs:915:59:
+…/data/occultism/loot_table/blocks/sacrificial_bowl.json: No such file or directory (os error 2)
+…
+test result: FAILED. 68 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+(The five: the loot tables, the block declarations, the blockstates/models/lang/tag, the recipe
+dialect and the two ingot tags. The rules' own tests were green in that run.)
+
+**Unit red 2 — the bowl's conversion rule** (`sdk-test-red2-0.2.12.log`), with `bowl_conversion`
+added with today's behaviour (`None`) so the defect is an assertion, not a compile error:
+
+```
+thread 'runtime::tests::a_plain_bowl_converts_its_stored_item_and_a_golden_one_does_not' (2856381) panicked at src/runtime.rs:2831:9:
+assertion `left == right` failed
+  left: None
+ right: Some(Conversion { result: "occultism:awakened_feather", count: 1 })
+test result: FAILED. 68 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+Green after the data and the body: **75 passed, 0 failed** (`sdk-test.log`).
+
+**In-game red — the product's off-hand defect** (`e2e-bowl-probe-0.2.12.log`, the first build, with
+temporary `PROBE` lines in `bowl_click`): the first run stored nothing, and the probe showed why:
+
+```
+PROBE bowl click pos=[226, 101, 44] block=occultism:sacrificial_bowl hand=Main sneak=Some(false)
+PROBE stored=None held=Some("minecraft:diamond_sword x1")
+PROBE insert written=true
+PROBE bowl click pos=[226, 101, 44] block=occultism:sacrificial_bowl hand=Off sneak=Some(false)
+PROBE stored=Some("minecraft:diamond_sword x1") held=None
+Bowl at [226, 101, 44]: stored=empty
+```
+
+Horizon dispatches a click's block Part **once per hand**; the main hand inserted the sword and the
+off hand's empty-hand turn took it straight back out, from one click. Vanilla reaches the off hand
+only after a main-hand failure, and upstream refuses the off hand for its golden bowl's activation
+for the same reason. The guard is `runtime::ClickHand::may_use_bowl` (main hand only, pinned by
+`only_the_main_hand_fills_a_bowl`), the same rule the crop harvest needed in 0.2.5. It was a **port**
+defect, not a jar one; the probe lines are removed and the delivered build has none.
+
+**In-game green — the family** (`e2e-bowl-0.2.12.log`): `PASS` + `EXIT:0`.
+
+### In game (phase W, verbatim from `e2e-default-0.2.12.log`, abridged to the assertions)
+
+```
+== W: the six sacrificial bowls ==
+== the six bowl grids ==
+  the sacrificial_bowl grid -> sacrificial_bowl: the result slot reads occultism:sacrificial_bowl x1
+  the sacrificial_bowl recipe: every ingredient was consumed ({"occultism:sacrificial_bowl": 1})
+  … the dark_sacrificial_bowl, golden_sacrificial_bowl, dark_golden_sacrificial_bowl,
+    copper_sacrificial_bowl and dark_copper_sacrificial_bowl grids: the same shape and count …
+== the wrong grids: nothing ==
+  four otherstone in the ring's corners: the result slot stayed empty
+  seven gold and one bowl: the result slot stayed empty
+== the six bowls: placed and read back ==
+  placed occultism:sacrificial_bowl at x=226
+  … (six ids) …
+== the storage round trip: a damaged sword in and back ==
+  sacrificial_bowl: the held stack before the click: … {components: {"minecraft:damage": 5}, count: 1, id: "minecraft:diamond_sword"}
+  sacrificial_bowl: the bowl's block entity reads -> Bowl at [226, 101, 44]: stored=minecraft:diamond_sword x1
+  sacrificial_bowl: the block entity's NBT carries the component: 226, 101, 44 has the following block data: {x: 226, y: 101, Items: [{components: {"minecraft:damage": 5}, count: 1, Slot: 0b, id: "minecraft:diamond_sword"}], z: 44, id: "occultism:sacrificial_bowl"}
+  sacrificial_bowl: after the take-out click -> Bowl at [226, 101, 44]: stored=empty
+  sacrificial_bowl: the returned stack reads … {components: {"minecraft:damage": 5}, count: 1, id: "minecraft:diamond_sword"}
+  golden_sacrificial_bowl: … the same five lines at 234 …
+== the slot limit: five in the hand, one in the bowl ==
+  the bowl holds -> Bowl at [226, 101, 44]: stored=minecraft:dirt x1
+  the hand kept four dirt: the jar's slot limit of one
+== breaking a full bowl: the bowl and its stack ==
+  the break: {"block_before": "occultism:sacrificial_bowl", "block": "minecraft:air", "drops": {"minecraft:apple": 1, "occultism:sacrificial_bowl": 1}}
+  the spilled stack: [{"item": {"count": 1, "item": "minecraft:apple"}, "kind": "item", …}]
+== the conversion: a feather over spirit fire, plain vs golden ==
+  sacrificial_bowl over spirit fire -> Bowl at [230, 102, 44]: stored=occultism:awakened_feather x1
+  golden_sacrificial_bowl over spirit fire -> Bowl at [230, 102, 44]: stored=minecraft:feather x1
+== a sneaking click changes nothing ==
+  after the sneaking click -> Bowl at [226, 101, 44]: stored=empty
+== the six bowls: hand 1, wooden pickaxe 1 ==
+  occultism:sacrificial_bowl by hand: {"…", "drops": {"occultism:sacrificial_bowl": 1}}
+  occultism:sacrificial_bowl with a wooden pickaxe: {"…", "drops": {"occultism:sacrificial_bowl": 1}}
+  … (all six, both legs) …
+  differential, otherstone by hand: {}
+```
+
+The driver (`tools/bowl_recipes.py`) opens a **real** crafting table (`ctl interact`), fills the grid
+through the screen's slots (100..108, result 200), reads the result, takes it and reads the inventory
+back; the player is in survival, so consumption is the vanilla rule. The storage leg aims at the
+bowl, right-clicks the held stack in, reads it back **through the block entity** (the `/occultism info`
+bowl line, which reads `block_entity_item_slot`, and `/data get block`, which shows the `Items` list
+with the `minecraft:damage` component), then right-clicks with an empty hand and reads the returned
+stack from `SelectedItem`, component included. The break's `ctl break` reply carries the bowl, and the
+spilled stack is read from `ctl entities`.
+
+`BOWL_NEGATIVE=1` inverts the first grid (`negative: the sacrificial_bowl grid made
+occultism:sacrificial_bowl x1, expected nothing`, `EXIT:1`), and `BOWL_SELFTEST=1` asserts the
+take-out click does **not** return the stack (`bowl selftest: minecraft:diamond_sword returned to the
+hand (this run must fail; the take-out click must give it back)`, `EXIT:1`). `CONTROL_LEG=1
+BOWL_ONLY=1` proves all six ids unknown as a block **and** as an item on a game without the package
+(`e2e-control-bowls-0.2.12.log`, `EXIT:0`), and `GAME=$CONTROL_GAME` is the scenario's own control
+(`the datura item did not register`, `EXIT:1`).
+
+### Ladder
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests (red 1) | `cargo test --offline`, data tests first | `sdk-test-red-0.2.12.log` | **68 passed, 5 failed** (files absent) |
+| tests (red 2) | the conversion rule stubbed to `None` | `sdk-test-red2-0.2.12.log` | **68 passed, 6 failed** |
+| tests | `cargo test --offline` | `sdk-test-0.2.12.log` (copied to `sdk-test.log`) | **75 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy-0.2.12.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt-0.2.12.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.12.log`, `sdk-build-second-0.2.12.log`, `sdk-reproducible-0.2.12.txt` | **`REPRODUCIBLE`**, 287,175 B |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | `sdk-artifact-0.2.12.txt` | 287,175 B, `d8c69505e24b2be9012ab6e5ad326735063fbe514bb2c82b90599a1b098aa292`, **558 entries**, no packed `Cargo.lock`, declares **0.2.12**, 0 empty files |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed) | `sdk-check-0.2.12.log` | exit 0, `occultism 0.2.12 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` (sha printed) | `sdk-fits-0.2.12.log` | `0a875da  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` (sha printed) | `sdk-fits-next-0.2.12.log` | **`0b14f8a  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | `sdk-gate-0.2.12.txt` | **1/1** (75 tests, 0 clippy warnings, package = tree) |
+| recipe types | `python3 ports/tools/check-recipe-types.py occultism` | `check-recipe-types-0.2.12.log` | `occultism: ok`, exit 0 |
+| recipe keys | `python3 tools/check_recipe_keys.py` | `check-recipe-keys-0.2.12.log` | `50 recipe(s), 50 craftable, 0 blocked, 0 failure(s)`, exit 0 |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.11 tag and export removed first) | `launcher-build-0.2.12.log` | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-c79386f47e7e`, exported manifest `version = "0.2.12"` |
+| in game (red, the product) | the first 0.2.12 build, `PROBE` lines | `e2e-bowl-probe-0.2.12.log` | **FAIL** + `EXIT:1` (the off hand emptied what the main hand inserted) |
+| in game (the family) | `BOWL_ONLY=1` | `e2e-bowl-0.2.12.log` | **PASS** + `EXIT:0` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen) | `e2e-default-0.2.12.log` | **PASS** + `EXIT:0` (A..W) |
+| in game (control ids) | `CONTROL_LEG=1 BOWL_ONLY=1` | `e2e-control-bowls-0.2.12.log` | **PASS** + `EXIT:0` (six ids unknown as a block and an item) |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | `e2e-control-0.2.12.log` | **FAIL** + `EXIT:1` (`the datura item did not register`) |
+| fail-capability (grid) | `BOWL_ONLY=1 BOWL_NEGATIVE=1` | `e2e-negative-bowl-0.2.12.log` | **FAIL** + `EXIT:1` |
+| fail-capability (take-out) | `BOWL_ONLY=1 BOWL_SELFTEST=1` | `e2e-selftest-bowl-0.2.12.log` | **FAIL** + `EXIT:1` |
+| fail-capability (scenario) | `SELFTEST=1` | `e2e-selftest-0.2.12.log` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | **72 logs, 72 ok**, 0 missing-exit, 0 bad-exit |
+
+### Parity coverage (0.2.12)
+
+| family | state |
+|---|---|
+| `sacrificial_bowl`, `dark_sacrificial_bowl` — grid, block, drops | **tested** — W (the 5-stone ring makes one with every stone consumed; four stones make nothing; the block places and reads back; hand 1 / wooden pickaxe 1) |
+| `golden_sacrificial_bowl`, `dark_golden_sacrificial_bowl` — grid, block, storage | **tested** — W (8 gold around the bowl makes one each, seven gold make nothing; the storage round trip on the golden bowl; hand 1 / pickaxe 1) |
+| `copper_sacrificial_bowl`, `dark_copper_sacrificial_bowl` — grid, block, drops | **tested** — W (the shapeless bowl + `#c:ingots/copper` grid; place/state; hand 1 / pickaxe 1) |
+| the one-slot storage: insert (limit 1), take-out, give-to-inventory | **tested** — W (a damaged sword in and back on a plain and a golden bowl, its `minecraft:damage` component read back through `/data get block`; five dirt put one in and left four in the hand). The give-to-inventory branch (a full hand clicking a full bowl) is `runtime`-tested only — the harness never holds a full hand on a full bowl in this leg |
+| the block entity's stored stack read | **tested** — W (`/occultism info`'s `Bowl at […]: stored=<id> x<count>`, which reads `block_entity_item_slot`; `/data get block` shows `Items`) |
+| the spill on break | **tested** — W (a full bowl's break drops the bowl and one apple as an item entity) |
+| the conversion over spirit fire, and the golden differential | **tested** — W (a feather in a plain bowl over a fire becomes an awakened feather; the same in a golden bowl stays a feather) |
+| the sneaking click | **tested** — W (shift-held click leaves the bowl empty and the apple in the hand) |
+| `requires_tool: false` on all six | **tested** — W (hand 1 **and** pickaxe 1 for every bowl, with `otherstone`'s hand break at 0 as the differential that proves the hand path rolls a table) |
+| the six loot tables, the `c:ingots/{gold,copper}` tags, `mineable/pickaxe`, lang, blockstates, models, textures, creative tab | **tested** — the unit tests read each file and tag; in game the hand/pickaxe breaks are the tables' roll and the grids are the tags' proof |
+| the ritual (`GoldenSacrificialBowlBlockEntity.activate`, 158 `ritual` recipes) | **`blocked(rituals)`** — the pentacle shapes live in code (`PentacleProvider`), the bowls' roles and the spirit jobs are the ritual system's own slice; the golden bowl therefore stores and returns, its activation messages and the ritual HUD/signal are not ported |
+| the bowl's client renderer (the held stack drawn in the bowl; the golden bowl's HUD) | **not ported** — no `block_entity_submit` renderer; the block draws its static model and the stored stack is read through the block entity, not drawn. A client slice of its own |
+| the bowl's `facing` state and directional placement | **not carried** — the jar's `DirectionalBlock` placement is not expressible through the content declaration's template (a template supplies placement); the bowl stands upright, its shape is the jar's upright one, and the blockstate is one variant. Recorded as a deviation |
+| the four uncarried bowls (silver pair, iesnium pair) | **not carried** — `#c:ingots/silver` has no member in this package and the iesnium pair are ritual results; the unit test `the_ritual_and_silver_bowls_are_not_carried` pins their absence |
+| spirit fire, the 26 conversion recipes, the crop, the seed source, the readouts, the spectator guard, the loot tables, 0.2.5–0.2.11 families | **tested** — phases A..V, unchanged, re-run in this slice's full run |
+
+### Measured behaviours of this pin (added by this slice)
+
+1. **A click reaches a block Part once per hand.** The main hand's insert and the off hand's take-out
+   ran from one click and cancelled out (`e2e-bowl-probe-0.2.12.log`); the guard is the main hand only.
+   Vanilla reaches the off hand only after a main-hand failure, so this is a port rule, not a jar one.
+2. **Declaring the container is what spills it.** `set_item_slot` writes a `Mod` block entity's items;
+   on break the engine's `Containers.dropContents` path spills them **only** for a block with a
+   declared `block_container` (the jar's `dropInventoryItems` equivalent) — measured by the apple.
+3. **`/data get block` is the block entity's saved view.** For a mod container the items are the
+   `Items` list (`{Slot, id, count, components}`), and a component survives the store/return trip —
+   which is the "exactly that stack" assertion, not just the id.
+4. **`/setblock` of a block that already stands there is a no-op**: it keeps the old block entity, so a
+   leg that needs an empty bowl must write air first (the first break-spill run handed the previous
+   leg's dirt to the player instead of taking its apple).
+5. **`ctl messages` is newest-first and keeps old replies**: "the last line matching" hands back the
+   *previous* click's readout. The driver marks each read with a unique chat line and takes the reply
+   above the marker.
+6. **`ctl tp` alone trips the server's `moved wrongly!` check** and the player is snapped back; a
+   server-side `tp @s` (through `execute in`) is what actually moves them, and the click then needs
+   the client to catch up (`wait_near`).
+7. **`requires_tool` is the template's, overridden by the declaration.** `minecraft:stone` says
+   `requires_tool: true`; all ten jar bowls say otherwise (`Properties.of()` with no
+   `requiresCorrectToolForDrops`), so the declaration sets `false` and the game proves it (hand 1).
+8. **Phase L's harvest retry flaked once in six full runs of this slice** (one run read
+   `fruit=2 seeds=6` from a single crop position, the two clicks of the retry loop both seeing age 7;
+   the next full run read `fruit=1 seeds=3` and the phase is unchanged since 0.2.5). Recorded, not
+   "fixed" in this slice: the guard (`may_harvest`) and the retry are the 0.2.5 harness, and no
+   bowl code runs before a phase W.
+
+### Deviations (deliberate, and why)
+
+| Area | Upstream | This port |
+|---|---|---|
+| the bowl's `facing` state | `DirectionalBlock`, six orientations, six blockstate variants | upright only: the content template supplies placement, so the state is not carried; the shape and the model are the jar's upright ones, and the blockstate is one variant |
+| the click's hand | vanilla's `useItemOn` runs for the main hand and reaches the off hand only after a failure | the Part answers `Success` and changes nothing on the off hand (Horizon dispatches both hands from one click; see the measured behaviours) |
+| sounds | `item_frame.add_item` / `item_frame.remove_item` on the click, `poof` on a conversion | none: the pin has no stamped sound helper (`native_play_sound` is `GameLevel`-only) — the same gap the spirit fire records |
+| the stored stack drawn in the bowl | a block entity renderer | not ported: no `block_entity_submit` renderer; the block draws its static model |
+| the golden bowl's ritual activation, its comparator signal and its HUD | `activate`, `getSignal`, `GoldenSacrificialBowlHUD` | `blocked(rituals)`: in a world without the ritual registry upstream's own `activate` returns false and the storage click runs, which is what this port ships |
+| the bowl's slot cap under a hopper | `ItemStackHandler.getSlotLimit → 1` caps every insert | the click path caps at one; the engine's declared container has no per-slot cap, so a hopper may put a larger stack in the slot (the take-out still caps at 64) |
+| `otherflower` in a bowl over fire | excluded from the conversion by name | the same (`runtime::bowl_converts_item`) |
+
+### Upstream defects fixed
+
+None: the bowls' properties, the ten loot tables, the six grids and the two ingot tags are internally
+consistent, and the `facing` gap is a content-API limit, not a jar defect.
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+### Next slice
+
+The **storage actuator family** — `storage_controller`, `storage_controller_dark`,
+`storage_controller_stabilized{,_dark}` — is the next obtainable result whose **ingredients are already
+carried**: `storage_controller`'s grid is `otherstone`/`otherrock` + a `storage_controller_base` (a
+ritual result, `blocked(ritual:craft_storage_controller_base)`), so it is *blocked* and must not be
+the next slice. The honest next family instead is the **17 impure-chalk craftings**
+(`chalk_*_impure`), which need `#occultism:dusts/chalk_base` and the five essence/paste items — all
+spirit-fire results the package already carries except `#occultism:otherworld_wood` (an Otherworld
+log family) — so the slice is a *data* one: enumerate the tags, carry the missing essences' spirit-fire
+recipes' inputs only where they exist, and prove each grid at the table. Gap line: the 0.2.5 coverage
+row *"the 17 impure-chalk craftings — not carried — ingredients missing"*, still open after six slices.
+The in-game assertion: fill each impure-chalk grid at the real table and read the result slot, with a
+wrong-ingredient grid as the differential; `check_recipe_keys.py` must stay at 0 blocked.

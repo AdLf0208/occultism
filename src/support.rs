@@ -18,15 +18,24 @@
 use std::sync::{LazyLock, Mutex};
 
 use mod_api::{
-    BlockClick, BlockUpdateFlags, Command, CommandArgumentValue, EntityRef,
-    EntityTickListenedEvent, EntityTickPostEvent, Flow, GameMode, Hand, Host, HostBlockStates,
-    HostSide, Identifier, InteractionResult, ItemStack, LevelRef, LootDropsEvent, RandomSource,
-    Recipe, RightClickBlockEvent, RunModCommandEvent, ServerHost, Text,
+    BlockClick, BlockEntityRef, BlockUpdateFlags, Command, CommandArgumentValue,
+    ContentsChangedEvent, EntityRef, EntityTickListenedEvent, EntityTickPostEvent, Flow, GameMode,
+    Hand, Host, HostBlockStates, HostSide, HostTransaction, Identifier, InteractionResult,
+    ItemStack, LevelRef, LootDropsEvent, PlayerRef, RandomSource, Recipe, RightClickBlockEvent,
+    RunModCommandEvent, ServerHost, Text,
 };
 
 use crate::runtime::{
     self, Conversion, DATURA, Mode, RECIPE_TYPE, Recent, RecentConversion, SPIRIT_FIRE,
 };
+
+/// The bowl's one slot, by `block_entity_item_slot`'s number
+/// (`SacrificialBowlBlockEntity`'s `ItemStackHandler(1)`).
+const BOWL_SLOT: u32 = 0;
+
+/// A player's off-hand slot, by `player_set_inventory_slot`'s numbers (36..39 are
+/// feet to head, 40 the off hand, as `/item replace entity`'s list reads).
+const OFF_HAND_SLOT: u32 = 40;
 
 /// The block state property the chalks set (`SpiritFireBlock.COLOR`).
 const COLOR: &str = "color";
@@ -390,8 +399,165 @@ pub fn listen(event: &mut EntityTickListenedEvent) {
     event.listened = true;
 }
 
+/// Write the bowl's one slot, then tell the game its contents changed: the
+/// explicit `set_changed` is what fires a `contents_changed` notice (a raw item
+/// write synthesizes none), which is upstream's `onContentsChanged`. The write is
+/// transactional, so a refused slot leaves nothing half-applied.
+fn write_bowl(host: &mut dyn ServerHost, entity: BlockEntityRef, stack: Option<ItemStack>) -> bool {
+    host.transaction(|host, tx| {
+        let written = entity
+            .set_item_slot(host, tx, BOWL_SLOT, stack)
+            .unwrap_or(false);
+        if written {
+            let _ = entity.set_changed(host);
+        }
+        Ok::<bool, ()>(written)
+    })
+    .unwrap_or(false)
+}
+
+/// Put `stack` in the hand the click used (`Player.setItemInHand`): the selected
+/// hotbar slot for the main hand, slot 40 for the off hand.
+fn set_hand(host: &mut dyn ServerHost, player: PlayerRef, hand: Hand, stack: Option<ItemStack>) {
+    let slot = match hand {
+        Hand::Main => player.selected_slot(&*host).map(|slot| slot as u32),
+        Hand::Off => Some(OFF_HAND_SLOT),
+    };
+    if let Some(slot) = slot {
+        let _ = player.set_inventory_slot(host, slot, stack);
+    }
+}
+
+/// A right click on a sacrificial bowl (`SacrificialBowlBlock.useItemOn`):
+///
+/// * an empty bowl takes one item from the hand (the jar's slot limit of one, so
+///   the rest of the stack stays in the hand);
+/// * a full bowl with an empty hand gives its stack back to that hand;
+/// * a full bowl with a full hand gives its stack to the inventory
+///   (`ItemHandlerHelper.giveItemToPlayer`), leaving the held item alone;
+/// * a sneaking click changes nothing.
+///
+/// Upstream answers `SUCCESS` for every click on one of its bowls, changed or not,
+/// which is what stops the item's own `useOn` from running on it. `None` for any
+/// other block, so the template keeps the click.
+pub fn bowl_click(host: &mut dyn ServerHost, click: &BlockClick<'_>) -> Option<InteractionResult> {
+    let player = host.player(click.player)?;
+    let level = player.level(&*host)?;
+    let block = level
+        .block(&*host, click.pos)
+        .map(|block| block.id(&*host))
+        .unwrap_or_default();
+    if !runtime::is_bowl(&block) {
+        return None;
+    }
+    // One click reaches this Part once per hand; vanilla reaches the off hand only
+    // after the main hand's action failed. Acting for both made the main hand's
+    // insert and the off hand's take-out cancel out in a single click (measured in
+    // game, 2026-11-23). Upstream refuses the off hand for its golden-bowl
+    // activation for the same reason.
+    if !hand(click.hand).may_use_bowl() {
+        return Some(InteractionResult::Success);
+    }
+    // `if (!pPlayer.isShiftKeyDown()) { … }`: a sneak click on a bowl is consumed
+    // and changes nothing.
+    if player.is_secondary_use_active(&*host).unwrap_or(false) {
+        return Some(InteractionResult::Success);
+    }
+    let Some(entity) = host.block_entity(level, click.pos) else {
+        return Some(InteractionResult::Success);
+    };
+    let stored = entity.item_slot(&*host, BOWL_SLOT).ok().flatten();
+    match (stored, click.stack.cloned()) {
+        // Nothing in the bowl, nothing in the hand: upstream still answers SUCCESS.
+        (None, None) => {}
+        (None, Some(held)) => {
+            let Some((bowl_count, _hand_left)) = runtime::bowl_insert(held.count()) else {
+                return Some(InteractionResult::Success);
+            };
+            // `insertItem(0, held, false)`: what fits goes in, the rest stays in
+            // the hand — with the stack's components, because the split moves them.
+            let split = held.split(bowl_count);
+            if let Some(bowl_stack) = split.taken
+                && write_bowl(host, entity, Some(bowl_stack))
+            {
+                set_hand(host, player, click.hand, split.remainder);
+            }
+        }
+        (Some(stored), None) => {
+            // `setItemInHand(hand, extractItem(0, 64, false))`.
+            let take = runtime::bowl_take(stored.count());
+            let split = stored.split(take);
+            if let Some(taken) = split.taken
+                && write_bowl(host, entity, split.remainder)
+            {
+                set_hand(host, player, click.hand, Some(taken));
+            }
+        }
+        (Some(stored), Some(_)) => {
+            // A full hand: `ItemHandlerHelper.giveItemToPlayer(extract)`.
+            let take = runtime::bowl_take(stored.count());
+            let split = stored.split(take);
+            if let Some(taken) = split.taken
+                && write_bowl(host, entity, split.remainder)
+            {
+                let _ = player.give_stack(host, taken);
+            }
+        }
+    }
+    Some(InteractionResult::Success)
+}
+
+/// The bowl's contents changed (`BlockEntity.setChanged`): a **non-golden** bowl
+/// standing on a spirit fire converts the stack it holds, unless the item is the
+/// flower upstream excludes. That is `SacrificialBowlBlockEntity.onContentsChanged`
+/// — its counterpart is no bus event, which is why the pin's `contents_changed`
+/// notice exists.
+pub fn bowl_contents_changed(host: &mut dyn ServerHost, event: &mut ContentsChangedEvent) {
+    let pos = [event.pos.x, event.pos.y, event.pos.z];
+    let level = event.level;
+    let block = level
+        .block(&*host, pos)
+        .map(|block| block.id(&*host))
+        .unwrap_or_default();
+    if !runtime::converts_in_bowl(&block) {
+        return;
+    }
+    let below = [pos[0], pos[1].saturating_sub(1), pos[2]];
+    if level
+        .block(&*host, below)
+        .map(|block| block.id(&*host))
+        .as_deref()
+        != Some(SPIRIT_FIRE)
+    {
+        return;
+    }
+    let Some(entity) = host.block_entity(level, pos) else {
+        return;
+    };
+    let Some(stored) = entity.item_slot(&*host, BOWL_SLOT).ok().flatten() else {
+        return;
+    };
+    let item = stored.item().id(&*host);
+    let conversion = with_table(&*host, |cached| {
+        runtime::bowl_conversion(&cached.table, &block, &item)
+    });
+    let Some(conversion) = conversion else {
+        return;
+    };
+    let Some(key) = Identifier::parse(&conversion.result)
+        .ok()
+        .and_then(|id| host.item_key(&id))
+    else {
+        return;
+    };
+    if let Some(result) = ItemStack::new(key, conversion.count) {
+        // The write of the notice: nested writes to this block do not re-enter it,
+        // so a converted stack is not converted again.
+        write_bowl(host, entity, Some(result));
+    }
+}
+
 /// A block broke and `event.drops` are what its loot table rolled: a hand-broken
-/// `short_grass`/`tall_grass` has the jar's 2% chance of a datura seed
 /// (`data/occultism/loot_modifiers/datura_seed_from_grass.json`, `…_from_tall_grass.json`:
 /// NeoForge's `add_item` global loot modifier, which is this hook).
 pub fn loot_drops(host: &mut dyn ServerHost, event: &mut LootDropsEvent<'_>) {
@@ -457,7 +623,7 @@ pub fn run_command(host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>
             } else if let Some(CommandArgumentValue::BlockPos(pos)) = event.command.argument("pos")
             {
                 let pos = *pos;
-                let (block, colour, rules, files, world, dimension) = {
+                let (block, colour, rules, files, world, dimension, stored) = {
                     let view: &dyn Host = &*host;
                     let level = view.level(view.dimension());
                     let block = level
@@ -473,7 +639,13 @@ pub fn run_command(host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>
                     let dimension = level
                         .and_then(|level| level.dimension().id(view))
                         .unwrap_or_default();
-                    (block, colour, rules, files, world, dimension)
+                    // A bowl's stack is read through its block entity's own slot,
+                    // which is the read the click's write can be compared with.
+                    let stored = level
+                        .and_then(|level| view.block_entity(level, pos))
+                        .and_then(|entity| entity.item_slot(view, BOWL_SLOT).ok().flatten())
+                        .map(|stack| (stack.item().id(view), stack.count()));
+                    (block, colour, rules, files, world, dimension, stored)
                 };
                 let last = STATS
                     .lock()
@@ -483,9 +655,16 @@ pub fn run_command(host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>
                         || "none".to_owned(),
                         |recent| format!("{} x{}", recent.result, recent.count),
                     );
-                // A position holding no spirit fire is answered without naming
-                // the block, so the readout is not a world probe.
-                runtime::info_line(pos, &block, &colour, &last, rules, files)
+                if runtime::is_bowl(&block) {
+                    runtime::bowl_line(
+                        pos,
+                        stored.as_ref().map(|(item, count)| (item.as_str(), *count)),
+                    )
+                } else {
+                    // A position holding no spirit fire is answered without naming
+                    // the block, so the readout is not a world probe.
+                    runtime::info_line(pos, &block, &colour, &last, rules, files)
+                }
             } else {
                 INFO_USAGE.to_owned()
             }

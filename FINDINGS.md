@@ -189,3 +189,42 @@ than shipped as creative-only blocks.
 **The family's loot tables**: `otherstone_pedestal` and `otherstone_pedestal_silver` are present (no
 omission this time); the frames have none (items); the two bases' tables exist and are not carried
 with the bases.
+
+## Slice 11 findings (2026-11-23) — the sacrificial bowls are a one-slot block entity
+
+Read at tag `release/v1.21.1-1.225.0` (commit `91de0d2a46e05ce315cc5afd292d266d4f46e7ab`): the jar's
+`data/occultism/{recipe/crafting,loot_table/blocks}`, `assets/occultism/{blockstates,models,textures}`,
+and `common/block/SacrificialBowlBlock.java`, `common/block/GoldenSacrificialBowlBlock.java`,
+`common/blockentity/SacrificialBowlBlockEntity.java`,
+`common/blockentity/GoldenSacrificialBowlBlockEntity.java`, `registry/OccultismBlocks.java:462-515`.
+
+**Ten bowls, two shapes.** `SacrificialBowlBlock` (`sacrificial_bowl`, `dark_`, `copper_`, `silver_`,
+`dark_copper_`, `dark_silver_`) is a `DirectionalBlock` + `EntityBlock` with a `facing` state; the four
+`GoldenSacrificialBowlBlock`s (`golden_`, `iesnium_`, `dark_golden_`, `dark_iesnium_`) are plain
+`Block`s with a `Block.box(3,2,3,13,8,13)` shape and no `facing`. All ten share
+`Properties.of().mapColor(STONE).sound(STONE).strength(1.5f, 30).noOcclusion()` and **none** calls
+`requiresCorrectToolForDrops()`: a bare hand drops one (the `minecraft:stone` template's
+`requires_tool: true` had to be overridden).
+
+**One slot, limit one.** `SacrificialBowlBlockEntity.itemStackHandler = new ItemStackHandler(1)` with
+`getSlotLimit → 1`. `useItemOn` (server, non-sneak) inserts the held stack (`insertItem(0, held,
+false)`: one in, rest stays), takes out with an empty hand (`setItemInHand(hand, extractItem(0, 64,
+false))`) or into the inventory when the hand is full, and answers `SUCCESS` for every click on one of
+its bowls. `onRemove` drops the inventory; in this port the engine's `Containers.dropContents` for a
+declared container is that drop.
+
+**The golden pair's difference.** `GoldenSacrificialBowlBlockEntity extends SacrificialBowlBlockEntity`
+— the same one-slot store — and its `activate()` is the **ritual** path (identify the ritual recipe,
+validate the pentacle, insert the activation item, start it). It also skips the inherited spirit-fire
+conversion by an `instanceof` check in `onContentsChanged`. In a world without the ritual registry its
+own `activate` finds no recipe and answers `false`, so the inherited storage `useItemOn` runs: the
+golden bowl in this port is a storage bowl that does not convert, which is exactly what upstream does
+with no rituals available.
+
+**The conversion in a bowl.** `onContentsChanged`: if the bowl is not golden and the block below is a
+spirit fire (or the spirit campfire), the held stack is replaced with the `occultism:spirit_fire`
+recipe's result — except `otherflower`, which the jar excludes by item.
+
+**The family's loot tables are all present** (ten, one per bowl), so the `otherrock`-slab omission rule
+has no instance here; the four bowls this port does not carry are the silver pair (their grid's
+`#c:ingots/silver` has no member in the package) and the iesnium pair (ritual results).

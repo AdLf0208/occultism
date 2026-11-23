@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "b": "occultism:dark_sacrificial_bowl",
+    "g": "#c:ingots/gold"
+  },
+  "pattern": [
+    "ggg",
+    "gbg",
+    "ggg"
+  ],
+  "result": {
+    "count": 1,
+    "id": "occultism:dark_golden_sacrificial_bowl"
+  }
+}

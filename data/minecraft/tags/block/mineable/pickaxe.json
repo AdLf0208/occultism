@@ -39,6 +39,12 @@
     "occultism:otherstone_pressure_plate",
     "occultism:otherrock_pressure_plate",
     "occultism:otherstone_pedestal",
-    "occultism:otherstone_pedestal_silver"
+    "occultism:otherstone_pedestal_silver",
+    "occultism:sacrificial_bowl",
+    "occultism:dark_sacrificial_bowl",
+    "occultism:copper_sacrificial_bowl",
+    "occultism:dark_copper_sacrificial_bowl",
+    "occultism:golden_sacrificial_bowl",
+    "occultism:dark_golden_sacrificial_bowl"
   ]
 }

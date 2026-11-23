@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "o": "occultism:otherstone"
+  },
+  "pattern": [
+    "o o",
+    "ooo"
+  ],
+  "result": {
+    "count": 1,
+    "id": "occultism:sacrificial_bowl"
+  }
+}

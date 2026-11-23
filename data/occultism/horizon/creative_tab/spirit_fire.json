@@ -88,7 +88,13 @@
     "occultism:chalk_blue_impure",
     "occultism:chalk_purple_impure",
     "occultism:chalk_magenta_impure",
-    "occultism:chalk_pink_impure"
+    "occultism:chalk_pink_impure",
+    "occultism:sacrificial_bowl",
+    "occultism:dark_sacrificial_bowl",
+    "occultism:copper_sacrificial_bowl",
+    "occultism:dark_copper_sacrificial_bowl",
+    "occultism:golden_sacrificial_bowl",
+    "occultism:dark_golden_sacrificial_bowl"
   ],
   "title": "itemGroup.occultism"
 }

@@ -473,3 +473,38 @@ transcript are in `notes.md`, §"Slice 10".
 Every leg above ran on the **final** 256,975 B artifact / tree (the first 256,642 B build, before the
 README refresh, was replaced and every leg re-run). `E2E_TMP` (`~/.cache/horizon-e2e/scratch`) was
 used throughout; nothing was written under `/tmp` except the short probe log quoted in `notes.md`.
+
+## 15. SDK 0.2.12 (the six sacrificial bowls), pin `0a875da`
+
+The slice (the tier's first block entity), the jar's slot shape, what the golden variant changes, the
+jar's ten-table loot inventory for the family (all present), the brief's `requires_tool` line
+(measured **false**) and the phase-W transcript are in `notes.md`, §"Slice 11".
+
+| Step | Command | Result |
+|---|---|---|
+| red 1 (unit, the data) | `cargo test --offline`, the family tests written before any file | **68 passed; 5 failed** — every family file absent (`…sacrificial_bowl.json: No such file or directory`), plus the two ingot tags — `sdk-test-red-0.2.12.log` |
+| red 2 (unit, the rule) | `bowl_conversion` added returning `None` | **68 passed; 6 failed** (`left: None / right: Some(Conversion { result: "occultism:awakened_feather", count: 1 })`) — `sdk-test-red2-0.2.12.log` |
+| green (unit) | `cargo test --offline` | **75 passed, 0 failed** — `sdk-test-0.2.12.log` (copied to `sdk-test.log`, which the gate reads) |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy-0.2.12.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt-0.2.12.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **`REPRODUCIBLE`**: 287,175 B, `d8c69505…aa292` — `sdk-build-0.2.12.log`, `sdk-build-second-0.2.12.log`, `sdk-reproducible-0.2.12.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | 287,175 B, `d8c69505e24b2be9012ab6e5ad326735063fbe514bb2c82b90599a1b098aa292`, **558 entries**, no packed `Cargo.lock`, declares **0.2.12**, 0 empty files — `sdk-artifact-0.2.12.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed) | exit 0, `occultism 0.2.12 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check-0.2.12.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` (sha printed) | `0a875da  made for`, exit 0 — `sdk-fits-0.2.12.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` (sha printed) | **`0b14f8a  fits`**, exit 0 — `sdk-fits-next-0.2.12.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** (75 tests, 0 clippy warnings, package = tree) — `sdk-gate-0.2.12.txt` |
+| recipe types | `python3 ports/tools/check-recipe-types.py occultism` | `occultism: ok`, exit 0 — `check-recipe-types-0.2.12.log` |
+| recipe keys | `python3 tools/check_recipe_keys.py` | `50 recipe(s), 50 craftable, 0 blocked, 0 failure(s)`, exit 0 — `check-recipe-keys-0.2.12.log` |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.11 tag and export removed first) | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-c79386f47e7e`, exported manifest `version = "0.2.12"` — `launcher-build-0.2.12.log` |
+| red (in game, the product) | the first 0.2.12 build with `PROBE` lines | **FAIL** + `EXIT:1`: the main hand inserted the sword and the **off hand** took it back out from the same click — `e2e-bowl-probe-0.2.12.log` |
+| in game (the family) | `BOWL_ONLY=1` | **PASS** + `EXIT:0` — `e2e-bowl-0.2.12.log` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen, launcher-built game) | **PASS** + `EXIT:0` (A..W) — `e2e-default-0.2.12.log` |
+| in game (control ids) | `CONTROL_LEG=1 BOWL_ONLY=1` | **PASS** + `EXIT:0` (the six ids unknown as a block and an item) — `e2e-control-bowls-0.2.12.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | **FAIL** + `EXIT:1` (`the datura item did not register`) — `e2e-control-0.2.12.log` |
+| fail-capability (grid) | `BOWL_ONLY=1 BOWL_NEGATIVE=1` | **FAIL** + `EXIT:1` (`negative: the sacrificial_bowl grid made occultism:sacrificial_bowl x1, expected nothing`) — `e2e-negative-bowl-0.2.12.log` |
+| fail-capability (take-out) | `BOWL_ONLY=1 BOWL_SELFTEST=1` | **FAIL** + `EXIT:1` (`bowl selftest: minecraft:diamond_sword returned to the hand`) — `e2e-selftest-bowl-0.2.12.log` |
+| fail-capability (scenario) | `SELFTEST=1` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) — `e2e-selftest-0.2.12.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | **72 logs, 72 ok**, 0 missing-exit, 0 bad-exit |
+
+Every leg above ran on the final 287,175 B artifact / tree. `E2E_TMP` (`~/.cache/horizon-e2e/scratch`)
+was used throughout; nothing was written under `/tmp` except the probe scripts.

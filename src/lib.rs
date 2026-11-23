@@ -32,9 +32,11 @@ pub mod support;
 use std::sync::Arc;
 
 use mod_api::{
-    self, CraftingGrid, CraftingRecipeHandler, CraftingRecipeValue, EntityTickListenedEvent,
-    EntityTickPostEvent, Flow, Hooks, HostSide, ItemStack, LootDropsEvent, RegisterCommandsEvent,
-    Registrar, RegistrationContext, RightClickBlockEvent, RunModCommandEvent, ServerHost,
+    self, BlockEntityPart, BlockEntityTicksEvent, BlockPart, ContentsChangedEvent, CraftingGrid,
+    CraftingRecipeHandler, CraftingRecipeValue, EntityTickListenedEvent, EntityTickPostEvent, Flow,
+    Hooks, HostSide, InteractionResult, ItemStack, LootDropsEvent, ModContainer,
+    RegisterCommandsEvent, Registrar, RegistrationContext, RightClickBlockEvent,
+    RunModCommandEvent, ServerHost, UseItemOnEvent, UseWithoutItemEvent,
 };
 
 /// The serializer the carried `occultism:spirit_fire` files need. The port reads
@@ -68,10 +70,56 @@ impl CraftingRecipeHandler for SpiritFireSerializer {
     }
 }
 
-/// The mod keeps its state (the per-fire conversion counters) in `support`; one loop serves
-/// every fire in every dimension.
+/// The mod keeps its state in `support`; one loop serves every fire in every dimension.
 #[derive(Default)]
 struct Mod;
+
+/// The sacrificial bowls' block entity, as one Part: a one-slot store whose click
+/// seats and returns a stack, and (the non-golden bowls) converts it while the bowl
+/// stands on a spirit fire. Upstream's `SacrificialBowlBlockEntity`; the golden pair
+/// shares the storage and skips the conversion (`GoldenSacrificialBowlBlockEntity`).
+struct Bowl;
+
+#[mod_api::horizon_part]
+impl BlockPart for Bowl {
+    /// `BlockBehaviour.useItemOn`: the bowl's own behaviour, with the held item.
+    /// `Some(SUCCESS)` for every click on one of ours (upstream answers SUCCESS
+    /// whether or not it changed the bowl), `None` for anything else.
+    fn use_item_on(
+        &self,
+        host: &mut dyn ServerHost,
+        event: &mut UseItemOnEvent<'_>,
+    ) -> Option<InteractionResult> {
+        support::bowl_click(host, event.click)
+    }
+
+    /// `BlockBehaviour.useWithoutItem`: the empty-hand click, which the engine asks
+    /// only after `use_item_on` answered `TryWithEmptyHand` (the `minecraft:stone`
+    /// template does). It is the take-out half of the same rule.
+    fn use_without_item(
+        &self,
+        host: &mut dyn ServerHost,
+        event: &mut UseWithoutItemEvent<'_>,
+    ) -> Option<InteractionResult> {
+        support::bowl_click(host, event.click)
+    }
+
+    /// `BlockEntity.setChanged` for one of our bowls: a non-golden bowl over a
+    /// spirit fire converts the stack it holds (upstream's `onContentsChanged`).
+    fn contents_changed(&self, host: &mut dyn ServerHost, event: &mut ContentsChangedEvent) {
+        support::bowl_contents_changed(host, event);
+    }
+}
+
+#[mod_api::horizon_part]
+impl BlockEntityPart for Bowl {
+    /// The bowl's block entity ticks. Upstream's plain bowl has no ticker, but a
+    /// tick is what sizes a mod block entity's `items` to its declared container;
+    /// the tick itself changes nothing.
+    fn block_entity_ticks(&self, _host: &dyn mod_api::Host, event: &mut BlockEntityTicksEvent<'_>) {
+        event.ticks = true;
+    }
+}
 
 #[mod_api::horizon_mod]
 impl Hooks for Mod {
@@ -87,6 +135,36 @@ impl Hooks for Mod {
             "occultism:spirit_fire",
             Some(Arc::new(SpiritFireSerializer)),
         );
+        // The bowls' block entity: one type over the six carried blocks, one Part
+        // that answers the click, the contents change and the ticker.
+        let bowls = r
+            .block_entity_type("sacrificial_bowl")
+            .blocks(&[
+                "sacrificial_bowl",
+                "dark_sacrificial_bowl",
+                "copper_sacrificial_bowl",
+                "dark_copper_sacrificial_bowl",
+                "golden_sacrificial_bowl",
+                "dark_golden_sacrificial_bowl",
+            ])
+            .build();
+        let _ = r.block_entity_part(&bowls, Bowl);
+        // The jar's `ItemStackHandler(1)`: one slot, reachable from every side by
+        // hoppers both ways. Declaring the container is also what makes the engine
+        // spill what a bowl holds when it is broken (`Containers.dropContents`).
+        for id in runtime::BOWLS {
+            let block = r.block_key(id);
+            r.block_container(
+                &block,
+                ModContainer {
+                    slots: 1,
+                    faces: std::array::from_fn(|_| vec![0]),
+                    inputs: vec![0],
+                    outputs: vec![0],
+                    menu: None,
+                },
+            );
+        }
     }
 
     /// `/occultism info|recipes`: the fire's readout and the loaded recipe table.
