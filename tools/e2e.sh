@@ -106,11 +106,24 @@
 # POLISHED_ONLY=1 is this family's red/green leg; POLISHED_NEGATIVE=1 inverts the
 # polished slab grid assertion, so the run must FAIL.
 #
+# The cobblestone tier (0.2.9) is phase T, on the polished row and at the same
+# table: the six cobble grids (three cobble blocks in the middle row -> six slabs,
+# the stair step -> four, two rows -> six), with a 2x2 of the cobble as the
+# differential; then each of the eight blocks placed, its default state read back,
+# a hand break (no drop) and a wooden pickaxe break (exactly one), a cobble wall
+# pair connecting, a double cobble slab dropping two, and othercobblerock_slab —
+# the jar's fourth missing table — dropping one. It also proves the plain pair's
+# obtainability: otherstone/otherrock broken with a wooden pickaxe drop one
+# othercobblestone/othercobblerock (the jar's alternatives table), and the same
+# block broken with a silk-touch pickaxe keeps the stone itself.
+# COBBLE_ONLY=1 is this family's red/green leg; COBBLE_NEGATIVE=1 inverts the
+# cobble slab grid assertion, so the run must FAIL.
+#
 # SELFTEST=1 flips the count assertion (3 awakened feathers -> 2): it must FAIL,
 # proving the scenario can fail. NEGATIVE=1 flips the ripe-crop harvest's
 # assertion (a ripe crop must drop a fruit) the same way; LOOT_NEGATIVE=1 is the
-# loot family's own counterfactual (a pickaxe break of otherstone must drop
-# nothing, so it must FAIL).
+# loot family's own counterfactual (a wooden pickaxe break of otherstone must drop
+# no othercobblestone, so it must FAIL).
 #
 # LOOT_ONLY=1 launches, lays the arena and runs only phase O — the red/green leg
 # for the loot family. Every scratch path honours `E2E_TMP` (the campaign's
@@ -162,6 +175,12 @@ POLISHED_NEGATIVE=${POLISHED_NEGATIVE:-0}
 # `POLISHED_ONLY=1` launches and runs only the polished-tier phase (the red/green
 # leg for that family), then exits 0.
 POLISHED_ONLY=${POLISHED_ONLY:-0}
+# The cobblestone tier's own counterfactual: the cobble slab grid must make
+# nothing, so this run MUST fail (see phase T).
+COBBLE_NEGATIVE=${COBBLE_NEGATIVE:-0}
+# `COBBLE_ONLY=1` launches and runs only the cobblestone-tier phase (the red/green
+# leg for that family), then exits 0.
+COBBLE_ONLY=${COBBLE_ONLY:-0}
 # `CONTROL_LEG=1` runs the packaged leg first on the same socket, as 0.2.0/0.2.2 did.
 # The default is a *separate* invocation (`GAME=$CONTROL_GAME`), because a control
 # launch in the same HORIZON_HOME leaves the main game without its log file and the
@@ -446,6 +465,17 @@ control_leg() {
         [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
     done
     echo "  without the package: none of the twelve bricks-tier or eight polished-tier blocks either"
+    # The cobblestone tier (0.2.9) must be unknown too.
+    for id in occultism:othercobblestone occultism:othercobblestone_slab \
+              occultism:othercobblestone_stairs occultism:othercobblestone_wall \
+              occultism:othercobblerock occultism:othercobblerock_slab \
+              occultism:othercobblerock_stairs occultism:othercobblerock_wall; do
+        ctl command "execute in minecraft:the_end run setblock $X0 101 0 $id" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        name=$(block_name "$X0" 101 0)
+        [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
+    done
+    echo "  without the package: none of the eight cobblestone-tier blocks either"
     ctl quit >/dev/null 2>&1 || true
 }
 
@@ -453,12 +483,14 @@ control_leg() {
 # back, broken in survival and the `ctl break` reply's `.drops` asserted:
 #   * otherstone and otherrock are `requires_tool: true` (stone template), so the
 #     fail-capable pair is: a hand break breaks the block and drops NOTHING, a
-#     wooden pickaxe break drops exactly one of it. Without the `requires_tool`
-#     gate both would drop, and the hand assertion would fail;
+#     wooden pickaxe break drops exactly one of them. Without the `requires_tool`
+#     gate both would drop, and the hand assertion would fail. Since 0.2.9 the
+#     pickaxe drops the **cobble** tier (the jar's alternatives table) and a
+#     silk-touch pickaxe keeps the stone — the same pair for that table;
 #   * otherflower and otherworld_sapling_natural are `requires_tool: false` and
 #     drop exactly one of themselves to a bare hand.
-# LOOT_NEGATIVE=1 flips the pickaxe assertion to "drops nothing", so the run must
-# FAIL: the counterfactual for this family.
+# LOOT_NEGATIVE=1 flips the pickaxe assertion to "drops no othercobblestone", so
+# the run must FAIL: the counterfactual for this family.
 phase_loot() {
     echo "== O: the four carried block loot tables =="
     end "gamerule random_tick_speed 0"
@@ -496,9 +528,21 @@ phase_loot() {
         jq -r '[(.drops // {})[]] | add // 0' <<<"$reply"
     }
 
-    # The stone pair: hand breaks nothing, a wooden pickaxe drops one.
-    for spec in "occultism:otherstone 232" "occultism:otherrock 234"; do
-        read -r id x <<<"$spec"
+    # The stone pair: hand breaks nothing; a wooden pickaxe rolls the cobble
+    # tier (the jar's `otherstone`/`otherrock` table, whose alternatives branch
+    # is a non-silk-touch break -> othercobblestone/othercobblerock), and a
+    # silk-touch pickaxe keeps the stone itself. The two are the fail-capable pair
+    # for the table 0.2.4 shipped simplified and 0.2.9 carries from the jar.
+    silk_hold() {
+        ctl command "clear @s" >/dev/null
+        ctl command "xp add @s 30 levels" >/dev/null
+        hold 1 minecraft:diamond_pickaxe
+        ctl command "enchant @s minecraft:silk_touch" >/dev/null
+        ctl wait 4 >/dev/null
+    }
+    for spec in "occultism:otherstone occultism:othercobblestone 232" \
+                "occultism:otherrock occultism:othercobblerock 234"; do
+        read -r id cobble x <<<"$spec"
         place "$x" "$id"
         got=$(state_at "$x" 101 "$BLOCK_Z")
         case "$got" in
@@ -517,7 +561,7 @@ phase_loot() {
         HAND_TOTAL=$(drops_total "$REPLY")
         [ "$HAND" = 0 ] || fail "a hand break of $id dropped $HAND of it (requires_tool must gate the table)"
         [ "$HAND_TOTAL" = 0 ] || fail "a hand break of $id dropped $HAND_TOTAL items (requires_tool must gate the table)"
-        # 2. A wooden pickaxe: exactly one of the block.
+        # 2. A wooden pickaxe: exactly one cobble block, never the stone.
         hold 1 minecraft:wooden_pickaxe
         place "$x" "$id"
         got=$(state_at "$x" 101 "$BLOCK_Z")
@@ -529,15 +573,35 @@ phase_loot() {
         echo "  $id with a wooden pickaxe: $(jq -c '{block_before,block,drops}' <<<"$REPLY")"
         [ "$(jq -r '.block' <<<"$REPLY")" = "minecraft:air" ] \
             || fail "the pickaxe break left $(jq -r '.block' <<<"$REPLY") at x=$x"
-        TOOL=$(drops_of "$REPLY" "$id")
+        COBBLE_DROPS=$(drops_of "$REPLY" "$cobble")
+        STONE_DROPS=$(drops_of "$REPLY" "$id")
         TOOL_TOTAL=$(drops_total "$REPLY")
         if [ "$LOOT_NEGATIVE" = 1 ]; then
-            echo "(negative: asserting the pickaxe break of $id drops nothing)"
-            [ "$TOOL" = 0 ] || fail "negative: $id dropped $TOOL with a wooden pickaxe (this run must fail)"
+            echo "(negative: asserting the pickaxe break of $id drops no $cobble)"
+            [ "$COBBLE_DROPS" = 0 ] || fail "negative: $id dropped $COBBLE_DROPS $cobble with a wooden pickaxe (this run must fail)"
         else
-            [ "$TOOL" = 1 ] || fail "a wooden pickaxe dropped $TOOL $id, expected exactly 1 ($(jq -c '.drops' <<<"$REPLY"))"
+            [ "$COBBLE_DROPS" = 1 ] || fail "a wooden pickaxe dropped $COBBLE_DROPS $cobble from $id, expected exactly 1 ($(jq -c '.drops' <<<"$REPLY"))"
             [ "$TOOL_TOTAL" = 1 ] || fail "the pickaxe break dropped $TOOL_TOTAL items in total, expected exactly 1"
+            [ "$STONE_DROPS" = 0 ] || fail "$id dropped itself without silk touch ($STONE_DROPS)"
         fi
+        # 3. A silk-touch pickaxe: exactly the stone, never the cobble block.
+        silk_hold
+        place "$x" "$id"
+        got=$(state_at "$x" 101 "$BLOCK_Z")
+        case "$got" in
+            "$id"*) ;;
+            *) fail "$id did not place again (silk touch): '$got'" ;;
+        esac
+        REPLY=$(break_at "$x" 101 "$BLOCK_Z") || fail "cannot mine $id with a silk-touch pickaxe"
+        echo "  $id with a silk-touch pickaxe: $(jq -c '{block_before,block,drops}' <<<"$REPLY")"
+        [ "$(jq -r '.block' <<<"$REPLY")" = "minecraft:air" ] \
+            || fail "the silk-touch break left $(jq -r '.block' <<<"$REPLY") at x=$x"
+        SILK_STONE=$(drops_of "$REPLY" "$id")
+        SILK_COBBLE=$(drops_of "$REPLY" "$cobble")
+        SILK_TOTAL=$(drops_total "$REPLY")
+        [ "$SILK_STONE" = 1 ] || fail "$id under silk touch dropped $SILK_STONE of itself, expected 1 ($(jq -c '.drops' <<<"$REPLY"))"
+        [ "$SILK_TOTAL" = 1 ] || fail "the silk-touch break dropped $SILK_TOTAL items in total, expected 1"
+        [ "$SILK_COBBLE" = 0 ] || fail "$id under silk touch also dropped $SILK_COBBLE $cobble"
     done
 
     # The two plants: a bare hand drops exactly one of itself.
@@ -561,7 +625,7 @@ phase_loot() {
         [ "$GOT" = 1 ] || fail "a hand break of $id dropped $GOT of it, expected exactly 1 ($(jq -c '.drops' <<<"$REPLY"))"
         [ "$GOT_TOTAL" = 1 ] || fail "a hand break of $id dropped $GOT_TOTAL items in total, expected exactly 1"
     done
-    echo "  otherstone/otherrock: hand 0, wooden pickaxe 1 each; otherflower and the natural sapling: hand 1 each"
+    echo "  otherstone/otherrock: hand 0; a wooden pickaxe drops exactly one othercobblestone/othercobblerock and no stone; a silk-touch pickaxe keeps the stone and drops no cobble; otherflower and the natural sapling: hand 1 each"
 }
 
 # The two carried crafting-table recipes (0.2.5). The driver opens a real table,
@@ -666,6 +730,34 @@ phase_polished() {
     echo "  a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab drops one"
 }
 
+# The cobblestone tier (0.2.9): the six cobble-tier grids in a real table (the
+# cobble slab/stair/wall recipes, a 2x2 of the cobble as the differential), then
+# each of the eight blocks placed, its default state read back, a bare hand break
+# (no drop: `requires_tool`) and a wooden pickaxe break (exactly one). A cobble
+# wall pair must connect, a double cobble slab drops the jar table's two, and
+# othercobblerock_slab drops one although the jar ships no table for it. The plain
+# pair's obtainability: the raw stones drop cobble without silk touch and
+# themselves with it. COBBLE_NEGATIVE=1 inverts the cobble slab grid assertion so
+# the run must FAIL.
+phase_cobble() {
+    echo "== T: the eight othercobblestone/othercobblerock blocks =="
+    end "gamerule random_tick_speed 0"
+    # Standing still over the dark End floor: peaceful keeps hostile spawns away.
+    end "difficulty peaceful"
+    end "kill @e[type=!player]"
+    ctl wait 20 >/dev/null
+    end "setblock $CRAFT_X 100 $CRAFT_Z minecraft:stone"
+    ctl wait 4 >/dev/null
+    COBBLE_NEGATIVE=$COBBLE_NEGATIVE python3 "$PORT/tools/cobble_recipes.py" \
+        "$SOCK" "$CTL" "$CRAFT_X" 101 "$CRAFT_Z" \
+        || fail "the cobblestone block check failed (see the COBBLE FAIL line above)"
+    echo "  the six cobble-tier recipes craft their declared counts with every ingredient consumed;"
+    echo "  four cobble blocks in the 2x2 and four dirt in the same cells made nothing;"
+    echo "  each block reads its stone template's default state, drops nothing to a hand and exactly one to a wooden pickaxe;"
+    echo "  a cobble wall pair connects, a double cobble slab drops two, and othercobblerock_slab drops one;"
+    echo "  the raw stones drop one cobble block without silk touch and keep themselves with it"
+}
+
 echo "== launch (The End arena, launcher-built game with the package) =="
 if [ "$CONTROL_LEG" = 1 ] && [ -n "$CONTROL_GAME" ]; then control_leg; fi
 launch "$GAME" "$WORLD"
@@ -674,7 +766,7 @@ arena
 # The red/green leg for the loot family: launch, arena, phase O only.
 if [ "$LOOT_ONLY" = 1 ]; then
     phase_loot
-    echo "PASS: the four carried block loot tables: otherstone and otherrock drop nothing to a bare hand and exactly one of themselves to a wooden pickaxe, otherflower and otherworld_sapling_natural drop exactly one of themselves to a bare hand, each after being placed and read back in survival"
+    echo "PASS: the four carried block loot tables: otherstone and otherrock drop nothing to a bare hand, exactly one othercobblestone/othercobblerock to a wooden pickaxe and themselves to a silk-touch pickaxe, otherflower and otherworld_sapling_natural drop exactly one of themselves to a bare hand, each after being placed and read back in survival"
     exit 0
 fi
 
@@ -703,6 +795,13 @@ fi
 if [ "$POLISHED_ONLY" = 1 ]; then
     phase_polished
     echo "PASS: the six polished-tier otherstone/otherrock recipes craft at a real table with every ingredient consumed (three polished blocks in the middle row make six slabs, the stair step four stairs, two rows six walls; four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), each of the eight blocks reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab — the table the jar omits — drops one"
+    exit 0
+fi
+
+# The red/green leg for the cobblestone tier: launch, arena, phase T only.
+if [ "$COBBLE_ONLY" = 1 ]; then
+    phase_cobble
+    echo "PASS: the six cobble-tier othercobblestone/othercobblerock recipes craft at a real table with every ingredient consumed (three cobble blocks in the middle row make six slabs, the stair step four stairs, two rows six walls; four cobble blocks in the 2x2 and four dirt make nothing), each of the eight blocks reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, a cobble wall pair connects, a double cobble slab drops two, othercobblerock_slab — the table the jar omits — drops one, and the raw stones drop one othercobblestone/othercobblerock with a wooden pickaxe and keep themselves under silk touch"
     exit 0
 fi
 
@@ -1281,4 +1380,6 @@ phase_bricks
 
 phase_polished
 
-echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand and exactly one to a wooden pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two; and the eight polished-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab (the table the jar omits) drops one"
+phase_cobble
+
+echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand, exactly one othercobblestone/othercobblerock to a wooden pickaxe and themselves to a silk-touch pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two; and the eight polished-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab (the table the jar omits) drops one; and the eight cobblestone-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four cobble blocks in the 2x2 and four dirt make nothing), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a cobble wall pair connects, a double cobble slab drops two, othercobblerock_slab (the table the jar omits) drops one, and the raw stones drop one othercobblestone/othercobblerock without silk touch and keep themselves with it"

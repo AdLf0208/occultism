@@ -352,3 +352,45 @@ The phase-S transcript (the six grids with consumption, the two furnace legs at 
 polished wall connection, the double slab dropping two and the missing-table slab dropping one) and
 the family's one unported recipe half (the six stonecutting shortcuts) are in `notes.md` under
 "Slice 7".
+
+## 12. SDK 0.2.9 (the cobblestone tier of the `otherstone`/`otherrock` family), pin `0a875da`
+
+Every step in a `ports/tools/build-slot.sh` lease (`BUILD_LOCAL=1` for the SDK ladder, as trap 10 of
+0.2.0 records), `CARGO_INCREMENTAL=0`, no `--target-dir`, no private slots. Evidence in
+`../_shared/evidence/occultism/` (ladder) and `../_shared/evidence/occultism-e2e/` (game legs). The
+slice adds eight block declarations, six 26.3 crafting recipes, eight loot tables (one of which the
+jar omits), eighteen block models, eight blockstates, eight item models, two textures, eight lang
+keys, four block tags and eight creative-tab entries; it also carries the jar's silk-touch
+alternatives table for `otherstone`/`otherrock`, closing the 0.2.4 deviation and making the pair
+obtainable. The enumeration, the jar's loot-table inventory (seven of eight), the stonecutting note
+and the upstream defect are in `notes.md`, §"Slice 8".
+
+| Step | Command | Result |
+|---|---|---|
+| red (unit) | `cargo test --offline` with the jar's six grids, seven tables, assets and lang carried verbatim | **50 passed; 5 failed** on assertions — the dialect (`othercobblestone_slab carries the 1.21.1 object-form ingredient "item":`), the loot `"function":` shape, the missing block declarations, the tags/lang, and `otherstone has no silk-touch alternative` — `sdk-test-red-0.2.9.log` |
+| green (unit) | `cargo test --offline` | **55 passed, 0 failed** — `sdk-test.log` |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **`REPRODUCIBLE`**: 228,663 B, `8c31154f…75e8` — `sdk-build-0.2.9.log`, `sdk-build-second-0.2.9.log`, `sdk-reproducible-0.2.9.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | 228,663 B, `8c31154f9a07a6a6d97c62a0d919127ad0a41707341d5ff71be5591d002375e8`, **459 entries**, no packed `Cargo.lock`, declares **0.2.9**, `src/runtime.rs` inside = outside (`79f10b12…`) — `sdk-artifact-0.2.9.txt` |
+| tree match | a second build from the final tree + `cmp` | **`PACKAGE_MATCHES_TREE`** — `sdk-artifact-0.2.9.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed) | exit 0, `occultism 0.2.9 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` (sha printed) | `0a875da  made for`, exit 0 — `sdk-fits.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` (sha printed) | `0b14f8a  fits`, exit 0 — `sdk-fits-next.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** — `sdk-gate-0.2.9.txt` |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.8 export removed first) | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-87d09c7f95d3`, exported `native-mods.json` version `0.2.9` — `launcher-build-0.2.9.log` |
+| red (in game, the family) | `COBBLE_ONLY=1` against the **0.2.8** export | **FAIL** + `EXIT:1` (`missing ingredient occultism:othercobblestone`) — `e2e-cobble-red-0.2.8-package.log` |
+| in game (the family) | `COBBLE_ONLY=1` | **PASS** + `EXIT:0` — `e2e-cobble-0.2.9.log` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen) | **PASS** + `EXIT:0` (A..T) — `e2e-default-0.2.9.log` |
+| in game (phase O) | `LOOT_ONLY=1` | **PASS** + `EXIT:0` — `e2e-loot-0.2.9.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | **FAIL** + `EXIT:1` (`the datura item did not register`) — `e2e-control-0.2.9.log` |
+| fail-capability (scenario) | `SELFTEST=1` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) — `e2e-selftest-0.2.9.log` |
+| fail-capability (this family) | `COBBLE_ONLY=1 COBBLE_NEGATIVE=1` | **FAIL** + `EXIT:1` (`negative: the cobble slab grid made occultism:othercobblestone_slab x6, expected nothing`) — `e2e-negative-cobble-0.2.9.log` |
+| fail-capability (phase O) | `LOOT_ONLY=1 LOOT_NEGATIVE=1` | **FAIL** + `EXIT:1` (`otherstone dropped 1 othercobblestone with a wooden pickaxe`) — `e2e-negative-loot-0.2.9.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | **50 logs, 50 ok**, 0 missing-exit, 0 bad-exit |
+
+The phase-T transcript (the six grids with consumption, the two differentials, the eight default
+states with hand 0 / pickaxe 1, the cobble wall connection, the double slab dropping two, the
+missing-table slab dropping one, and the raw stones' wooden-pickaxe/silk-touch pair) and the
+family's one unported recipe half (the six stonecutting shortcuts, with 0.2.8's reason corrected) are
+in `notes.md` under "Slice 8".

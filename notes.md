@@ -29,6 +29,10 @@ pair, and the jar's missing `otherrock_bricks_slab` table (§"Slice 6").
 **0.2.8 (2026-11-23):** the polished tier — the pair smelted from the raw
 stones and their slab/stair/wall, and the jar's missing
 `polished_otherrock_slab` table (§"Slice 7").
+**0.2.9 (2026-11-23):** the cobblestone tier — `othercobblestone`/`othercobblerock`
+and their slab/stair/wall, the jar's missing `othercobblerock_slab` table, and
+the raw stones' own silk-touch alternatives table, which makes the pair
+obtainable (§"Slice 8").
 
 ## Class + tier and the approach
 
@@ -1819,3 +1823,316 @@ run must fail (`e2e-negative-polished-0.2.8.log`:
 | stonecutting shortcuts | six `stonecutting/polished_*` recipes | not carried; the crafting grids produce the same blocks |
 
 Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+## Slice 8 (0.2.9, 2026-11-23) — the cobblestone tier of the building family
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). Class
+**content**, tier **deep** (ledger row 345). Licence **MIT**, ours on `main` → an
+`Update occultism 0.2.9` publication.
+
+**Gap line it comes from:** the 0.2.8 parity row — *"the remaining 16 building recipes (cobblestone
+families, buttons, pressure plates, frames, pedestals, tablets, sacrificial bowls, storage
+controllers) — **not carried**"* — and 0.2.8's `## Next slice`, which named the cobblestone
+families as the next step. It is a behaviour change (eight new obtainable blocks, and the raw stones
+now drop them), so it is a real version.
+
+**Shape:** the data half of a `deep` mod, exactly as slices 3–7. No runtime rule, no glue, no block
+entity: eight blocks copy vanilla's stone/slab/stair/wall templates, the engine rolls the loot tables
+on a player break, the crafting table matches the six grids (the plain pair has no grid upstream),
+and the raw stones' own tables give the pair its obtainability.
+
+### The family is eight blocks and six grids (the brief says "six results")
+
+The brief said "`othercobblestone`, `othercobblerock` and their slab/stair/wall (six results)".
+Measured from Occultism 1.225.0: **8** blockstates, **8** `en_us` block keys, **8** item models,
+**6** `recipe/crafting/` grids, **7** of **8** `loot_table/blocks/` tables (the omission below) and
+**6** `recipe/stonecutting/` shortcuts. The two plain blocks are results with no recipe: upstream
+gets them from the raw stones (below). The six are the crafting grids. Reported, not invented.
+
+**The brief's "2×2 cobblestone recipe" does not exist.** The jar has no grid for
+`othercobblestone`/`othercobblerock` (`unzip -l … | grep recipe/crafting | grep othercobblestone`
+lists only the slab/stair/wall, plus `nature_paste_mossy_cobblestone`, whose result is vanilla's);
+a 2×2 of the cobble blocks makes nothing, which is one of this phase's differentials. Upstream's
+actual mechanic is the raw stones' loot table: a break **without silk touch** drops the cobble
+block, silk touch keeps the stone (the jar's reverse furnace pair, `smelting/otherstone` and
+`smelting/otherrock`, is **not** carried in this slice — see the unported half below). The
+artefact wins; the slice carries that table and proves it.
+
+### What was carried (and from where)
+
+| family | files | source |
+|---|---|---|
+| block declarations | 8 (`data/occultism/horizon/block/<name>.json`) | port-authored from `OccultismBlocks` (tag `release/v1.21.1-1.225.0`) |
+| crafting recipes | 6 (`.../recipe/crafting/<name>.json`) | the jar's `building_blocks/crafting/*` rewritten to the 26.3 dialect |
+| loot tables | 8 (`.../loot_table/blocks/<name>.json`) | the jar's seven + **the one the jar does not have** (`othercobblerock_slab`) |
+| the raw stones' tables | 2 (`otherstone`, `otherrock`) | the jar's alternatives tables in the 26.3 condition dialect (was a simplified self-drop) |
+| blockstates | 8 | the jar's (unchanged format) |
+| block models | 18 | the jar's (plain, slab + slab_top, stairs + inner + outer, wall post + side + side_tall, per stone) |
+| item models | 8 | the jar's |
+| textures | 2 | the jar's `block/{othercobblestone,othercobblerock}.png` |
+| lang | 8 keys | the jar's `en_us` (`Othercobblestone`, `Othercobblerock Wall`, …) |
+| tags | `minecraft:mineable/pickaxe` (+8), `walls`/`slabs`/`stairs` (+2 each) | the jar's datagen output |
+| creative tab | 8 entries | after the eight 0.2.8 polished-tier blocks |
+
+### The rule under test
+
+| block | template | hardness / resistance | `requires_tool` | recipe |
+|---|---|---|---|---|
+| `othercobblestone`, `othercobblerock` | `minecraft:stone` | 1.5 / 30 | **true** | **no grid**: the raw stones' non-silk-touch drop |
+| `*_slab` | `minecraft:stone_slab` | 1.5 / 30 | **true** | `ooo` (middle row) → 6 |
+| `*_stairs` | `minecraft:stone_stairs` | 1.5 / 1.5 | **true** | `#  `/`## `/`###` → 4 |
+| `*_wall` | `minecraft:cobblestone_wall` | 1.5 / 1.5 | **true** | `ooo`/`ooo` → 6 |
+
+Upstream (`OccultismBlocks.java`): `OTHERCOBBLESTONE` is
+`of().mapColor(STONE).sound(STONE).strength(1.5f, 30).requiresCorrectToolForDrops()`,
+`OTHERCOBBLEROCK` is `ofFullCopy(OTHERROCK)`, the two slabs `ofFullCopy(OTHERSTONE)` /
+`ofFullCopy(OTHERROCK)` (1.5 / 30), and the stairs and walls
+`of().strength(1.5f).requiresCorrectToolForDrops()` (1.5 / 1.5). All eight are pickaxe-gated, so a
+hand break breaks them and rolls nothing — the same fail-capable pair slices 3–7 used.
+
+Source read this slice: `klikli-dev/occultism` at tag `release/v1.21.1-1.225.0` (commit
+`91de0d2a…`, as 0.2.7 recorded for the same tag), file `registry/OccultismBlocks.java` — the eight
+declarations and their properties, fetched from the tag; the **jar** itself for the six crafting
+grids, the seven loot tables, the blockstates, models, textures, tags and lang (the same artefact
+0.2.6–0.2.8 read). The clone is not kept; the jar stays in `../_shared/licence-cache/`.
+
+### The jar's loot-table inventory for this family (enumerated, not guessed)
+
+`unzip -l occultism-1.21.1-neoforge-1.225.0.jar | grep loot_table/blocks | grep cobble`:
+
+```
+othercobblerock.json          othercobblestone.json
+othercobblerock_stairs.json   othercobblestone_slab.json
+othercobblerock_wall.json     othercobblestone_stairs.json
+                              othercobblestone_wall.json
+```
+
+Seven of the eight results have one. **`othercobblerock_slab.json` is absent** — the fourth
+`otherrock`-family slab the jar omits, after 0.2.6's `otherrock_slab`, 0.2.7's
+`otherrock_bricks_slab` and 0.2.8's `polished_otherrock_slab`. The pattern is now exact: **every
+slab of the `otherrock` family has no table, and every `otherstone`/`othercobblestone` slab does**
+(`othercobblestone_slab` is present). The rule the brief asked for — enumerate the family's tables
+and assert before carrying — is `every_cobble_block_has_a_26_3_loot_table_that_drops_itself`,
+which reads each of the eight paths, so the next omission fails the unit run instead of shipping.
+
+### Upstream defects fixed
+
+1. **`othercobblerock_slab` has no loot table in Occultism 1.225.0** (the fourth omission above),
+   although `OccultismBlocks.OTHERCOBBLEROCK_SLAB` is registered `LootTableType.CUSTOM`, so nothing
+   generates a default and the block would drop nothing at all.
+   - **Proved** by the jar listing and by the red run (`othercobblestone_slab's loot table uses the
+     1.21.1 "function": shape` in the same test; the missing file is the next failure once the
+     others are fixed — `othercobblerock_slab.json: No such file or directory`).
+   - **Fixed** minimally: `ports/occultism/data/occultism/loot_table/blocks/othercobblerock_slab.json`,
+     the same table as `othercobblestone_slab`, including the `type=double` → 2 branch.
+   - **Proved fixed in game**: the wooden-pickaxe break drops exactly one
+     `occultism:othercobblerock_slab`, and a `type=double` cobble slab drops two.
+   - **User-visible**: the slab is obtainable instead of vanishing on break.
+2. **The raw stones' table (a port deviation closed, not a jar defect).** 0.2.4 shipped
+   `otherstone`/`otherrock` as "drops itself", recorded in the deviation table because the cobble
+   tier was not carried. Now it is, so the jar's own table is carried: an `alternatives` entry whose
+   first child is a `match_tool` on `minecraft:silk_touch` (→ the stone) and whose second is the
+   `survives_explosion` cobble drop. Proved in game by the pair — a wooden pickaxe drops
+   `othercobblestone`/`othercobblerock`, a silk-touch pickaxe drops the stone itself — in phase O
+   and again in phase T. Without it the two plain blocks are unobtainable in survival.
+
+### The dialect finding this slice added: condition objects
+
+The 1.21.1 loot tables spell a condition's kind `"condition": "minecraft:…"`; the 26.3 loader reads
+`"type"` (`horizon-items/src/items.rs:1442-1449`, `conditions()` at `:1576`). An unknown kind is
+**false**, so a verbatim carry of the raw stones' table would drop *nothing at all* — the same
+class of silent drop as the object-form ingredient. `the_raw_stones_drop_the_cobble_tier_without_silk_touch`
+pins it: it refuses `"condition": "minecraft:` and requires `"type": "minecraft:alternatives"`,
+`"type": "minecraft:match_tool"` and `"type": "minecraft:survives_explosion"`. The seven other
+tables use the port's shape (`"condition": { "type": … }`, `modifier` rather than `functions`).
+
+### The family's unported recipe halves: six stonecutting shortcuts and the reverse smelt pair
+
+**The reverse smelt pair.** The jar smelts the cobble back into the stone (`recipe/smelting/otherstone`
+and `otherrock`: the cobble block → the stone, 200 ticks, 0.5 xp). Both endpoints are carried now, so
+the pair *could* be carried, but it is a furnace mechanic of its own and the brief's slice is the six
+crafting results; it is recorded here rather than shipped unproven, and it can ride along with the
+next slice (which already runs the furnace pattern in phases R/S).
+
+**The six stonecutting shortcuts.** `data/occultism/recipe/stonecutting/` carries six for this tier —
+`othercobblestone_{slab(2),stairs,wall}_from_othercobblestone` and the `othercobblerock` three.
+They are **not carried**, and the reason is corrected from 0.2.8's note:
+
+- 0.2.8 said *"the package has no stonecutter recipe type"*. That is **false**: the pin reads
+  `minecraft:stonecutting` out of the datapack (`horizon-client/src/stations.rs:568`), keeps a
+  `StationRecipes.stonecutting` list and serves the stonecutter menu (`menu.rs:938`). The data
+  would load.
+- What the campaign's harness cannot do is *select* a stonecutter recipe: the recipe list is a set of
+  GUI buttons (a `player_stonecutter_recipe_select` moment), not menu slots, and `horizon-ctl` has
+  no command for it — so a carried shortcut could not be proven in game, and the parity rule
+  forbids shipping an unproven recipe.
+- Recorded here as the family's one unported recipe half, with a later stonecutter slice (which
+  would need a ctl command or a `ui`-driven button click) as the way to close it. The same applies
+  to 0.2.8's six polished shortcuts; that note's reason is superseded by this one.
+
+### Red → green
+
+**Unit red — the dialect, the missing table and the raw stones** (`sdk-test-red-0.2.9.log`), with
+the jar's six grids, seven tables, assets and lang carried **byte for byte** first:
+
+```
+---- runtime::tests::the_cobble_recipes_are_the_jars_shapes_in_the_26_3_dialect stdout ----
+thread '…' panicked at src/runtime.rs:1541:17:
+othercobblestone_slab carries the 1.21.1 object-form ingredient "item":, which the 26.3 loader drops: {
+…
+---- runtime::tests::every_cobble_block_has_a_26_3_loot_table_that_drops_itself stdout ----
+thread '…' panicked at src/runtime.rs:1607:17:
+othercobblestone_slab's loot table uses the 1.21.1 "function": shape, which the 26.3 loader does not read (it reads `modifier`): {
+…
+---- runtime::tests::the_cobble_blocks_copy_the_upstream_stone_templates stdout ----
+thread '…' panicked at src/runtime.rs:831:59:
+…/data/occultism/horizon/block/othercobblestone.json: No such file or directory (os error 2)
+…
+---- runtime::tests::the_raw_stones_drop_the_cobble_tier_without_silk_touch stdout ----
+thread '…' panicked at src/runtime.rs:1650:13:
+otherstone has no silk-touch alternative: {
+…  (the simplified 0.2.4 self-drop table)
+test result: FAILED. 50 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+The fifth failure is `every_cobble_block_has_its_state_model_and_name` (the tags, lang and
+declarations this slice had not written yet). Green after the rewrite and the new table:
+**55 passed, 0 failed** (`sdk-test.log`).
+
+**In-game red — the family** (`e2e-cobble-red-0.2.8-package.log`, the **0.2.8** export,
+`COBBLE_ONLY=1`):
+
+```
+== T: the eight othercobblestone/othercobblerock blocks ==
+  survival, table at 222,101,38
+COBBLE FAIL: missing ingredient occultism:othercobblestone in the open screen (inventory: {})
+FAIL: the cobblestone block check failed (see the COBBLE FAIL line above)
+EXIT:1
+```
+
+The 0.2.8 package does not carry the tier's items at all, so the leg cannot even fill the grid —
+the exact state this slice changes. The 0.2.9 package, same leg: `PASS` + `EXIT:0`
+(`e2e-cobble-0.2.9.log`).
+
+### In game (phase T, verbatim from `e2e-cobble-0.2.9.log`, abridged)
+
+```
+== T: the eight othercobblestone/othercobblerock blocks ==
+  survival, table at 222,101,38
+  the othercobblestone_slab grid: the result slot reads occultism:othercobblestone_slab x6
+  the othercobblestone_slab recipe: every ingredient was consumed ({"occultism:othercobblestone_slab": 6})
+  … stairs x4, wall x6, and the same three for othercobblerock …
+  four othercobblestone in the 2x2: the result slot stayed empty
+  four dirt in the 2x2: the result slot stayed empty
+== the eight blocks: default state, hand 0, wooden pickaxe 1 ==
+  placed occultism:othercobblestone_slab[type=bottom,waterlogged=false] at x=214
+  occultism:othercobblestone_slab by hand: {"block_before": "occultism:othercobblestone_slab[type=bottom,waterlogged=false]", "block": "minecraft:air", "drops": {}}
+  occultism:othercobblestone_slab with a wooden pickaxe: {"…", "drops": {"occultism:othercobblestone_slab": 1}}
+  … the same pair for all eight (slab [type=bottom,waterlogged=false], stairs [facing=north,…],
+      wall [east=none,…,up=true,…], plain) …
+  wall pair: occultism:othercobblestone_wall[east=low,…] / occultism:othercobblestone_wall[…,west=low]
+  double cobble slab: the pickaxe break dropped 2 (the jar table's double branch)
+  othercobblerock_slab (the jar's missing table): {"occultism:othercobblerock_slab": 1}
+== the plain pair: the raw stones drop cobble without silk touch, themselves with it ==
+  otherstone with a wooden pickaxe: {"drops": {"occultism:othercobblestone": 1}}
+  otherstone with a silk-touch pickaxe: {"drops": {"occultism:otherstone": 1}}
+  otherrock with a wooden pickaxe: {"drops": {"occultism:othercobblerock": 1}}
+  otherrock with a silk-touch pickaxe: {"drops": {"occultism:otherrock": 1}}
+```
+
+The driver is `tools/cobble_recipes.py`. It opens a **real** table (`ctl interact`), fills each grid
+one item per cell, takes the result and asserts every ingredient was consumed. The eight blocks are
+placed at `214..228 101 46` (the slab first, at the brief's own `214 101 46`), each read back at its
+whole template state, broken by a bare hand (`drops: {}`) and by a wooden pickaxe
+(`drops: {<id>: 1}`). Differentials: four cobble blocks in the same 2x2 and four dirt make nothing;
+a hand break of every block drops nothing while the pickaxe drops one. The raw-stone pair uses a
+wooden pickaxe and then `/enchant @s minecraft:silk_touch` on a diamond pickaxe, with the break
+reply's `.drops` as the assertion (the silk child is the table's `match_tool` branch).
+`COBBLE_NEGATIVE=1` asserts the cobble slab grid makes nothing, so the run must fail
+(`e2e-negative-cobble-0.2.9.log`:
+`COBBLE FAIL: negative: the cobble slab grid made occultism:othercobblestone_slab x6, expected nothing`,
+`EXIT:1`). The control game does not know any of the eight ids.
+
+### Ladder
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests (red) | `cargo test --offline`, jar bytes carried verbatim | `sdk-test-red-0.2.9.log` | **50 passed, 5 failed** on assertions (dialect, loot `function`, missing block declarations, tags/lang, the raw stones' table) |
+| tests | `cargo test --offline` | `sdk-test.log` | **55 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.9.log`, `sdk-build-second-0.2.9.log`, `sdk-reproducible-0.2.9.txt` | **`REPRODUCIBLE`**, 228,663 B, `8c31154f…75e8` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | `sdk-artifact-0.2.9.txt` | 228,663 B, `8c31154f9a07a6a6d97c62a0d919127ad0a41707341d5ff71be5591d002375e8`, **459 entries**, no packed `Cargo.lock`, declares **0.2.9**, `src/runtime.rs` inside = outside (`79f10b12…`) |
+| tree match | a second build from the final tree + `cmp` | `sdk-reproducible-0.2.9.txt` | **`PACKAGE_MATCHES_TREE`** |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed) | `sdk-check.log` | exit 0, `occultism 0.2.9 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` (sha printed) | `sdk-fits.log` | `0a875da  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` (sha printed) | `sdk-fits-next.log` | **`0b14f8a  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | `sdk-gate-0.2.9.txt` | **1/1** |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.8 export removed first) | `launcher-build-0.2.9.log` | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-87d09c7f95d3`, exported `native-mods.json` version `0.2.9` |
+| in game (the family, red) | `COBBLE_ONLY=1` against the **0.2.8** export | `e2e-cobble-red-0.2.8-package.log` | **FAIL** + `EXIT:1` (`missing ingredient occultism:othercobblestone`) |
+| in game (the family) | `COBBLE_ONLY=1` | `e2e-cobble-0.2.9.log` | **PASS** + `EXIT:0` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen) | `e2e-default-0.2.9.log` | **PASS** + `EXIT:0` (A..T) |
+| in game (loot family) | `LOOT_ONLY=1` | `e2e-loot-0.2.9.log` | **PASS** + `EXIT:0` (the stones' silk pair in phase O) |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | `e2e-control-0.2.9.log` | **FAIL** + `EXIT:1` (`the datura item did not register`) |
+| fail-capability (scenario) | `SELFTEST=1` | `e2e-selftest-0.2.9.log` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) |
+| fail-capability (this family) | `COBBLE_ONLY=1 COBBLE_NEGATIVE=1` | `e2e-negative-cobble-0.2.9.log` | **FAIL** + `EXIT:1` |
+| fail-capability (phase O, after the table) | `LOOT_ONLY=1 LOOT_NEGATIVE=1` | `e2e-negative-loot-0.2.9.log` | **FAIL** + `EXIT:1` (`otherstone dropped 1 othercobblestone with a wooden pickaxe`) |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | **50 logs, 50 ok**, 0 missing-exit, 0 bad-exit |
+
+### Parity coverage (0.2.9)
+
+| family | state |
+|---|---|
+| `othercobblestone_slab`, `othercobblestone_stairs`, `othercobblestone_wall` + their recipes | **tested** — T (middle row → 6, stair step → 4, two rows → 6, every ingredient consumed; default state read back; hand 0 / wooden pickaxe 1) |
+| `othercobblerock_slab`, `othercobblerock_stairs`, `othercobblerock_wall` + their recipes | **tested** — T (same six assertions; `othercobblerock_slab`'s table is the port's fix for the jar's fourth omission) |
+| `othercobblestone`, `othercobblerock` (no crafting grid) | **tested** — T (placed, read back, hand 0 / pickaxe 1) **and** obtainability: O+T (a wooden pickaxe on `otherstone`/`otherrock` drops exactly one `othercobblestone`/`othercobblerock`; a silk-touch pickaxe keeps the stone; both are asserted from the break reply's `.drops`) |
+| the slab tables' `type=double` branch | **tested** — T (a double cobble slab drops 2) |
+| `minecraft:walls` connection | **tested** — T (two cobble walls read `west=low`/`east=low`) |
+| `minecraft:mineable/pickaxe`, `slabs`, `stairs`, `walls`, lang, blockstates, item models, textures | **tested** — the unit test reads each file and tag; in game the pickaxe break is the tag's proof |
+| the reverse smelt pair (`smelting/otherstone`, `smelting/otherrock`: cobble → stone, 200 ticks, 0.5 xp) | **not carried** — both endpoints exist, but a furnace mechanic is a separate leg; recorded for the next slice rather than shipped unproven |
+| the six `stonecutting/othercobble*` shortcuts the jar also ships | **not carried** — the same results come from the six crafting grids; the pin *does* read `minecraft:stonecutting` (correcting 0.2.8's note), but the harness has no way to select a stonecutter recipe (a GUI button, not a menu slot), so a carried shortcut could not be proven in game (see above) |
+| the remaining 10 building recipes (buttons, pressure plates, frames, pedestals, tablets, sacrificial bowls, storage controllers) | **not carried** — their results are still unregistered; the next tiers of the family |
+| the 17 impure-chalk craftings | **not carried** — ingredients missing (unchanged) |
+| spirit fire, the 26 conversion recipes, the crop, the seed source, the readouts, the spectator guard, the four loot tables, the two 0.2.5 recipes, the six 0.2.6 blocks, the twelve 0.2.7 blocks, the eight 0.2.8 blocks | **tested** — phases A..S, unchanged except phase O's own table (the stones now drop cobble; silk touch keeps them) |
+| pentacle rituals, spirits/AI, GeckoLib models, Otherworld, guide book, Curios, machine recipes | **not ported** — the gap list above (unchanged) |
+
+### Measured behaviours of this pin (added by this slice)
+
+1. **The engine reads the jar's `match_tool`/`silk_touch` predicate**, so the raw stones' alternatives
+   table works as written once its condition kind is `"type"` (`items.rs:1508-1534`); the in-game
+   silk break is that branch's proof, not a unit reading.
+2. **`/enchant @s minecraft:silk_touch` works in survival with `xp add @s 30 levels`** on a held
+   diamond pickaxe (the allthemodium/alltheores harness pattern); the break reply then names the
+   stone itself.
+3. **A break reply's `.drops` is keyed by the full id** (`occultism:othercobblestone`), so a driver
+   comparing a bare id mis-asserts even when the game is right — this slice's first phase-T run did
+   exactly that (`expected exactly one occultism:othercobblestone`, with the drop present in the
+   printed reply) and was fixed in the driver, not the product.
+4. The 0.2.4–0.2.8 findings stand (peaceful in the End, the break reply as the drop assertion, a
+   fresh table per grid, `--offscreen` for menu phases, the stale-export trap, `ctl container`).
+
+### Deviations (deliberate, and why)
+
+| Area | Upstream | This port |
+|---|---|---|
+| map colour of the stairs and walls | `Properties.of()` leaves `MapColor.NONE` | the template's stone colour (as 0.2.6–0.2.8) |
+| `othercobblerock_slab` table | missing from the jar | shipped (the upstream-defect fix above) |
+| stonecutting shortcuts | six `stonecutting/othercobble*` recipes | not carried; the crafting grids produce the same blocks, and the harness cannot select a stonecutter recipe yet |
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+### Next slice
+
+The **redstone pair of the same family**: `otherstone_button`, `otherrock_button`,
+`otherstone_pressure_plate`, `otherrock_pressure_plate` (the jar's four grids and their loot tables;
+`occultism:otherrock_button`/`…_pressure_plate` are plain `ButtonBlock`/`PressurePlateBlock` with
+`BlockSetType.STONE`), which 0.2.8's gap row still lists as *not carried*. It fits the same
+`data`-inside-`deep` shape: four block declarations, four 26.3 grids, four tables (enumerate them
+first — the omission rule), models/blockstates/lang/tags and the same six-block in-game pattern,
+plus a press/click leg for the plate and button. Gap line: the 0.2.8 parity row, now *"the remaining
+10 building recipes (buttons, pressure plates, frames, pedestals, tablets, sacrificial bowls,
+storage controllers)"*. The same slice can carry the tier's reverse smelt pair
+(`smelting/otherstone`/`otherrock`) with a furnace leg already scripted. After that the frames,
+pedestals, tablets and bowls are the first results that are not plain building blocks (shapes, and
+for the bowls a block entity upstream) and belong in a slice of their own; the stonecutter half waits
+for a ctl way to select a recipe.

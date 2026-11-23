@@ -1,0 +1,15 @@
+{
+  "category": "building",
+  "key": {
+    "o": "occultism:othercobblerock"
+  },
+  "pattern": [
+    "ooo",
+    "ooo"
+  ],
+  "result": {
+    "count": 6,
+    "id": "occultism:othercobblerock_wall"
+  },
+  "type": "minecraft:crafting_shaped"
+}

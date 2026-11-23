@@ -5,6 +5,8 @@
     "occultism:otherstone_bricks_wall",
     "occultism:otherrock_bricks_wall",
     "occultism:polished_otherstone_wall",
-    "occultism:polished_otherrock_wall"
+    "occultism:polished_otherrock_wall",
+    "occultism:othercobblestone_wall",
+    "occultism:othercobblerock_wall"
   ]
 }

@@ -1508,6 +1508,265 @@ mod tests {
         }
     }
 
+    /// The eight `othercobblestone`/`othercobblerock` blocks this slice carries,
+    /// with the vanilla template each copies and the count its jar recipe makes.
+    /// The two plain blocks make nothing in a grid: upstream has no recipe for
+    /// them — a player gets them by breaking `otherstone`/`otherrock` without
+    /// silk touch (the table tested below), and smelts them back into the stone.
+    const COBBLE: [(&str, &str, u32); 8] = [
+        ("othercobblestone", "minecraft:stone", 0),
+        ("othercobblestone_slab", "minecraft:stone_slab", 6),
+        ("othercobblestone_stairs", "minecraft:stone_stairs", 4),
+        ("othercobblestone_wall", "minecraft:cobblestone_wall", 6),
+        ("othercobblerock", "minecraft:stone", 0),
+        ("othercobblerock_slab", "minecraft:stone_slab", 6),
+        ("othercobblerock_stairs", "minecraft:stone_stairs", 4),
+        ("othercobblerock_wall", "minecraft:cobblestone_wall", 6),
+    ];
+
+    #[test]
+    fn the_cobble_recipes_are_the_jars_shapes_in_the_26_3_dialect() {
+        // The jar's six cobble-tier grids (`building_blocks/crafting`): three
+        // cobble blocks in the middle row make six slabs, the stair step makes
+        // four stairs and two rows of three make six walls. The 26.3 loader reads
+        // an ingredient as a bare `"id"`; the jar's `{"item": …}` object is
+        // dropped without a word (the 0.2.5–0.2.8 finding), so a byte-for-byte
+        // carry yields nothing.
+        for (name, _, count) in COBBLE {
+            if count == 0 {
+                continue; // the plain pair: no grid upstream
+            }
+            let text = content(&format!("occultism/recipe/crafting/{name}.json"));
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{name} carries the 1.21.1 object-form ingredient {object_form}, \
+                     which the 26.3 loader drops: {text}"
+                );
+            }
+            assert!(
+                text.contains("\"minecraft:crafting_shaped\""),
+                "{name} is the jar's shaped recipe: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{name}\"")),
+                "{name} does not make itself: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"count\": {count}")),
+                "{name} does not make {count}: {text}"
+            );
+        }
+        // Each shape is made of the **cobble** block, never of the smooth stone:
+        // a copy of the previous tier's recipe would name the wrong ingredient.
+        for stone in ["othercobblestone", "othercobblerock"] {
+            let smooth = format!("\"occultism:{}\"", stone.replace("cobble", ""));
+            for suffix in ["_slab", "_stairs", "_wall"] {
+                let text = content(&format!("occultism/recipe/crafting/{stone}{suffix}.json"));
+                assert!(
+                    text.contains(&format!("\"occultism:{stone}\"")),
+                    "{stone}{suffix} is not made of {stone}: {text}"
+                );
+                assert!(
+                    !text.contains(&smooth),
+                    "{stone}{suffix} names the smooth stone: {text}"
+                );
+            }
+            let slab = content(&format!("occultism/recipe/crafting/{stone}_slab.json"));
+            assert!(
+                slab.contains("\"ooo\""),
+                "the {stone} slab recipe is one row of three: {slab}"
+            );
+            let stairs = content(&format!("occultism/recipe/crafting/{stone}_stairs.json"));
+            for row in ["\"#  \"", "\"## \"", "\"###\""] {
+                assert!(
+                    stairs.contains(row),
+                    "the {stone} stair recipe lost {row}: {stairs}"
+                );
+            }
+            let wall = content(&format!("occultism/recipe/crafting/{stone}_wall.json"));
+            assert_eq!(
+                wall.matches("\"ooo\"").count(),
+                2,
+                "the {stone} wall recipe is two rows of three: {wall}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_cobble_block_has_a_26_3_loot_table_that_drops_itself() {
+        // The rule the jar breaks a fourth time: `othercobblerock_slab.json` is
+        // absent from Occultism 1.225.0 although the block is registered
+        // `LootTableType.CUSTOM`, so nothing generates a default and the block
+        // would drop nothing at all. The jar ships every other cobble table
+        // (`othercobblestone_slab` included) and all four of the otherrock
+        // family's slabs are the ones it omits. The port ships the missing one.
+        for (name, _, _) in COBBLE {
+            let text = content(&format!("occultism/loot_table/blocks/{name}.json"));
+            for legacy in ["\"function\":", "\"functions\":"] {
+                assert!(
+                    !text.contains(legacy),
+                    "{name}'s loot table uses the 1.21.1 {legacy} shape, which the 26.3 \
+                     loader does not read (it reads `modifier`): {text}"
+                );
+            }
+            assert!(
+                text.contains(&format!("\"name\": \"occultism:{name}\"")),
+                "{name}'s loot table does not drop itself: {text}"
+            );
+        }
+        // A cobble slab's table is the jar's: one when single, two when double.
+        for name in ["othercobblestone_slab", "othercobblerock_slab"] {
+            let text = content(&format!("occultism/loot_table/blocks/{name}.json"));
+            assert!(
+                text.contains("\"minecraft:match_block\"")
+                    && text.contains("\"type\": \"double\"")
+                    && text.contains("\"count\": 2"),
+                "{name}'s double-slab branch is missing: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_raw_stones_drop_the_cobble_tier_without_silk_touch() {
+        // Upstream's `otherstone`/`otherrock` table (the jar's own file, carried
+        // here): a silk-touch pickaxe drops the stone itself and any other break
+        // the cobble tier. 0.2.4 shipped a simplified table (the block always
+        // dropped itself) because this tier was not carried; now it is, and the
+        // deviation's reason is gone. The engine reads `match_tool` with the
+        // `minecraft:enchantments` predicate (`horizon-items/src/items.rs:1508`),
+        // which is the branch's proof in game. The jar's condition objects spell
+        // their kind `"condition": "minecraft:…"`; the 26.3 loader reads `"type"`
+        // and drops the other silently (an unknown kind is false, so a verbatim
+        // carry would drop nothing at all), exactly the ingredient-shape trap.
+        for (stone, cobble) in [
+            ("otherstone", "othercobblestone"),
+            ("otherrock", "othercobblerock"),
+        ] {
+            let text = content(&format!("occultism/loot_table/blocks/{stone}.json"));
+            for legacy in ["\"function\":", "\"functions\":"] {
+                assert!(
+                    !text.contains(legacy),
+                    "{stone}'s loot table uses the 1.21.1 {legacy} shape: {text}"
+                );
+            }
+            assert!(
+                !text.contains("\"condition\": \"minecraft:"),
+                "{stone} carries the 1.21.1 string-form condition kind, which the \
+                 26.3 loader does not read (it reads `type`): {text}"
+            );
+            assert!(
+                text.contains("\"type\": \"minecraft:alternatives\""),
+                "{stone} has no silk-touch alternative: {text}"
+            );
+            assert!(
+                text.contains("\"type\": \"minecraft:match_tool\"")
+                    && text.contains("\"minecraft:silk_touch\""),
+                "{stone} does not keep itself for a silk-touch tool: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"name\": \"occultism:{stone}\"")),
+                "{stone} does not drop itself under silk touch: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"name\": \"occultism:{cobble}\"")),
+                "{stone} does not drop {cobble} without silk touch: {text}"
+            );
+            assert!(
+                text.contains("\"type\": \"minecraft:survives_explosion\""),
+                "{stone} lost the jar's explosion guard: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_cobble_blocks_copy_the_upstream_stone_templates() {
+        // Upstream (`OccultismBlocks.java`): `OTHERCOBBLESTONE`/`OTHERCOBBLEROCK`
+        // are `of().mapColor(STONE).sound(STONE).strength(1.5f, 30)
+        // .requiresCorrectToolForDrops()`, their slabs `ofFullCopy(OTHERSTONE)` /
+        // `ofFullCopy(OTHERROCK)` (1.5 / 30), and the stairs and walls
+        // `of().strength(1.5f).requiresCorrectToolForDrops()` (1.5 / 1.5). Every
+        // one needs a pickaxe, so a bare hand rolls nothing.
+        for (name, template, _) in COBBLE {
+            let text = content(&format!("occultism/horizon/block/{name}.json"));
+            assert!(
+                text.contains(&format!("\"template\": \"{template}\"")),
+                "{name} does not copy {template}: {text}"
+            );
+            assert!(
+                text.contains("\"requires_tool\": true"),
+                "{name} must be gated on a pickaxe as upstream gates it: {text}"
+            );
+            assert!(
+                text.contains("\"hardness\": 1.5"),
+                "{name} is not hardness 1.5: {text}"
+            );
+            let resistance = if name.ends_with("_stairs") || name.ends_with("_wall") {
+                1.5
+            } else {
+                30.0
+            };
+            assert!(
+                text.contains(&format!("\"explosion_resistance\": {resistance}")),
+                "{name} is not resistance {resistance}: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_cobble_block_has_its_state_model_and_name() {
+        // A block with no blockstate renders as the missing model, an item with
+        // no model is a purple-black cube, an id absent from
+        // `mineable/pickaxe` never drops to a pickaxe, and a wall outside
+        // `minecraft:walls` does not connect to its neighbours.
+        let pickaxe = content("minecraft/tags/block/mineable/pickaxe.json");
+        let walls = content("minecraft/tags/block/walls.json");
+        let slabs = content("minecraft/tags/block/slabs.json");
+        let stairs = content("minecraft/tags/block/stairs.json");
+        let lang = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("assets/occultism/lang/en_us.json"),
+        )
+        .expect("the package's lang file");
+        for (name, _, _) in COBBLE {
+            let id = format!("occultism:{name}");
+            assert!(
+                pickaxe.contains(&format!("\"{id}\"")),
+                "{id} is not in mineable/pickaxe"
+            );
+            let tag = if name.ends_with("_wall") {
+                &walls
+            } else if name.ends_with("_slab") {
+                &slabs
+            } else if name.ends_with("_stairs") {
+                &stairs
+            } else {
+                // The plain pair is in no shape tag.
+                &pickaxe
+            };
+            assert!(
+                tag.contains(&format!("\"{id}\"")),
+                "{id} is missing from its tag"
+            );
+            assert!(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join(format!("assets/occultism/blockstates/{name}.json"))
+                    .is_file(),
+                "{id} has no blockstate"
+            );
+            assert!(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join(format!("assets/occultism/models/item/{name}.json"))
+                    .is_file(),
+                "{id} has no item model"
+            );
+            assert!(
+                lang.contains(&format!("\"block.occultism.{name}\"")),
+                "{id} has no lang entry"
+            );
+        }
+    }
+
     #[test]
     fn a_conversion_is_scoped_to_its_world_and_dimension() {
         let mut recent = Recent::default();

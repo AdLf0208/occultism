@@ -5,6 +5,8 @@
     "occultism:otherstone_bricks_slab",
     "occultism:otherrock_bricks_slab",
     "occultism:polished_otherstone_slab",
-    "occultism:polished_otherrock_slab"
+    "occultism:polished_otherrock_slab",
+    "occultism:othercobblestone_slab",
+    "occultism:othercobblerock_slab"
   ]
 }
