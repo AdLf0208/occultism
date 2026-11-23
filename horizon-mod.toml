@@ -1,6 +1,6 @@
 id = "occultism"
 name = "Occultism"
-version = "0.2.10"
+version = "0.2.11"
 description = """A port of Occultism 1.225.0 for Horizon: the spirit-fire conversion loop and the datura it
 is lit with. A datura (Demon's Dream Fruit) struck with flint and steel or a fire charge lights
 occultism:spirit_fire; any item entity standing in that fire which one of the carried
@@ -12,10 +12,10 @@ scoped to the world, dimension and position). A spectator's click changes nothin
 The datura crop grows from occultism:datura_seeds on farmland by random tick (the wheat template, ages
 0-7), is harvested by right-click at its last age (the loot table's fruit and seeds, replanted at age 0),
 and breaks by hand into its loot table; breaking short or tall grass without shears has the jar's 2%
-chance of a seed. The package carries 44 blocks (with their item forms), 42 carried item declarations,
-43 loot tables (the crop's, the four carried blocks', the six stone building blocks', the twelve
+chance of a seed. The package carries 46 blocks (with their item forms), 44 carried item declarations,
+45 loot tables (the crop's, the four carried blocks', the six stone building blocks', the twelve
 bricks-tier ones', the eight polished-tier ones', the eight cobblestone-tier ones' and the four redstone ones'), 27
-spirit-fire recipes, 34 crafting-table recipes, 6 smelting recipes, 15 tags and the models, textures and lang they
+spirit-fire recipes, 38 crafting-table recipes, 6 smelting recipes, 15 tags and the models, textures and lang they
 need. The crafting
 recipes are the ones whose result and every ingredient the package already provides: a 3x3 grid of
 the datura fruit or the datura seed (the #c:crops/datura / #c:seeds/datura alternative) makes one
@@ -28,9 +28,13 @@ bricks into the cracked pair at 200 ticks), the polished tier is smelted from th
 (otherstone or otherrock + coal in a furnace, 200 ticks, 0.5 experience) and then shaped into its
 slabs, stairs and walls, the cobblestone tier is mined from the raw stones (a break without silk
 touch drops othercobblestone or othercobblerock, silk touch keeps the stone) and shaped into its
-slabs, stairs and walls, and the redstone pair is one stone -> one button and two stones in a row ->
+slabs, stairs and walls, the redstone pair is one stone -> one button and two stones in a row ->
 one pressure plate, each plate reading powered under the player and each button staying pressed for
-its template's press duration; a cobble block also smelts back into the stone. The pentacle rituals,
+its template's press duration, and the frames and pedestals are the tier's ornamental half: eight
+stones in a ring make one otherstone or otherrock frame (an item, used by rituals), and five slabs
+plus one stone make a pedestal (the otherrock one keeps the jar's old id
+occultism:otherstone_pedestal_silver) whose post-shaped, non-occluding block drops only to a
+pickaxe; a cobble block also smelts back into the stone. The pentacle rituals,
 the summoned spirits and their AI, the GeckoLib models, the Otherworld dimension, the guide book, Curios
 slots and the spirit-job recipes are not ported yet."""
 authors = ["klikli-dev", "AdLf0208"]

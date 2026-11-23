@@ -151,3 +151,41 @@ the `/occultism info|fires|recipes` readouts.
 | `data/occultism/loot_table/blocks/otherrock_bricks_slab.json` | **absent** from the jar, same `LootTableType.CUSTOM` registration (0.2.7's instance) | the same listing: every otherrock brick table is there, the slab's is not | the port ships it (the `otherstone_bricks_slab` table with its `type=double` branch), proven by a pickaxe break (0.2.7) |
 | `data/occultism/loot_table/blocks/polished_otherrock_slab.json` | **absent** from the jar, same registration (0.2.8's instance) | the listing of the polished tables is seven of eight, the otherrock slab missing | the port ships it, proven by a pickaxe break and a double slab dropping two (0.2.8) |
 | `data/occultism/loot_table/blocks/othercobblerock_slab.json` | **absent** from the jar, same registration (0.2.9's instance). The pattern is now exact: **every `otherrock`-family slab lacks a table** (`otherrock_slab`, `otherrock_bricks_slab`, `polished_otherrock_slab`, `othercobblerock_slab`), while every `otherstone`/`othercobblestone` slab has one (`othercobblestone_slab` is present) | the cobble-ore listing (seven of eight) in `ports/_shared/evidence/occultism/jar-loot-inventory-0.2.9.txt`; the unit test `every_cobble_block_has_a_26_3_loot_table_that_drops_itself` reads each path | the port ships it (the `othercobblestone_slab` table with its `type=double` branch), proven in game by a pickaxe break dropping exactly one and a double slab dropping two (0.2.9) |
+
+## Slice 10 findings (2026-11-23) — the frames are items, the pedestals are plain blocks
+
+Read at tag `release/v1.21.1-1.225.0` (commit `91de0d2a46e05ce315cc5afd292d266d4f46e7ab`): the jar's
+`assets/occultism/{blockstates,models}` and `data/occultism/{recipe,loot_table}`, plus
+`registry/OccultismItems.java`, `registry/OccultismBlocks.java`,
+`common/block/NonPathfindableBlock.java`, `datagen/recipe/OccultismRecipeProvider.java:638-674` and
+`datagen/recipe/RitualRecipes.java:1390-1560`.
+
+**`otherstone_frame` / `otherrock_frame` are items** (`OccultismItems.java:407-410`,
+`new Item(defaultProperties())`, `minecraft:paper`-equivalent). The jar carries an item model
+(`minecraft:item/generated` + `occultism:item/<frame>`) and an `en_us` name for each, and **no**
+blockstate, block model, block declaration or loot table. Their only use is as ritual ingredients
+(`RitualRecipes`, e.g. the otherworld-goggles ritual) — the recipes are in the jar's 3x3 ring
+(`ooo`/`o o`/`ooo`, eight of the stone → one frame). Anything that treats them as "the wall-mounted
+item frame" is wrong for this version.
+
+**`otherstone_pedestal` and `otherstone_pedestal_silver` are `NonPathfindableBlock`s**
+(`OccultismBlocks.java:535-541`): `Properties.ofFullCopy(OTHERSTONE).noOcclusion()`, so hardness 1.5,
+resistance 30, `MapColor.STONE`, `requiresCorrectToolForDrops` — and no block entity, no container, no
+`use`: a pedestal is the pentacle's decorative stand, not a display case. `NonPathfindableBlock` adds
+the four-box post shape and `isPathfindable → false`.
+
+**The otherrock pedestal's id is the jar's old one**: `OTHERROCK_PEDESTAL = register(
+"otherstone_pedestal_silver", …)` with the `TODO: change id in next major version` comment, and its
+recipe file is `recipe/crafting/otherrock_pedestal.json` while the result is
+`occultism:otherstone_pedestal_silver`. Both were carried as-is.
+
+**The storage-controller bases are ritual results, not crafting results**:
+`RitualRecipes.java:1544-1557` makes `storage_controller_base` (`…_dark`) from a Foliot ritual, the
+crafting recipes for the actuator need the base **and** a `dimensional_matrix` (another ritual), and
+`models/block/storage_controller_base.json` parents `occultism:block/storage_controller` (the machine
+the port does not carry). They are recorded `blocked(ritual:craft_storage_controller_base)` rather
+than shipped as creative-only blocks.
+
+**The family's loot tables**: `otherstone_pedestal` and `otherstone_pedestal_silver` are present (no
+omission this time); the frames have none (items); the two bases' tables exist and are not carried
+with the bases.

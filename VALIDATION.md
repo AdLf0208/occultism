@@ -438,3 +438,38 @@ with consumption, the three wrong-ingredient controls plus the one-stone-makes-t
 four default states with hand 1 / pickaxe 1 and the `otherstone` hand-0 differential, both plates
 pressed and released, and both buttons clicked, held and released) and the family's deviations (the
 20-tick press, the item-tag fix) are in `notes.md` under "Slice 9".
+
+## 14. SDK 0.2.11 (the frames and pedestals), pin `0a875da`
+
+The slice, the two brief premises it corrected (the frame is an **item**, the pedestal holds **no**
+stack — neither has a block entity), the jar's loot-table inventory for the family, and the phase-V
+transcript are in `notes.md`, §"Slice 10".
+
+| Step | Command | Result |
+|---|---|---|
+| red (unit) | `cargo test --offline`, the four tests written before any file | **60 passed; 4 failed** — every family file absent (`...: No such file or directory`), plus `occultism:otherstone_pedestal is not in mineable/pickaxe` — `sdk-test-red-0.2.11.log` |
+| green (unit) | `cargo test --offline` | **64 passed, 0 failed** — `sdk-test-0.2.11.log` (copied to `sdk-test.log`, which the gate reads) |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy-0.2.11.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt-0.2.11.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **`REPRODUCIBLE`**: 256,975 B, `3d335fe8…d5998` — `sdk-build-0.2.11.log`, `sdk-build-second-0.2.11.log`, `sdk-reproducible-0.2.11.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | 256,975 B, `3d335fe802e7668d869bac6ab47ffacb9770b1d9b602cc7fe74805e4fe8d5998`, **514 entries**, no packed `Cargo.lock`, declares **0.2.11**, `src/runtime.rs` and `README.md` inside = outside, 0 empty files — `sdk-artifact-0.2.11.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed) | exit 0, `occultism 0.2.11 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check-0.2.11.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` (sha printed) | `0a875da  made for`, exit 0 — `sdk-fits-0.2.11.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` (sha printed) | **`0b14f8a  fits`**, exit 0 — `sdk-fits-next-0.2.11.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** (64 tests, 0 clippy warnings) — `sdk-gate-0.2.11.txt` |
+| recipe types | `python3 ports/tools/check-recipe-types.py occultism` | `occultism: ok`, exit 0 — `check-recipe-types-0.2.11.log` |
+| recipe keys | `python3 tools/check_recipe_keys.py` | `44 recipe(s), 44 craftable, 0 blocked, 0 failure(s)`, exit 0 — `check-recipe-keys-0.2.11.log` |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.10 tag and export removed first) | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-f6977ddf144c`, exported manifest `version = "0.2.11"` — `launcher-build-0.2.11.log` |
+| red (in game, the family) | `PEDESTAL_ONLY=1` against the **0.2.10** export | **FAIL** + `EXIT:1` (`the otherstone_frame grid … made None x0`) — `e2e-pedestal-red-0.2.10-package.log` |
+| in game (the family) | `PEDESTAL_ONLY=1` | **PASS** + `EXIT:0` — `e2e-pedestal-0.2.11.log` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen, launcher-built game) | **PASS** + `EXIT:0` (A..V) — `e2e-default-0.2.11.log` |
+| in game (control ids) | `CONTROL_LEG=1 PEDESTAL_ONLY=1` | **PASS** + `EXIT:0` (the four ids unknown as a block and an item) — `e2e-control-frames-0.2.11.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | **FAIL** + `EXIT:1` (`the datura item did not register`) — `e2e-control-0.2.11.log` |
+| fail-capability (grid) | `PEDESTAL_ONLY=1 PEDESTAL_NEGATIVE=1` | **FAIL** + `EXIT:1` (`negative: the otherstone_frame grid made occultism:otherstone_frame x1`) — `e2e-negative-pedestal-0.2.11.log` |
+| fail-capability (item) | `PEDESTAL_ONLY=1 PEDESTAL_SELFTEST=1` | **FAIL** + `EXIT:1` (`frame selftest: occultism:otherstone_frame left air …`) — `e2e-selftest-frame-0.2.11.log` |
+| fail-capability (scenario) | `SELFTEST=1` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) — `e2e-selftest-0.2.11.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | **65 logs, 65 ok**, 0 missing-exit, 0 bad-exit |
+
+Every leg above ran on the **final** 256,975 B artifact / tree (the first 256,642 B build, before the
+README refresh, was replaced and every leg re-run). `E2E_TMP` (`~/.cache/horizon-e2e/scratch`) was
+used throughout; nothing was written under `/tmp` except the short probe log quoted in `notes.md`.

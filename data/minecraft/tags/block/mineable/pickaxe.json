@@ -37,6 +37,8 @@
     "occultism:othercobblerock_stairs",
     "occultism:othercobblerock_wall",
     "occultism:otherstone_pressure_plate",
-    "occultism:otherrock_pressure_plate"
+    "occultism:otherrock_pressure_plate",
+    "occultism:otherstone_pedestal",
+    "occultism:otherstone_pedestal_silver"
   ]
 }

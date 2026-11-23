@@ -33,6 +33,13 @@ stones and their slab/stair/wall, and the jar's missing
 and their slab/stair/wall, the jar's missing `othercobblerock_slab` table, and
 the raw stones' own silk-touch alternatives table, which makes the pair
 obtainable (§"Slice 8").
+**0.2.10 (2026-11-23):** the redstone pair — `otherstone`/`otherrock` buttons and
+pressure plates (their grids, the press/click states and the jar's item-tag
+omission) and the tier's reverse smelt pair (§"Slice 9").
+**0.2.11 (2026-11-23):** the frames and pedestals — the two frame **items**, the
+two post-shaped pedestals with their grids and loot tables, and the brief's two
+premises it had to correct (the frame is not a block, the pedestal holds no
+stack) (§"Slice 10").
 
 ## Class + tier and the approach
 
@@ -2427,3 +2434,317 @@ item (the block entity's saved `Item` read back through `ctl container`/`ctl blo
 click returning the held item, and a `requires_tool: true` hand 0 / pickaxe 1 pair. If the frames are
 out of reach, the six stonecutting shortcuts wait on a `ctl` way to select a stonecutter recipe (a
 `player_stonecutter_recipe_select` moment), which is a harness feature, not a port one.
+
+## Slice 10 (0.2.11, 2026-11-23) — the frames and pedestals
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). Class
+**content**, tier **deep** (ledger row 345). Licence **MIT**, ours on `main` → an
+`Update occultism 0.2.11` publication (the publisher appends to the retained PR #1754).
+
+**Gap line it comes from:** 0.2.10's parity row — *"the remaining 6 building recipes (frames,
+pedestals, tablets, sacrificial bowls, storage controllers) — **not carried**"* — and 0.2.10's
+`## Next slice`, which named exactly this pair. It is a behaviour change (four new obtainable
+results: two frame items and two pedestal blocks), so it is a real version.
+
+### The brief's premise was wrong twice, and the artefact wins
+
+The brief calls the slice *"`otherstone_frame`, `otherstone_pedestal`,
+`otherstone_pedestal_silver` and the storage-controller bases"* and says *"a frame's displayed item
+and a pedestal's stored stack are block entities, so it is the `machines`-shaped half"*. Measured
+against the jar and `klikli-dev/occultism` at tag `release/v1.21.1-1.225.0`
+(commit `91de0d2a…`, the tag the jar was built from):
+
+| Brief says | The artefact says | Where |
+|---|---|---|
+| the frame is a wall-mounted item frame with a block entity | `otherstone_frame` / `otherrock_frame` are **`OccultismItems` entries** (`new Item(defaultProperties())`): an item model, an item name and a grid each, and **no blockstate, no block model, no loot table, no block item** | `registry/OccultismItems.java:407-410`; the jar has no `blockstates/other*_frame.json`, no `models/block/other*_frame.json` and no `loot_table/blocks/other*_frame.json` |
+| a pedestal stores a stack and has a click | both pedestals are plain **`NonPathfindableBlock`s**: no block entity, no container, no `use` — a full copy of `OTHERSTONE` with `noOcclusion()`, a four-box post shape and `isPathfindable → false` | `registry/OccultismBlocks.java:535-541`, `common/block/NonPathfindableBlock.java` |
+| the storage-controller bases are this slice | they are ritual-only results (`craft_storage_controller_base` / `…_dark` are pentacle rituals), their block model **parents `occultism:block/storage_controller`** (the storage actuator machine the port does not carry), and the `storage_controller` crafting recipe needs the base **and** a `dimensional_matrix` (also ritual-only) | `datagen/recipe/RitualRecipes.java:1544-1557`, `recipe/crafting/storage_controller{,_dark}.json`, `models/block/storage_controller_base.json` |
+
+So there is **no block entity, no `use_item_on` and no renderer** in this slice: it is the data half of
+the tier, exactly as slices 3–9, and nothing here is faked to look like a machine. The two frames are
+proven to be **items** in game (`give` puts one in the inventory, `setblock` of the id leaves air) —
+that is the assertion that would fail if a future change turned the frame into a block.
+
+**The storage-controller bases are `blocked(ritual:craft_storage_controller_base)`**, recorded in the
+coverage table below: they are not a crafting result at all, they cannot be obtained without the
+pentacle system, and carrying them would ship a creative-only block whose visual is the unported
+actuator's model.
+
+### The jar's loot-table inventory for this family (enumerated first, as the last four slices did)
+
+`unzip -l occultism-1.21.1-neoforge-1.225.0.jar | grep loot_table/blocks`:
+
+```
+otherstone_pedestal.json          otherstone_pedestal_silver.json
+storage_controller_base.json      storage_controller_base_dark.json
+```
+
+**Two pedestal tables, both present** (the first family since 0.2.10 with no omission at all — the
+four `otherrock`-family slabs the earlier slices had to add are the pattern's whole extent). The two
+frames have **no** table because they are items; a unit test asserts the absence, so a future jar that
+turns them into blocks fails the run instead of shipping a table-less block. The bases' two tables
+exist and are **not carried** with the bases (see above).
+
+### What was carried (and from where)
+
+| family | files | source |
+|---|---|---|
+| item declarations | 2 (`data/occultism/horizon/item/<frame>.json`) | port-authored from `OccultismItems` (`minecraft:paper` template) |
+| block declarations | 2 (`data/occultism/horizon/block/<pedestal>.json`) | port-authored from `OccultismBlocks` + `NonPathfindableBlock` (shape, occlusion, properties) |
+| crafting recipes | 4 (`.../recipe/crafting/{otherstone,otherrock}_frame.json`, `otherstone_pedestal.json`, `otherrock_pedestal.json`) | the jar's grids, rewritten to the 26.3 dialect |
+| loot tables | 2 (`.../loot_table/blocks/<pedestal>.json`) | the jar's two, in the 26.3 condition dialect |
+| blockstates | 2 | the jar's |
+| block models | 2 | the jar's (229-element-free: 8 boxes, `cutout`, `pedestal_base`/`pedestal_base_dark`) |
+| item models | 4 | the jar's (the pedestals parent their block model; the frames are `item/generated`) |
+| textures | 4 | the jar's `block/pedestal_base{,_dark}.png`, `item/other{stone,rock}_frame.png` |
+| lang | 4 keys | the jar's `en_us` (`Otherstone Pedestal`, `Otherrock Pedestal`, `Otherstone Frame`, `Otherrock Frame`) |
+| tags | `minecraft:mineable/pickaxe` (+2) | the jar's datagen output |
+| creative tab | 4 entries | after the four 0.2.10 redstone blocks (the port's family grouping) |
+
+### The rule under test
+
+| result | kind | template | hardness / resistance | `requires_tool` | recipe |
+|---|---|---|---|---|---|
+| `otherstone_frame`, `otherrock_frame` | **item** | `minecraft:paper` (stack 64) | — | — | `ooo`/`o o`/`ooo` → 1 (eight stones) |
+| `otherstone_pedestal` | block | `minecraft:stone` | 1.5 / 30 | **true** | `s s`/` o `/`sss` → 1 (5 slabs + 1 stone) |
+| `otherstone_pedestal_silver` | block | `minecraft:stone` | 1.5 / 30 | **true** | the same, from `otherrock_slab` + `otherrock`, in the jar's file `otherrock_pedestal.json` |
+
+Upstream (`OccultismBlocks.java:535-541`): both pedestals are
+`new NonPathfindableBlock(Block.Properties.ofFullCopy(OTHERSTONE.get()).noOcclusion())`, and
+`OTHERSTONE` is registered `Properties.of().mapColor(STONE).sound(STONE).strength(1.5f, 30)
+.requiresCorrectToolForDrops()`. `NonPathfindableBlock` adds the post shape (four boxes:
+1,0,1→15,2,15; 2,2,2→14,3,14; 3,3,3→13,14,13; 2,14,2→14,16,14) and `isPathfindable → false`.
+
+**The brief's `requires_tool` line, as measured (this is the one it asked to be measured):** the pin's
+own prepared facts give `minecraft:stone` **`requires_tool: true`** (hardness 1.5, `can_occlude: true`,
+`block_entity: false` — `gameplay-facts.json`, state id 1), and `ofFullCopy` copies exactly that
+property, so a **bare hand breaks a pedestal and rolls nothing** while a wooden pickaxe drops one.
+That is what the game leg asserts (the same pair as 0.2.4's `otherstone`); the brief's "hand 0 or hand
+1, I was wrong last time" resolves to **hand 0 / pickaxe 1**, not inherited from the brief but read
+from the template facts and proved in game.
+
+### The one property this slice cannot prove in game
+
+`NonPathfindableBlock.isPathfindable → false` is a scoped behaviour with **no probe at this pin**:
+`horizon-ctl` has no command that asks a block state for its path type (`horizon-ctl --help` and the
+pin's `commands.json` list none), and a mob-pathfinding observation is not a fail-capable assertion.
+The declaration therefore carries the **shape** (the four boxes) and `occludes: false` — both pinned
+by `the_pedestals_copy_the_upstream_non_pathfindable_shape` — and the pathfinder answer is recorded
+**`blocked(harness:no-pathfindability-probe)`** in the coverage table rather than shipped as an
+unprovable `is_pathfindable` Part. The `minecraft:stone` template's own answer starts at
+"not pathfindable" for a full cube, so the gap is the partial shape's middle gaps only.
+
+### Tools added
+
+- `tools/pedestal_recipes.py` — the phase-V driver (grids, differentials, the item legs, the
+  pedestal breaks).
+- `tools/check_recipe_keys.py` — the campaign's `check-recipe-keys` for this port (the campaign has
+  no `ports/tools/check-recipe-keys.py`; this is adapted from `ports/actuallyadditions/tools/`,
+  recurses into `recipe/crafting`/`recipe/smelting` and skips the port's own `spirit_fire` type).
+  Result: **44 recipe(s), 44 craftable, 0 blocked, 0 failure(s)**, exit 0
+  (`evidence/occultism/check-recipe-keys-0.2.11.log`), next to `check-recipe-types.py occultism` →
+  `occultism: ok`.
+
+### Red → green
+
+**Unit red** (`sdk-test-red-0.2.11.log`), the four tests written first:
+
+```
+running 64 tests
+...
+---- runtime::tests::every_pedestal_has_a_26_3_loot_table_that_drops_itself stdout ----
+thread 'runtime::tests::every_pedestal_has_a_26_3_loot_table_that_drops_itself' (53666) panicked at src/runtime.rs:831:59:
+…/data/occultism/loot_table/blocks/otherstone_pedestal.json: No such file or directory (os error 2)
+
+---- runtime::tests::every_frame_and_pedestal_has_its_model_name_and_tag stdout ----
+thread '…' (53664) panicked at src/runtime.rs:2264:13:
+occultism:otherstone_pedestal is not in mineable/pickaxe
+
+---- runtime::tests::the_frame_and_pedestal_recipes_are_the_jars_shapes_in_the_26_3_dialect stdout ----
+thread '…' (53690) panicked at src/runtime.rs:831:59:
+…/data/occultism/recipe/crafting/otherstone_frame.json: No such file or directory (os error 2)
+
+---- runtime::tests::the_pedestals_copy_the_upstream_non_pathfindable_shape stdout ----
+thread '…' (53693) panicked at src/runtime.rs:831:59:
+…/data/occultism/horizon/block/otherstone_pedestal.json: No such file or directory (os error 2)
+
+test result: FAILED. 60 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+```
+
+Green after the data and assets: **64 passed, 0 failed** (`sdk-test.log`).
+
+**In-game red — the family** (`e2e-pedestal-red-0.2.10-package.log`, the **0.2.10** export,
+`PEDESTAL_ONLY=1`):
+
+```
+== V: the frames and pedestals ==
+== the four frame and pedestal grids ==
+PEDESTAL FAIL: the otherstone_frame grid -> otherstone_frame made None x0, expected occultism:otherstone_frame x1
+FAIL: the frames-and-pedestals check failed (see the PEDESTAL FAIL line above)
+EXIT:1
+```
+
+The 0.2.10 package carries the stones and slabs but neither the frames nor their grids, so the grid
+yields nothing: the exact behaviour this slice changes. The 0.2.11 package, same leg: `PASS` +
+`EXIT:0` (`e2e-pedestal-0.2.11.log`).
+
+The first 0.2.11 run of that leg failed too, and the cause was **in the driver, not the product**: its
+ring/slab cells were grid **indices** (0..8) where `click-slot` needs **slot numbers** (100..108), so
+it right-clicked the player's own inventory cells and the grid stayed empty. Fixed in the driver
+(`GRID[i]`); no product change. A second harness defect was found at the same time: the asset copy had
+left four **0-byte** `.json` files in `textures/` (the `unzip -p … .json` attempt created them before
+the `.png` fallback ran), which the packager shipped; they were deleted before the delivered build and
+the unit test/`unzip -l` sweep now reports no empty file.
+
+### In game (phase V, verbatim from `e2e-default-0.2.11.log`)
+
+```
+== V: the frames and pedestals ==
+  survival, table at 222,101,38
+== the four frame and pedestal grids ==
+  the otherstone_frame grid -> otherstone_frame: the result slot reads occultism:otherstone_frame x1
+  the otherstone_frame: taken into slot 0 (inventory {"occultism:otherstone_frame": 1})
+  the otherstone_frame recipe: every ingredient was consumed ({"occultism:otherstone_frame": 1})
+  the otherrock_frame grid -> otherrock_frame: the result slot reads occultism:otherrock_frame x1
+  … the otherstone_pedestal grid -> otherstone_pedestal x1 …
+  the otherrock_pedestal grid -> otherstone_pedestal_silver: the result slot reads occultism:otherstone_pedestal_silver x1
+  the otherstone_pedestal_silver: taken into slot 0 (inventory {"occultism:otherstone_pedestal_silver": 1})
+  the otherstone_pedestal_silver recipe: every ingredient was consumed ({"occultism:otherstone_pedestal_silver": 1})
+== the wrong grids: nothing ==
+  nine otherstone in the ring and the centre: the result slot stayed empty
+  four otherstone_slab and one otherstone: the result slot stayed empty
+== the two frames: items, not blocks ==
+  occultism:otherstone_frame: one in the inventory
+  /setblock occultism:otherstone_frame: the block stayed air (it is an item)
+  occultism:otherrock_frame: one in the inventory
+  /setblock occultism:otherrock_frame: the block stayed air (it is an item)
+== the two pedestals: state, hand 0, wooden pickaxe 1 ==
+  placed occultism:otherstone_pedestal at x=214
+  occultism:otherstone_pedestal by hand: {"block_before": "occultism:otherstone_pedestal", "block": "minecraft:air", "drops": {}}
+  occultism:otherstone_pedestal with a wooden pickaxe: {"…", "drops": {"occultism:otherstone_pedestal": 1}}
+  placed occultism:otherstone_pedestal_silver at x=216
+  occultism:otherstone_pedestal_silver by hand: {"block_before": "occultism:otherstone_pedestal_silver", "block": "minecraft:air", "drops": {}}
+  occultism:otherstone_pedestal_silver with a wooden pickaxe: {"…", "drops": {"occultism:otherstone_pedestal_silver": 1}}
+  differential, otherstone by hand: {}
+```
+
+The driver opens a **real** crafting table (`ctl interact`), fills the grid one item per cell through
+the screen's slots (100..108, result 200), reads the result, takes it and reads the inventory back;
+the player is in survival, so consumption is the vanilla rule. The two frames are then given and a
+`setblock` of their id is refused (air stays) — the item-not-block assertion. Each pedestal is placed
+by `setblock`, its state read back (a bare id: no state properties), broken by a bare hand (`drops:
+{}`) and by a wooden pickaxe (`drops: {<id>: 1}`), with a bare-hand break of `occultism:otherstone`
+(nothing) as the differential that keeps the hand-0 assertion fail-capable.
+
+`PEDESTAL_NEGATIVE=1` inverts the frame grid ("negative: the otherstone_frame grid made
+occultism:otherstone_frame x1, expected nothing", `e2e-negative-pedestal-0.2.11.log`, `EXIT:1`), and
+`PEDESTAL_SELFTEST=1` asserts the frame **does** place a block ("frame selftest:
+occultism:otherstone_frame left air at 214,101,50 (this run must fail; the frame is an item, not a
+block)", `e2e-selftest-frame-0.2.11.log`, `EXIT:1`). `CONTROL_LEG=1 PEDESTAL_ONLY=1` proves all four
+ids unknown as a block **and** as an item on a game without the package
+(`e2e-control-frames-0.2.11.log`, `EXIT:0`).
+
+### Ladder
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests (red) | `cargo test --offline`, tests first | `sdk-test-red-0.2.11.log` | **60 passed, 4 failed** (files absent) |
+| tests | `cargo test --offline` | `sdk-test.log` (copy of `sdk-test-0.2.11.log`) | **64 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy-0.2.11.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt-0.2.11.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.11.log`, `sdk-build-second-0.2.11.log`, `sdk-reproducible-0.2.11.txt` | **`REPRODUCIBLE`**, 256,975 B |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | `sdk-artifact-0.2.11.txt` | 256,975 B, `3d335fe802e7668d869bac6ab47ffacb9770b1d9b602cc7fe74805e4fe8d5998`, **514 entries**, no packed `Cargo.lock`, declares **0.2.11**, `src/runtime.rs` and `README.md` inside = outside, 0 empty files |
+| package check | `cargo horizon-mod check occultism.hmod` | `sdk-check-0.2.11.log` | exit 0, `occultism 0.2.11 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` | `sdk-fits-0.2.11.log` | `0a875da  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` | `sdk-fits-next-0.2.11.log` | **`0b14f8a  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | `sdk-gate-0.2.11.txt` | **1/1** (64 tests, 0 clippy warnings) |
+| recipe types | `python3 ports/tools/check-recipe-types.py occultism` | `check-recipe-types-0.2.11.log` | `occultism: ok`, exit 0 |
+| recipe keys | `python3 tools/check_recipe_keys.py` | `check-recipe-keys-0.2.11.log` | `44 recipe(s), 44 craftable, 0 blocked, 0 failure(s)`, exit 0 |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.10 tag and export removed first) | `launcher-build-0.2.11.log` | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-f6977ddf144c`, exported manifest version `0.2.11` |
+| in game (the family, red) | `PEDESTAL_ONLY=1` against the **0.2.10** export | `e2e-pedestal-red-0.2.10-package.log` | **FAIL** + `EXIT:1` (`the otherstone_frame grid … made None x0`) |
+| in game (the family) | `PEDESTAL_ONLY=1` | `e2e-pedestal-0.2.11.log` | **PASS** + `EXIT:0` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen) | `e2e-default-0.2.11.log` | **PASS** + `EXIT:0` (A..V) |
+| in game (control ids) | `CONTROL_LEG=1 PEDESTAL_ONLY=1` | `e2e-control-frames-0.2.11.log` | **PASS** + `EXIT:0` (four ids unknown as a block and an item) |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | `e2e-control-0.2.11.log` | **FAIL** + `EXIT:1` (`the datura item did not register`) |
+| fail-capability (this family, grid) | `PEDESTAL_ONLY=1 PEDESTAL_NEGATIVE=1` | `e2e-negative-pedestal-0.2.11.log` | **FAIL** + `EXIT:1` |
+| fail-capability (this family, item) | `PEDESTAL_ONLY=1 PEDESTAL_SELFTEST=1` | `e2e-selftest-frame-0.2.11.log` | **FAIL** + `EXIT:1` |
+| fail-capability (scenario) | `SELFTEST=1` | `e2e-selftest-0.2.11.log` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | **65 logs, 65 ok**, 0 missing-exit, 0 bad-exit |
+
+The first delivered artifact was 256,642 B (`9e6613eb…`, 514 entries) — the same slice before the
+README update below; every leg was re-run on the final 256,975 B artifact, so the logs and the
+delivered file belong together.
+
+### Parity coverage (0.2.11)
+
+| family | state |
+|---|---|
+| `otherstone_frame`, `otherrock_frame` — the grid, the item, the item-ness | **tested** — V (eight stones in a ring make exactly one of each with every stone consumed; `give` puts one in the inventory; `setblock` of the id leaves air, which is the item-not-block assertion; the ninth stone in the hole makes nothing; `PEDESTAL_SELFTEST` inverts the item leg) |
+| `otherstone_pedestal`, `otherstone_pedestal_silver` — the grid | **tested** — V (five slabs + one stone make exactly one of each with every ingredient consumed; four slabs + one stone make nothing; `PEDESTAL_NEGATIVE` inverts the frame grid) |
+| the two pedestal blocks — state, drops | **tested** — V (placed, state read back, a bare hand drops nothing, a wooden pickaxe drops exactly one; otherstone's bare-hand break drops nothing as the differential) |
+| the two pedestal loot tables | **tested** — V (the pickaxe drop is the table's roll; the unit test enumerates both paths and the 26.3 dialect) |
+| the `otherstone_pedestal_silver` id (the jar's old name for the otherrock pedestal) | **tested** — V (the grid's result id is `occultism:otherstone_pedestal_silver` although its file is `otherrock_pedestal.json`) |
+| `minecraft:mineable/pickaxe`, blockstates, block/item models, textures, lang, creative tab | **tested** — the unit test reads each file and tag; in game the pickaxe break is the tag's proof |
+| the pedestal shape (four boxes) and `occludes: false` | **tested (unit)** — `the_pedestals_copy_the_upstream_non_pathfindable_shape` reads the declaration's exact boxes and the flag; there is no in-game shape/occlusion probe at this pin |
+| `NonPathfindableBlock.isPathfindable → false` | **`blocked(harness:no-pathfindability-probe)`** — no `horizon-ctl` command and no fail-capable mob observation asks a block state for its path type; the data carries the shape and the occlusion |
+| the two storage-controller bases (`storage_controller_base`, `_dark`) | **`blocked(ritual:craft_storage_controller_base)`** — ritual-only results, no crafting grid, and their model parents the unported `occultism:block/storage_controller`; the storage actuator is its own machine slice |
+| the remaining family: tablets (`otherstone_tablet`, needs `#c:dusts/otherworld_wood`), sacrificial bowls (block entity + ritual), storage controllers (ritual + machine) | **not carried** — the ingredients/machines are not in the package (the tablets' tag is not carried) |
+| the six `stonecutting/` shortcuts | **not carried** — unchanged from 0.2.9/0.2.10: the harness cannot select a stonecutter recipe (`player_stonecutter_recipe_select` is a GUI button, not a menu slot) |
+| the 17 impure-chalk craftings | **not carried** — ingredients missing (unchanged) |
+| spirit fire, the 26 conversion recipes, the crop, the seed source, the readouts, the spectator guard, the loot tables, 0.2.5–0.2.10 families | **tested** — phases A..U, unchanged in this slice's full run |
+| pentacle rituals, spirits/AI, GeckoLib models, Otherworld, guide book, Curios, machine recipes | **not ported** — the gap list above (unchanged) |
+
+### Measured behaviours of this pin (added by this slice)
+
+1. **`requires_tool` comes from the template the declaration copies**, not from the block's name or
+   the brief: `minecraft:stone` is `requires_tool: true` in `gameplay-facts.json` (hardness 1.5,
+   `can_occlude: true`, `block_entity: false`), and both pedestals are `ofFullCopy(OTHERSTONE)`, so
+   both are hand-0 / pickaxe-1. The hand break still removes the block and rolls nothing.
+2. **A `setblock` of an item id is refused** with "Could not set the block" and leaves air — that is
+   how the frame's item-ness is asserted in game, and it is a differential a *block* cannot fake
+   (the pedestal's own `setblock` succeeds in the same phase).
+3. **`click-slot` takes slot numbers, not grid indices** (0..8 vs 100..108): the first driver run
+   clicked the player's inventory cells and the grid stayed empty without an error. Recorded because
+   it looked exactly like a missing recipe.
+4. **A shell asset copy can leave 0-byte files**: `unzip -p jar path.json > out.json` creates
+   `out.json` even when the member is absent (the PNG fallback then writes `out.png`, leaving both).
+   The delivered build sweeps `find assets -name '*.json' -size 0` and reports 0 empty files.
+5. The 0.2.4–0.2.10 findings stand (peaceful in the End, the break reply as the drop assertion, a
+   fresh table per grid, `--offscreen` for menu phases, the stale-export/lock traps, item entities
+   killed before a placement, the launcher's native-build mutex answering "A native build or cache
+   cleanup is running" — retry after the other agent's build, do not read it as a failure).
+
+### Deviations (deliberate, and why)
+
+| Area | Upstream | This port |
+|---|---|---|
+| the pedestals' pathfinder answer | `isPathfindable → false` | the shape and `noOcclusion` are declared; the pathfinder answer is not shipped (no probe), recorded `blocked(harness:no-pathfindability-probe)` |
+| the storage-controller bases | blocks, ritual-only results | not carried (`blocked(ritual:craft_storage_controller_base)`); their model parents the unported actuator |
+| the frames' use | ritual ingredients (`RitualRecipes`), no in-world use | carried as plain items with their grids; the rituals that consume them are not ported (unchanged gap) |
+| creative-tab order | registration order (`OccultismItems.ITEMS`) | after the 0.2.10 redstone pair, the port's family grouping |
+
+### Upstream defects fixed
+
+None in this slice: the two jar quirks it carries are correct behaviour, not defects — the frames are
+items (no table, no blockstate) and the otherrock pedestal keeps the old `otherstone_pedestal_silver`
+id with an `otherrock_pedestal.json` recipe file (the jar's own `TODO: change id in next major
+version`). The jar's naming is carried as-is so a pack or a ritual that names either keeps working.
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+### Next slice
+
+The **sacrificial bowls** are the next results of the family and the tier's first genuine machine:
+`sacrificial_bowl` (crafted from five `otherstone` — the only obtainable one, so the slice can be
+obtained in survival) plus `golden_sacrificial_bowl` (gold + the bowl) and the ritual-only
+copper/silver/iesnium/dark/celestial variants; upstream's `SacrificialBowlBlock` is a
+`BaseEntityBlock` with a block entity that holds the offered stack and starts a ritual. Gap line:
+this slice's parity row — *"the remaining family: … sacrificial bowls (block entity + ritual)"*. The
+in-game assertion: craft the bowl, place it, right-click an item in (the block entity's held stack
+read back through the block entity's saved data / a one-slot container), right-click with an empty
+hand to take it back, and assert the stack came back exactly; plus the `requires_tool` pair on the
+bowl block. It needs the pin's `block_entity` + `block_entity_tick` Parts and a one-slot item handler
+(the `block_entity_tick` item slots exist only when the entity has a container), and the ritual
+itself stays `blocked(rituals)` — the bowl's *storage and return* is the part this campaign can prove.
+Tier fits: still `deep`, and the first slice that legitimately needs `native_block_entity*` glue —
+which the brief for this one assumed and the artefact did not.

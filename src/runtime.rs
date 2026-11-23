@@ -2045,6 +2045,292 @@ mod tests {
         }
     }
 
+    /// The two `otherstone`/`otherrock` frame **items** this slice carries. They
+    /// are `OccultismItems`, not blocks (`OccultismItems.java:407-410`): no
+    /// blockstate, no loot table and no block item, only an item model and a name.
+    const FRAMES: [&str; 2] = ["otherstone_frame", "otherrock_frame"];
+
+    /// The two pedestals this slice carries. Upstream registers them as plain
+    /// `NonPathfindableBlock`s (`OccultismBlocks.java:535-541`), and the
+    /// "silver"/otherrock one keeps the jar's old id `otherstone_pedestal_silver`
+    /// (the `TODO: change id in next major version` beside it).
+    const PEDESTALS: [&str; 2] = ["otherstone_pedestal", "otherstone_pedestal_silver"];
+
+    /// The stone each pedestal's jar grid takes: the `otherrock` pedestal (whose
+    /// block id is `otherstone_pedestal_silver`) is made of `otherrock`.
+    fn pedestal_stone(name: &str) -> &'static str {
+        if name == "otherstone_pedestal_silver" {
+            "otherrock"
+        } else {
+            "otherstone"
+        }
+    }
+
+    #[test]
+    fn the_frame_and_pedestal_recipes_are_the_jars_shapes_in_the_26_3_dialect() {
+        // The jar's four grids (`recipe/crafting/{otherstone_frame,
+        // otherrock_frame,otherstone_pedestal,otherrock_pedestal}.json`): eight
+        // stones in a ring make one frame (the middle empty), five slabs + one
+        // stone make one pedestal. The 26.3 loader reads an ingredient as a bare
+        // `"id"`; the jar's `{"item": …}` object is dropped without a word and
+        // the grid then yields nothing. The otherrock pedestal's **file** is
+        // `otherrock_pedestal.json` while its result is
+        // `occultism:otherstone_pedestal_silver` — the jar's own naming, kept.
+        for frame in FRAMES {
+            let stone = if frame == "otherrock_frame" {
+                "otherrock"
+            } else {
+                "otherstone"
+            };
+            let text = content(&format!("occultism/recipe/crafting/{frame}.json"));
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{frame} carries the 1.21.1 object-form ingredient {object_form}, \
+                     which the 26.3 loader drops: {text}"
+                );
+            }
+            assert!(
+                text.contains("\"minecraft:crafting_shaped\""),
+                "{frame} is the jar's shaped ring: {text}"
+            );
+            for row in ["\"ooo\"", "\"o o\"", "\"ooo\""] {
+                assert!(
+                    text.contains(row),
+                    "{frame}'s ring still carries the row {row}: {text}"
+                );
+            }
+            assert!(
+                text.contains(&format!("\"occultism:{stone}\"")),
+                "{frame} is not made of occultism:{stone}: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{frame}\"")),
+                "{frame}'s recipe does not make it: {text}"
+            );
+            assert!(
+                text.contains("\"count\": 1"),
+                "{frame}'s recipe does not make one: {text}"
+            );
+        }
+        for pedestal in PEDESTALS {
+            let stone = pedestal_stone(pedestal);
+            let file = if pedestal == "otherstone_pedestal_silver" {
+                "otherrock_pedestal"
+            } else {
+                pedestal
+            };
+            let text = content(&format!("occultism/recipe/crafting/{file}.json"));
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{file} carries the 1.21.1 object-form ingredient {object_form}, \
+                     which the 26.3 loader drops: {text}"
+                );
+            }
+            for row in ["\"s s\"", "\" o \"", "\"sss\""] {
+                assert!(
+                    text.contains(row),
+                    "{file}'s pattern still carries the row {row}: {text}"
+                );
+            }
+            assert!(
+                text.contains(&format!("\"occultism:{stone}_slab\"")),
+                "{file} is not made of {stone} slabs: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"occultism:{stone}\"")),
+                "{file} is not made of {stone}: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{pedestal}\"")),
+                "{file}'s recipe does not make {pedestal}: {text}"
+            );
+            assert!(
+                text.contains("\"count\": 1"),
+                "{file}'s recipe does not make one: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_pedestal_has_a_26_3_loot_table_that_drops_itself() {
+        // The jar ships both pedestal tables; like every 1.21.1 table they spell
+        // their guard `"condition": "minecraft:survives_explosion"`, the string
+        // form the 26.3 loader reads as an unknown kind and so as false — a
+        // verbatim carry drops nothing at all. The port's tables use the
+        // `explosion_decay` modifier, as every carried table does. The two frames
+        // are items and have no table (asserted below).
+        for pedestal in PEDESTALS {
+            let text = content(&format!("occultism/loot_table/blocks/{pedestal}.json"));
+            for legacy in ["\"function\":", "\"functions\":"] {
+                assert!(
+                    !text.contains(legacy),
+                    "{pedestal}'s loot table uses the 1.21.1 {legacy} shape, which the \
+                     26.3 loader does not read (it reads `modifier`): {text}"
+                );
+            }
+            assert!(
+                !text.contains("\"condition\": \"minecraft:"),
+                "{pedestal} carries the 1.21.1 string-form condition kind, which the \
+                 26.3 loader does not read (it reads `type`): {text}"
+            );
+            assert!(
+                text.contains(&format!("\"name\": \"occultism:{pedestal}\"")),
+                "{pedestal}'s loot table does not drop itself: {text}"
+            );
+            assert!(
+                text.contains("\"type\": \"minecraft:survives_explosion\""),
+                "{pedestal} lost the jar's survives_explosion guard: {text}"
+            );
+            assert!(
+                text.contains("\"type\": \"minecraft:block\""),
+                "{pedestal}'s loot table is not a block table: {text}"
+            );
+        }
+        for frame in FRAMES {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join(format!("data/occultism/loot_table/blocks/{frame}.json"));
+            assert!(
+                !path.is_file(),
+                "{frame} is an item; an item needs no block loot table ({})",
+                path.display()
+            );
+        }
+    }
+
+    #[test]
+    fn the_pedestals_copy_the_upstream_non_pathfindable_shape() {
+        // Upstream's `NonPathfindableBlock` (`NonPathfindableBlock.java`): a full
+        // copy of `OTHERSTONE` (hardness 1.5, resistance 30, map colour STONE,
+        // `requiresCorrectToolForDrops`), `noOcclusion()`, the four-box post shape
+        // below and `isPathfindable → false`. The declaration carries the shape
+        // and the occlusion; the pathfinder answer has no in-game probe at this
+        // pin and is recorded as a gap in notes.md.
+        let boxes = [
+            "[0.0625, 0.0, 0.0625, 0.9375, 0.125, 0.9375]",
+            "[0.125, 0.125, 0.125, 0.875, 0.1875, 0.875]",
+            "[0.1875, 0.1875, 0.1875, 0.8125, 0.875, 0.8125]",
+            "[0.125, 0.875, 0.125, 0.875, 1.0, 0.875]",
+        ];
+        for pedestal in PEDESTALS {
+            let text = content(&format!("occultism/horizon/block/{pedestal}.json"));
+            assert!(
+                text.contains("\"template\": \"minecraft:stone\""),
+                "{pedestal} does not copy minecraft:stone: {text}"
+            );
+            assert!(
+                text.contains("\"requires_tool\": true"),
+                "{pedestal} must gate its drops on a pickaxe (upstream is \
+                 requiresCorrectToolForDrops): {text}"
+            );
+            assert!(
+                text.contains("\"hardness\": 1.5"),
+                "{pedestal} is not hardness 1.5: {text}"
+            );
+            assert!(
+                text.contains("\"explosion_resistance\": 30.0"),
+                "{pedestal} is not resistance 30: {text}"
+            );
+            assert!(
+                text.contains("\"map_color\": 11"),
+                "{pedestal} is not map colour 11 (MapColor.STONE): {text}"
+            );
+            assert!(
+                text.contains("\"occludes\": false"),
+                "{pedestal} must not occlude (upstream noOcclusion): {text}"
+            );
+            for shape in boxes {
+                assert!(
+                    text.contains(shape),
+                    "{pedestal} lost the upstream box {shape}: {text}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_frame_and_pedestal_has_its_model_name_and_tag() {
+        let pickaxe = content("minecraft/tags/block/mineable/pickaxe.json");
+        let tab = content("occultism/horizon/creative_tab/spirit_fire.json");
+        let lang = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("assets/occultism/lang/en_us.json"),
+        )
+        .expect("the package's lang file");
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/occultism");
+        for pedestal in PEDESTALS {
+            let id = format!("occultism:{pedestal}");
+            assert!(
+                pickaxe.contains(&format!("\"{id}\"")),
+                "{id} is not in mineable/pickaxe"
+            );
+            assert!(
+                assets
+                    .join(format!("blockstates/{pedestal}.json"))
+                    .is_file(),
+                "{id} has no blockstate"
+            );
+            assert!(
+                assets
+                    .join(format!("models/block/{pedestal}.json"))
+                    .is_file(),
+                "{id} has no block model"
+            );
+            assert!(
+                assets
+                    .join(format!("models/item/{pedestal}.json"))
+                    .is_file(),
+                "{id} has no item model"
+            );
+            assert!(
+                lang.contains(&format!("\"block.occultism.{pedestal}\"")),
+                "{id} has no block lang entry"
+            );
+            assert!(
+                tab.contains(&format!("\"{id}\"")),
+                "{id} is not in the creative tab"
+            );
+        }
+        for frame in FRAMES {
+            let id = format!("occultism:{frame}");
+            // An item, not a block: its declaration is an item one and it has no
+            // blockstate or block declaration.
+            assert!(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join(format!("data/occultism/horizon/item/{frame}.json"))
+                    .is_file(),
+                "{id} has no item declaration"
+            );
+            assert!(
+                !assets.join(format!("blockstates/{frame}.json")).exists(),
+                "{id} is an item; it must have no blockstate"
+            );
+            assert!(
+                !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join(format!("data/occultism/horizon/block/{frame}.json"))
+                    .exists(),
+                "{id} is an item; it must have no block declaration"
+            );
+            assert!(
+                assets.join(format!("models/item/{frame}.json")).is_file(),
+                "{id} has no item model"
+            );
+            assert!(
+                assets.join(format!("textures/item/{frame}.png")).is_file(),
+                "{id} has no item texture"
+            );
+            assert!(
+                lang.contains(&format!("\"item.occultism.{frame}\"")),
+                "{id} has no item lang entry"
+            );
+            assert!(
+                tab.contains(&format!("\"{id}\"")),
+                "{id} is not in the creative tab"
+            );
+        }
+    }
+
     #[test]
     fn a_conversion_is_scoped_to_its_world_and_dimension() {
         let mut recent = Recent::default();

@@ -135,6 +135,19 @@
 # PLATE_SELFTEST=1 and BUTTON_SELFTEST=1 each invert their own leg, so those runs
 # must FAIL.
 #
+# The frames and pedestals (0.2.11) are phase V, on the last floor row (z=50) and
+# at the same table: eight stones in a ring (the centre empty) make one otherstone
+# or otherrock frame, five slabs + one stone make one pedestal (the otherrock one,
+# whose file is `otherrock_pedestal.json`, makes `otherstone_pedestal_silver`),
+# with a ninth stone in the frame's hole and one slab short of the pedestal as the
+# wrong-shape differentials; the frames are **items** — `give` puts one in the
+# inventory and a `setblock` of the id must leave air; then each pedestal placed,
+# its state read back, a bare hand (nothing: `requires_tool` is true on the
+# `minecraft:stone` template) and a wooden pickaxe (exactly one), with a
+# bare-hand break of `otherstone` (nothing) as the differential. PEDESTAL_ONLY=1
+# is this family's red/green leg; PEDESTAL_NEGATIVE=1 flips the frame grid and
+# PEDESTAL_SELFTEST=1 flips the item leg, so both runs must FAIL.
+#
 # SELFTEST=1 flips the count assertion (3 awakened feathers -> 2): it must FAIL,
 # proving the scenario can fail. NEGATIVE=1 flips the ripe-crop harvest's
 # assertion (a ripe crop must drop a fruit) the same way; LOOT_NEGATIVE=1 is the
@@ -205,6 +218,15 @@ REDSTONE_ONLY=${REDSTONE_ONLY:-0}
 # is NOT pressed. Both must fail (see phase U).
 PLATE_SELFTEST=${PLATE_SELFTEST:-0}
 BUTTON_SELFTEST=${BUTTON_SELFTEST:-0}
+# The frames-and-pedestals family's own counterfactual: the otherstone frame grid
+# must make nothing, so this run MUST fail (see phase V).
+PEDESTAL_NEGATIVE=${PEDESTAL_NEGATIVE:-0}
+# `PEDESTAL_SELFTEST=1` asserts the otherstone frame id **does** place a block, so
+# a working package (the frame is an item) must fail this run (see phase V).
+PEDESTAL_SELFTEST=${PEDESTAL_SELFTEST:-0}
+# `PEDESTAL_ONLY=1` launches and runs only the frames-and-pedestals phase (the
+# red/green leg for that family), then exits 0.
+PEDESTAL_ONLY=${PEDESTAL_ONLY:-0}
 # `CONTROL_LEG=1` runs the packaged leg first on the same socket, as 0.2.0/0.2.2 did.
 # The default is a *separate* invocation (`GAME=$CONTROL_GAME`), because a control
 # launch in the same HORIZON_HOME leaves the main game without its log file and the
@@ -510,6 +532,21 @@ control_leg() {
         [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
     done
     echo "  without the package: none of the four redstone-pair blocks either"
+    # The frames and pedestals (0.2.11) must be unknown too.
+    for id in occultism:otherstone_pedestal occultism:otherstone_pedestal_silver; do
+        ctl command "execute in minecraft:the_end run setblock $X0 101 0 $id" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        name=$(block_name "$X0" 101 0)
+        [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
+    done
+    for id in occultism:otherstone_frame occultism:otherrock_frame; do
+        ctl command "clear @s" >/dev/null || true
+        ctl command "item replace entity @s hotbar.0 with $id 1" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        ctl inventory | jq -e --arg i "$id" '[.hotbar[], .main[] | select(.item == $i)] | length == 0' >/dev/null \
+            || fail "the control game has the $id item, so it carries this package"
+    done
+    echo "  without the package: neither the two pedestal blocks nor the two frame items"
     ctl quit >/dev/null 2>&1 || true
 }
 
@@ -849,6 +886,61 @@ phase_redstone() {
     echo "  each button reads powered=true after a click, still true ten ticks later and false after its press duration"
 }
 
+# The frames and pedestals (0.2.11): the four grids (a stone ring -> one frame,
+# five slabs + one stone -> one pedestal) with the wrong-shape differentials, the
+# frames as **items** (given, and a `setblock` of the id refused), each pedestal
+# placed, read back, broken by a hand (nothing — the `minecraft:stone` template is
+# `requires_tool: true`) and by a wooden pickaxe (exactly one), with otherstone's
+# hand break (nothing) as the differential. PEDESTAL_NEGATIVE=1 flips the frame
+# grid and PEDESTAL_SELFTEST=1 flips the item leg; both runs must FAIL.
+phase_pedestal() {
+    echo "== V: the frames and pedestals =="
+    end "gamerule random_tick_speed 0"
+    end "difficulty peaceful"
+    end "kill @e[type=!player]"
+    ctl wait 20 >/dev/null
+    end "setblock $CRAFT_X 100 $CRAFT_Z minecraft:stone"
+    ctl wait 4 >/dev/null
+    PEDESTAL_NEGATIVE=$PEDESTAL_NEGATIVE PEDESTAL_SELFTEST=$PEDESTAL_SELFTEST \
+        python3 "$PORT/tools/pedestal_recipes.py" \
+        "$SOCK" "$CTL" "$CRAFT_X" 101 "$CRAFT_Z" \
+        || fail "the frames-and-pedestals check failed (see the PEDESTAL FAIL line above)"
+    echo "  the four frame/pedestal grids craft their declared counts with every ingredient consumed;"
+    echo "  a ninth stone in the frame's hole and four slabs + one stone made nothing;"
+    echo "  both frames are items: given into the inventory and refused by /setblock (air stays);"
+    echo "  each pedestal reads its own state, drops nothing to a bare hand and exactly one to a wooden pickaxe;"
+    echo "  otherstone's bare-hand break dropped nothing (the differential)"
+}
+
+# The frames-and-pedestals control leg: the game without the package, four ids.
+control_frames() {
+    echo "== control: the four frame and pedestal ids on a game without the package =="
+    launch "$CONTROL_GAME" "$CONTROL_WORLD"
+    arena
+    local id name
+    for id in occultism:otherstone_pedestal occultism:otherstone_pedestal_silver \
+              occultism:otherstone_frame occultism:otherrock_frame; do
+        ctl command "execute in minecraft:the_end run setblock $X0 101 0 $id" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        name=$(block_name "$X0" 101 0)
+        [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
+        ctl command "clear @s" >/dev/null || true
+        ctl command "item replace entity @s hotbar.0 with $id 1" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        ctl inventory | jq -e --arg i "$id" '[.hotbar[], .main[] | select(.item == $i)] | length == 0' >/dev/null \
+            || fail "the control game has the $id item, so it carries this package"
+    done
+    echo "  without the package: none of the four frame/pedestal ids exist as a block or an item"
+    ctl quit >/dev/null 2>&1 || true
+}
+
+# The frames/pedestals' own control leg: the game without the package, four ids.
+if [ "$CONTROL_LEG" = 1 ] && [ "$PEDESTAL_ONLY" = 1 ] && [ -n "$CONTROL_GAME" ]; then
+    control_frames
+    echo "PASS: a game without the package refuses all four frame/pedestal ids as a block and as an item"
+    exit 0
+fi
+
 # The redstone pair's own control leg: the game without the package, four ids.
 if [ "$CONTROL_LEG" = 1 ] && [ "$REDSTONE_ONLY" = 1 ] && [ -n "$CONTROL_GAME" ]; then
     control_redstone
@@ -907,6 +999,13 @@ fi
 if [ "$REDSTONE_ONLY" = 1 ]; then
     phase_redstone
     echo "PASS: the four otherstone/otherrock redstone blocks work end to end: one stone in a real table makes one button and two stones in one row make one pressure plate (each of the four grids with every ingredient consumed, while a cobble button grid and a cobble plate grid make nothing and one stone in the plate grid makes the button rather than the plate), the cobble block smelts back into the stone in a real furnace at 200 ticks and 0.5 experience while a fuel-less furnace stays idle, each of the four blocks reads its template's default state and drops exactly one of itself to a bare hand and exactly one to a wooden pickaxe (with otherstone's hand break dropping nothing as the differential), each pressure plate reads powered=true under the player and powered=false after stepping off, and each button reads powered=true after a right click, is still pressed ten ticks later and reads powered=false after its press duration"
+    exit 0
+fi
+
+# The red/green leg for the frames and pedestals: launch, arena, phase V only.
+if [ "$PEDESTAL_ONLY" = 1 ]; then
+    phase_pedestal
+    echo "PASS: the frames and pedestals work end to end: eight stones in a ring make one otherstone or otherrock frame (an item — given into the inventory, and refused by /setblock, which leaves air), five slabs + one stone make one otherstone_pedestal or the jar's otherstone_pedestal_silver (whose file is otherrock_pedestal.json), every ingredient is consumed, a ninth stone in the frame's hole and one slab short of the pedestal make nothing, and each pedestal reads its state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe (with otherstone's hand break dropping nothing as the differential)"
     exit 0
 fi
 
@@ -1489,4 +1588,6 @@ phase_cobble
 
 phase_redstone
 
-echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand, exactly one othercobblestone/othercobblerock to a wooden pickaxe and themselves to a silk-touch pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two; and the eight polished-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab (the table the jar omits) drops one; and the eight cobblestone-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four cobble blocks in the 2x2 and four dirt make nothing), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a cobble wall pair connects, a double cobble slab drops two, othercobblerock_slab (the table the jar omits) drops one, and the raw stones drop one othercobblestone/othercobblerock without silk touch and keep themselves with it; and the four redstone-pair blocks work the same way: one stone in a real table makes one button and two stones in one row make one pressure plate (every ingredient consumed, while a cobble button grid and a cobble plate grid make nothing and one stone in the plate grid makes the button rather than the plate), the cobble block smelts back into the stone in a real furnace at 200 ticks and 0.5 experience while a fuel-less furnace stays idle, each block reads its template's default state and drops exactly one of itself to a bare hand and one to a wooden pickaxe (otherstone's hand break dropping nothing, the differential), each plate reads powered=true under the player and false after stepping off, and each button reads powered=true after a click, is still pressed ten ticks later and false after its press duration"
+phase_pedestal
+
+echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand, exactly one othercobblestone/othercobblerock to a wooden pickaxe and themselves to a silk-touch pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two; and the eight polished-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab (the table the jar omits) drops one; and the eight cobblestone-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four cobble blocks in the 2x2 and four dirt make nothing), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a cobble wall pair connects, a double cobble slab drops two, othercobblerock_slab (the table the jar omits) drops one, and the raw stones drop one othercobblestone/othercobblerock without silk touch and keep themselves with it; and the four redstone-pair blocks work the same way: one stone in a real table makes one button and two stones in one row make one pressure plate (every ingredient consumed, while a cobble button grid and a cobble plate grid make nothing and one stone in the plate grid makes the button rather than the plate), the cobble block smelts back into the stone in a real furnace at 200 ticks and 0.5 experience while a fuel-less furnace stays idle, each block reads its template's default state and drops exactly one of itself to a bare hand and one to a wooden pickaxe (otherstone's hand break dropping nothing, the differential), each plate reads powered=true under the player and false after stepping off, and each button reads powered=true after a click, is still pressed ten ticks later and false after its press duration; and the frames and pedestals work the same way: eight stones in a ring make one occultism:otherstone_frame or occultism:otherrock_frame (items, given and refused by /setblock), five slabs + one stone make one occultism:otherstone_pedestal or occultism:otherstone_pedestal_silver (whose file is otherrock_pedestal.json), every ingredient is consumed, a ninth stone in the frame's hole and one slab short of the pedestal make nothing, and each pedestal reads its state, drops nothing to a bare hand and exactly one to a wooden pickaxe (otherstone's hand break dropping nothing, the differential)"

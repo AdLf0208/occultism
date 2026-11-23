@@ -7,8 +7,10 @@ delivered slices are the **spirit-fire conversion loop** (its gateway), the
 **crafting-table recipes** the package can carry (`demons_dream_essence`,
 `book_of_binding_empty`), and the **otherstone/otherrock building family**: the
 slabs, stairs and walls (0.2.6), the bricks tier — bricks, their slab, stair and
-wall, the chiseled pair and the cracked pair (0.2.7) — and the polished tier:
-the smelted plain pair and their slabs, stairs and walls (0.2.8).
+wall, the chiseled pair and the cracked pair (0.2.7) — the polished tier: the
+smelted plain pair and their slabs, stairs and walls (0.2.8) — the cobblestone
+tier mined from the raw stones (0.2.9), the button and pressure-plate pair
+(0.2.10), and the frames and pedestals (0.2.11).
 
 ## What works
 
@@ -34,17 +36,27 @@ the smelted plain pair and their slabs, stairs and walls (0.2.8).
   brick slab/stair/wall recipes work from those bricks, two brick slabs stacked
   make the chiseled block, and a furnace turns the bricks into the cracked pair.
   The polished pair is smelted from the raw stone (200 ticks, 0.5 experience) and
-  then shaped into its slabs, stairs and walls. All of them are pickaxe blocks (a
-  bare hand breaks them and drops nothing).
+  then shaped into its slabs, stairs and walls. The cobblestone tier is mined from
+  the raw stones (a break without silk touch drops `othercobblestone` or
+  `othercobblerock`, silk touch keeps the stone) and shaped the same way, and a
+  cobble block smelts back into the stone. All of them are pickaxe blocks (a bare
+  hand breaks them and drops nothing).
+- **Redstone**: one stone in a crafting table makes a stone button and two stones
+  in one row make a pressure plate, in both stones; the plates read powered under
+  a player and the buttons stay pressed for their template's press duration.
+- **Frames and pedestals**: eight stones in a ring make an `otherstone_frame` or
+  `otherrock_frame` (plain items — the mod's ritual frames), and five slabs plus
+  one stone make a post-shaped `otherstone_pedestal` or
+  `otherstone_pedestal_silver` (the otherrock one, under the jar's old id).
 - `/occultism info <x> <y> <z>` and `/occultism recipes` for a readout.
 
 ## What it does not do (yet)
 
 The pentacle rituals (158 recipes), the summoned spirits and their AI, the
 Otherworld dimension, the guide book, accessory slots, and the crafting recipes
-whose result (the rest of the otherstone/otherrock building family — the
-cobblestone family, buttons, pressure plates, frames, pedestals, tablets, bowls —
-and the impure chalks)
+whose result (the rest of the otherstone/otherrock building family — the tablets,
+the sacrificial bowls, the storage controllers and their ritual-only bases — and
+the impure chalks)
 or ingredients this package does not carry yet. See
 [`notes.md`](notes.md) for the full gap list and the reason for each.
 
@@ -52,7 +64,7 @@ or ingredients this package does not carry yet. See
 
 One file: `occultism.hmod`. It is the whole mod — `horizon-mod.toml`,
 `src/lib.rs` + `src/support.rs` (the code), `src/runtime.rs` (the pure rules and
-their 50 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
+their 64 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
 tags and lang) and the licence notices.
 
 A native SDK package is built against the game by the launcher:
