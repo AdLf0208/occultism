@@ -26,6 +26,9 @@ models, tags and the jar's missing `otherrock_slab` table (§"Slice 5").
 **0.2.7 (2026-11-22):** the bricks tier of the same family — the two brick
 blocks with their slab/stair/wall, the chiseled pair and the smelted cracked
 pair, and the jar's missing `otherrock_bricks_slab` table (§"Slice 6").
+**0.2.8 (2026-11-23):** the polished tier — the pair smelted from the raw
+stones and their slab/stair/wall, and the jar's missing
+`polished_otherrock_slab` table (§"Slice 7").
 
 ## Class + tier and the approach
 
@@ -1582,3 +1585,237 @@ the furnace leg already scripted. After that the **cobblestone families** (six r
 **redstone pair** (buttons, pressure plates) close the "made from the stone" recipes; the frames,
 pedestals, tablets and bowls are the first results that are not plain building blocks (they carry
 shapes and, for the bowls, a block entity upstream) and belong in a slice of their own.
+
+## Slice 7 (0.2.8, 2026-11-23) — the polished tier of the building family
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). Class
+**content**, tier **deep** (ledger row 345). Licence **MIT**, ours on `main` → an
+`Update occultism 0.2.8` publication.
+
+**Gap line it comes from:** the 0.2.7 parity row — *"the remaining 22 building recipes (polished,
+cobblestone families, buttons, pressure plates, frames, pedestals, tablets, sacrificial bowls,
+storage controllers) — **not carried**"* — and 0.2.7's `## Next slice`, which named this exact tier.
+It is a behaviour change (eight new obtainable blocks), so it is a real version.
+
+**Shape:** the data half of a `deep` mod, exactly as slices 3–6. No runtime rule, no glue, no block
+entity: eight blocks copy vanilla's stone/slab/stair/wall templates, the engine rolls the loot tables
+on a player break, the crafting table matches the six grids and a vanilla furnace runs the two
+smelting recipes.
+
+### The family is eight results, not nine (the artefact wins)
+
+The brief said "nine results (`polished_otherstone`, `polished_otherrock` plus their
+slab/stair/wall)". The jar has **eight**: the two plain blocks plus six variants
+(2 + 3 + 3). Measured from Occultism 1.225.0: **8** `blockstates/polished_*`, **8** `en_us` block
+keys, **6** `recipe/crafting/polished_*` grids, **2** `recipe/smelting/polished_*` and **7**
+`loot_table/blocks/polished_*` (the omission below). There is no ninth polished block; the count is
+reported rather than invented.
+
+### What was carried (and from where)
+
+| family | files | source |
+|---|---|---|
+| block declarations | 8 (`data/occultism/horizon/block/<name>.json`) | port-authored from `OccultismBlocks` (tag `release/v1.21.1-1.225.0`) |
+| crafting recipes | 6 (`.../recipe/crafting/<name>.json`) | the jar's `building_blocks/crafting/*` rewritten to the 26.3 dialect |
+| smelting recipes | 2 (`.../recipe/smelting/polished_*.json`) | the jar's `smelting/polished_*` in the 26.3 dialect |
+| loot tables | 8 (`.../loot_table/blocks/<name>.json`) | the jar's seven + **the one the jar does not have** (`polished_otherrock_slab`) |
+| blockstates | 8 | the jar's (unchanged format) |
+| block models | 14 | the jar's (plain, slab + slab_top, stairs + inner + outer, wall post + side + side_tall, per stone) |
+| item models | 8 | the jar's |
+| textures | 2 | the jar's `block/polished_{otherstone,otherrock}.png` |
+| lang | 8 keys | the jar's `en_us` (`Polished Otherstone`, `Polished Otherrock Wall`, …) |
+| tags | `minecraft:mineable/pickaxe` (+8), `walls`/`slabs`/`stairs` (+2 each) | the jar's datagen output |
+| creative tab | 8 entries | after the twelve 0.2.7 bricks-tier blocks |
+
+### The rule under test
+
+| block | template | hardness / resistance | `requires_tool` | recipe |
+|---|---|---|---|---|
+| `polished_otherstone`, `polished_otherrock` | `minecraft:stone` | 1.5 / 30 | **true** | **smelting** the raw stone, 200 ticks, 0.5 xp |
+| `*_slab` | `minecraft:stone_slab` | 1.5 / 30 | **true** | `ooo` (middle row) → 6 |
+| `*_stairs` | `minecraft:stone_stairs` | 1.5 / 1.5 | **true** | `#  `/`## `/`###` → 4 |
+| `*_wall` | `minecraft:cobblestone_wall` | 1.5 / 1.5 | **true** | `ooo`/`ooo` → 6 |
+
+Upstream (`OccultismBlocks.java:181-233`): the plain block and the slab are
+`ofFullCopy(OTHERSTONE)` (hardness 1.5, resistance 30, `requiresCorrectToolForDrops`), the stair and
+wall `of().strength(1.5f).requiresCorrectToolForDrops()`. All eight are pickaxe-gated, so a hand
+break breaks them and rolls nothing — the same fail-capable pair slices 3–6 used, measured again for
+all eight here.
+
+Source read: `klikli-dev/occultism` at tag `release/v1.21.1-1.225.0`
+(commit `91de0d2a46e05ce315cc5afd292d266d4f46e7ab`), `registry/OccultismBlocks.java` (the eight
+declarations), `datagen/recipe/OccultismRecipeProvider.java` (the six grids and the smelting pair) and
+`datagen/tags/OccultismBlockTagProvider.java` (each block's tags). The jar stays in
+`../_shared/licence-cache/` as the licence/asset evidence.
+
+### Upstream defect fixed (the third instance of the slab-table omission)
+
+**`polished_otherrock_slab` has no loot table in Occultism 1.225.0.** The jar carries seven of the
+eight polished tables and omits this one, while `OccultismBlocks.POLISHED_OTHERROCK_SLAB` is
+registered `LootTableType.CUSTOM` (so nothing generates a default). `unzip -l … | grep
+loot_table/blocks | grep polished` lists `polished_otherstone`, `_slab`, `_stairs`, `_wall`,
+`polished_otherrock`, `_stairs`, `_wall` — the otherrock slab is the only one missing. This is the
+third otherrock slab the jar omits (0.2.6's `otherrock_slab`, 0.2.7's `otherrock_bricks_slab`, this
+one); the polished family itself has exactly one omission.
+
+- **Proved** by the jar listing and by the red run (`polished_otherrock_slab.json: No such file or
+  directory` when the unit test reads it).
+- **Fixed** minimally: `ports/occultism/data/occultism/loot_table/blocks/polished_otherrock_slab.json`,
+  the same table as `polished_otherstone_slab`, including the `type=double` → 2 modifier.
+- **Proved fixed in game**: the wooden-pickaxe break drops exactly one
+  `occultism:polished_otherrock_slab`, and a `type=double` slab drops two.
+- **User-visible**: the slab is obtainable instead of vanishing on break.
+
+Worth an upstream report (the same one-file datagen omission); not filed — the campaign files one
+only on request.
+
+### Red → green
+
+**Unit red 1 — the dialect** (`sdk-test-red-0.2.8.log`), with the jar's six grids and seven tables
+carried **byte for byte** first:
+
+```
+---- runtime::tests::the_polished_recipes_are_the_jars_shapes_in_the_26_3_dialect stdout ----
+thread 'runtime::tests::the_polished_recipes_are_the_jars_shapes_in_the_26_3_dialect' (437898) panicked at src/runtime.rs:1297:17:
+polished_otherstone_slab carries the 1.21.1 object-form ingredient "item":, which the 26.3 loader drops: {
+
+---- runtime::tests::the_polished_pair_is_smelted_from_the_raw_stones stdout ----
+thread 'runtime::tests::the_polished_pair_is_smelted_from_the_raw_stones' (437897) panicked at src/runtime.rs:1373:13:
+polished_otherstone carries a 1.21.1 object-form ingredient: {
+
+---- runtime::tests::every_polished_block_has_a_26_3_loot_table_that_drops_itself stdout ----
+thread '…' panicked at src/runtime.rs:1401:17:
+polished_otherstone_slab's loot table uses the 1.21.1 "function": shape, which the 26.3 loader does not read (it reads `modifier`): {
+
+test result: FAILED. 47 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+**Unit red 2 — the upstream defect** (`sdk-test-red2-0.2.8.log`), after the dialect rewrite:
+
+```
+thread 'runtime::tests::every_polished_block_has_a_26_3_loot_table_that_drops_itself' (456815) panicked at src/runtime.rs:831:59:
+…/data/occultism/loot_table/blocks/polished_otherrock_slab.json: No such file or directory (os error 2)
+test result: FAILED. 49 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+```
+
+Green after the table is added: **50 passed, 0 failed** (`sdk-test.log`; the five new tests are the
+dialect, the smelting pair, the loot/self-drop, the template properties and the state/model/name set).
+
+**In-game red — the family** (`e2e-polished-red-0.2.7-package.log`, the **0.2.7** export,
+`POLISHED_ONLY=1`):
+
+```
+== S: the eight polished-tier otherstone/otherrock blocks ==
+  survival, table at 222,101,38
+== the polished pair in a real furnace, and the same stone with no fuel ==
+  furnace with coal: [{"count": 1, "item": "occultism:otherstone"}, {"count": 1, "item": "minecraft:coal"}, null]
+POLISHED FAIL: the furnace made None from otherstone, expected one occultism:polished_otherstone
+FAIL: the polished block check failed (see the POLISHED FAIL line above)
+EXIT:1
+```
+
+The 0.2.7 package has the raw stone and the crafting grids' ingredients but neither the polished
+results nor their smelting recipe, so the furnace produces nothing: the exact behaviour this slice
+changes. The 0.2.8 package, same leg: `PASS` + `EXIT:0` (`e2e-polished-0.2.8.log`).
+
+### In game (phase S, verbatim from `e2e-polished-0.2.8.log`, abridged)
+
+```
+== S: the eight polished-tier otherstone/otherrock blocks ==
+  survival, table at 222,101,38
+== the polished pair in a real furnace, and the same stone with no fuel ==
+  furnace with coal: [null, null, {"count": 1, "item": "occultism:polished_otherstone"}]
+  otherstone + coal -> occultism:polished_otherstone (the input is gone)
+  furnace with coal: [null, null, {"count": 1, "item": "occultism:polished_otherrock"}]
+  otherrock + coal -> occultism:polished_otherrock (the input is gone)
+  furnace without fuel: [{"count": 1, "item": "occultism:otherstone"}, null, null]
+  no fuel: the output stayed empty and the input stayed put
+  the polished_otherstone_slab grid: the result slot reads occultism:polished_otherstone_slab x6
+  the polished_otherstone_slab recipe: every ingredient was consumed ({"occultism:polished_otherstone_slab": 6})
+  … stairs x4, wall x6, and the same three for otherrock …
+  four polished otherstone in the 2x2: the result slot stayed empty
+  four dirt in the 2x2: the result slot stayed empty
+== the eight blocks: default state, hand 0, wooden pickaxe 1 ==
+  placed occultism:polished_otherstone at x=214
+  occultism:polished_otherstone by hand: {"block_before": "occultism:polished_otherstone", "block": "minecraft:air", "drops": {}}
+  occultism:polished_otherstone with a wooden pickaxe: {"…", "drops": {"occultism:polished_otherstone": 1}}
+  placed occultism:polished_otherstone_slab[type=bottom,waterlogged=false] at x=216
+  … the same pair for all eight (slab [type=bottom,waterlogged=false], stairs [facing=north,…],
+      wall [east=none,…,up=true,…], and the plain pair) …
+  wall pair: occultism:polished_otherstone_wall[east=low,…] / occultism:polished_otherstone_wall[…,west=low]
+  double polished slab: the pickaxe break dropped 2 (the jar table's double branch)
+  polished_otherrock_slab (the jar's missing table): {"occultism:polished_otherrock_slab": 1}
+```
+
+The driver is `tools/polished_recipes.py`. It opens a **real** table (`ctl interact`), fills each
+grid one item per cell, takes the result and asserts every ingredient was consumed; each furnace leg
+uses `ctl container` to load one raw stone and one coal at `230 101 42`, waits **240 ticks** and reads
+the three slots back (`[null, null, {polished: 1}]`), with a no-fuel leg that must stay idle. The
+eight blocks are placed at `214..228 101 46` (one block every two x), each read back at its whole
+template state, broken by a bare hand (`drops: {}`) and by a wooden pickaxe (`drops: {<id>: 1}`).
+Differentials: four polished blocks in the same 2x2 and four dirt make nothing; the fuel-less furnace
+cooks nothing and keeps its input. `POLISHED_NEGATIVE=1` asserts the slab grid makes nothing, so the
+run must fail (`e2e-negative-polished-0.2.8.log`:
+`POLISHED FAIL: negative: the polished slab grid made occultism:polished_otherstone_slab x6, expected nothing`,
+`EXIT:1`). The control game does not know `occultism:datura`, so it cannot read any of the eight ids.
+
+### Ladder
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests (red 1) | `cargo test --offline`, jar bytes carried verbatim | `sdk-test-red-0.2.8.log` | **47 passed, 3 failed** (dialect, smelting pair, loot `function` shape) |
+| tests (red 2) | same, after the dialect rewrite | `sdk-test-red2-0.2.8.log` | **49 passed, 1 failed** — the missing `polished_otherrock_slab.json` |
+| tests | `cargo test --offline` | `sdk-test.log` | **50 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.8.log`, `sdk-build-second-0.2.8.log`, `sdk-reproducible-0.2.8.txt` | **byte-identical**, 207,277 B, `c1faa25a…1d0e2` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | `sdk-artifact-0.2.8.txt` | 207,277 B, `c1faa25ad14a03c78cdea9183c48b38985997518e033f1e0d1a089f7f1e1d0e2`, **401 entries**, no packed `Cargo.lock`, declares **0.2.8**, `src/runtime.rs` inside = outside (`798ab04a…`) |
+| tree match | a build from the final tree + `cmp` | `sdk-reproducible-0.2.8.txt` | **`PACKAGE_MATCHES_TREE`** — the delivered file is the tree's build |
+| package check | `cargo horizon-mod check occultism.hmod` | `sdk-check.log` (sha printed) | exit 0, `occultism 0.2.8 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` | `sdk-fits.log` (sha printed) | `0a875da  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` | `sdk-fits-next.log` (sha printed) | **`0b14f8a  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | `sdk-gate-0.2.8.txt` | **1/1** |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.7 export removed first) | `launcher-build-0.2.8.log` | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-9231e7cc9d32`, manifest `version = "0.2.8"` |
+| in game (the family, red) | `POLISHED_ONLY=1` against the **0.2.7** export | `e2e-polished-red-0.2.7-package.log` | **FAIL** + `EXIT:1` (`the furnace made None from otherstone`) |
+| in game (the family) | `POLISHED_ONLY=1` | `e2e-polished-0.2.8.log` | **PASS** + `EXIT:0` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen) | `e2e-default-0.2.8.log` | **PASS** + `EXIT:0` (A..S) |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | `e2e-control-0.2.8.log` | **FAIL** + `EXIT:1` (`the datura item did not register`, `Unknown item 'occultism:datura'`) |
+| fail-capability (scenario) | `SELFTEST=1` | `e2e-selftest-0.2.8.log` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) |
+| fail-capability (this family) | `POLISHED_ONLY=1 POLISHED_NEGATIVE=1` | `e2e-negative-polished-0.2.8.log` | **FAIL** + `EXIT:1` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | **42 logs, 42 ok**, 0 missing-exit, 0 bad-exit |
+
+### Parity coverage (0.2.8)
+
+| family | state |
+|---|---|
+| `polished_otherstone`, `polished_otherrock` + their smelting recipes | **tested** — S (one raw stone + one coal → exactly one polished block in a real furnace at 230 101 42 after 240 ticks, the input gone; a fuel-less furnace stays idle and keeps the input; both blocks placed, read back, hand 0 / pickaxe 1) |
+| `polished_otherstone_slab`, `polished_otherrock_slab` + recipes | **tested** — S (middle row → 6 with every ingredient consumed; `type=double` drops 2; `polished_otherrock_slab`'s table is the port's fix for the jar's omission and drops 1) |
+| `polished_otherstone_stairs`, `polished_otherrock_stairs` + recipes | **tested** — S (the stair step → 4; hand 0 / pickaxe 1) |
+| `polished_otherstone_wall`, `polished_otherrock_wall` + recipes | **tested** — S (two rows → 6; two polished walls connect `west=low`/`east=low`) |
+| the 2x2 differential | **tested** — S (four polished blocks in the 2x2 and four dirt make nothing) |
+| the six `stonecutting/polished_*` shortcuts the jar also ships | **not carried** — the same results come from the six crafting grids; the package has no stonecutter recipe type, so this is the family's one unported recipe half (a later stonecutter slice would prove it) |
+| the remaining 16 building recipes (cobblestone families, buttons, pressure plates, frames, pedestals, tablets, sacrificial bowls, storage controllers) | **not carried** — their results are still unregistered; the next tiers of the family |
+| the 17 impure-chalk craftings | **not carried** — ingredients missing (unchanged) |
+| spirit fire, the 26 conversion recipes, the crop, the seed source, the readouts, the spectator guard, the four loot tables, the two 0.2.5 recipes, the six 0.2.6 blocks, the twelve 0.2.7 blocks | **tested** — phases A..R, unchanged |
+| pentacle rituals, spirits/AI, GeckoLib models, Otherworld, guide book, Curios, machine recipes | **not ported** — the gap list above (unchanged) |
+
+### Measured behaviours of this pin (added by this slice)
+
+1. **A smelting-only block has no crafting grid.** The plain polished pair is obtainable only from the
+   furnace, so the furnace leg is its obtainability proof; the six variants are then crafted from it.
+2. **The jar's polished loot tables are seven of eight**, and the missing one is the otherrock slab —
+   the third otherrock-slab omission in the family. The other six otherrock slabs this port ships are
+   the port's own tables, not the jar's.
+3. The 0.2.4–0.2.7 findings stand (peaceful in the End, the break reply as the drop assertion, a fresh
+   table per grid, `--offscreen` for menu phases, the stale-export trap, `ctl container` for the
+   furnace slots).
+
+### Deviations (deliberate, and why)
+
+| Area | Upstream | This port |
+|---|---|---|
+| map colour of the stairs and walls | `Properties.of()` leaves `MapColor.NONE` | the template's stone colour (as 0.2.6/0.2.7) |
+| `polished_otherrock_slab` table | missing from the jar | shipped (the upstream-defect fix above) |
+| stonecutting shortcuts | six `stonecutting/polished_*` recipes | not carried; the crafting grids produce the same blocks |
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices

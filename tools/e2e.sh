@@ -94,6 +94,18 @@
 # slab dropping two. BRICKS_ONLY=1 is this family's red/green leg;
 # BRICKS_NEGATIVE=1 inverts the bricks-grid assertion, so the run must FAIL.
 #
+# The polished tier (0.2.8) is phase S, on the same row and at the same table
+# after phase R has emptied them: the six polished-tier grids (three polished
+# blocks in the middle row -> six slabs, the stair step -> four, two rows -> six),
+# with a 2x2 of polished blocks as the differential, the polished pair
+# smelted from the raw stone in a real furnace (200 ticks, 0.5 xp) with a
+# no-fuel differential, then each of the eight blocks placed, its default state
+# read back, a hand break (no drop) and a wooden pickaxe break (exactly one), a
+# polished wall pair connecting, a double slab dropping two, and
+# polished_otherrock_slab — the jar's third missing table — dropping one.
+# POLISHED_ONLY=1 is this family's red/green leg; POLISHED_NEGATIVE=1 inverts the
+# polished slab grid assertion, so the run must FAIL.
+#
 # SELFTEST=1 flips the count assertion (3 awakened feathers -> 2): it must FAIL,
 # proving the scenario can fail. NEGATIVE=1 flips the ripe-crop harvest's
 # assertion (a ripe crop must drop a fruit) the same way; LOOT_NEGATIVE=1 is the
@@ -144,6 +156,12 @@ BRICKS_NEGATIVE=${BRICKS_NEGATIVE:-0}
 # `BRICKS_ONLY=1` launches and runs only the bricks-tier phase (the red/green leg
 # for that family), then exits 0.
 BRICKS_ONLY=${BRICKS_ONLY:-0}
+# The polished tier's own counterfactual: three polished blocks in the middle row
+# must make nothing, so this run MUST fail (see phase S).
+POLISHED_NEGATIVE=${POLISHED_NEGATIVE:-0}
+# `POLISHED_ONLY=1` launches and runs only the polished-tier phase (the red/green
+# leg for that family), then exits 0.
+POLISHED_ONLY=${POLISHED_ONLY:-0}
 # `CONTROL_LEG=1` runs the packaged leg first on the same socket, as 0.2.0/0.2.2 did.
 # The default is a *separate* invocation (`GAME=$CONTROL_GAME`), because a control
 # launch in the same HORIZON_HOME leaves the main game without its log file and the
@@ -415,6 +433,19 @@ control_leg() {
         [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
     done
     echo "  without the package: none of the six building blocks either"
+    # The bricks tier (0.2.7) and the polished tier (0.2.8) must be unknown too.
+    for id in occultism:otherstone_bricks occultism:chiseled_otherstone_bricks \
+              occultism:cracked_otherrock_bricks occultism:polished_otherstone \
+              occultism:polished_otherrock occultism:polished_otherstone_slab \
+              occultism:polished_otherstone_stairs occultism:polished_otherstone_wall \
+              occultism:polished_otherrock_slab occultism:polished_otherrock_stairs \
+              occultism:polished_otherrock_wall; do
+        ctl command "execute in minecraft:the_end run setblock $X0 101 0 $id" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        name=$(block_name "$X0" 101 0)
+        [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
+    done
+    echo "  without the package: none of the twelve bricks-tier or eight polished-tier blocks either"
     ctl quit >/dev/null 2>&1 || true
 }
 
@@ -608,6 +639,33 @@ phase_bricks() {
     echo "  a brick wall pair connects, and a double brick slab drops two"
 }
 
+# The polished tier (0.2.8): the six polished-tier grids in a real table (the
+# polished slab/stair/wall recipes, a 2x2 of polished blocks as the differential),
+# the plain pair in a real furnace with a no-fuel differential,
+# then each of the eight blocks placed, its default state read back, a bare hand
+# break (no drop: `requires_tool`) and a wooden pickaxe break (exactly one). A
+# polished wall pair must connect, a double slab drops the jar table's two, and
+# polished_otherrock_slab drops one although the jar ships no table for it.
+# POLISHED_NEGATIVE=1 inverts the polished slab grid assertion so the run must FAIL.
+phase_polished() {
+    echo "== S: the eight polished-tier otherstone/otherrock blocks =="
+    end "gamerule random_tick_speed 0"
+    # Standing still over the dark End floor: peaceful keeps hostile spawns away.
+    end "difficulty peaceful"
+    end "kill @e[type=!player]"
+    ctl wait 20 >/dev/null
+    end "setblock $CRAFT_X 100 $CRAFT_Z minecraft:stone"
+    ctl wait 4 >/dev/null
+    POLISHED_NEGATIVE=$POLISHED_NEGATIVE python3 "$PORT/tools/polished_recipes.py" \
+        "$SOCK" "$CTL" "$CRAFT_X" 101 "$CRAFT_Z" \
+        || fail "the polished block check failed (see the POLISHED FAIL line above)"
+    echo "  the six polished-tier recipes craft their declared counts with every ingredient consumed;"
+    echo "  four polished blocks in the 2x2 and four dirt in the same cells made nothing;"
+    echo "  the polished pair smelted in a real furnace while the fuel-less one stayed idle;"
+    echo "  each block reads its template's default state, drops nothing to a hand and exactly one to a wooden pickaxe;"
+    echo "  a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab drops one"
+}
+
 echo "== launch (The End arena, launcher-built game with the package) =="
 if [ "$CONTROL_LEG" = 1 ] && [ -n "$CONTROL_GAME" ]; then control_leg; fi
 launch "$GAME" "$WORLD"
@@ -638,6 +696,13 @@ fi
 if [ "$BRICKS_ONLY" = 1 ]; then
     phase_bricks
     echo "PASS: the ten bricks-tier otherstone/otherrock recipes craft at a real table with every ingredient consumed (a 2x2 of the stone makes four bricks, the brick slab/stair/wall recipes work from those bricks, two brick slabs make one chiseled block; four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, each of the twelve blocks reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two"
+    exit 0
+fi
+
+# The red/green leg for the polished tier: launch, arena, phase S only.
+if [ "$POLISHED_ONLY" = 1 ]; then
+    phase_polished
+    echo "PASS: the six polished-tier otherstone/otherrock recipes craft at a real table with every ingredient consumed (three polished blocks in the middle row make six slabs, the stair step four stairs, two rows six walls; four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), each of the eight blocks reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab — the table the jar omits — drops one"
     exit 0
 fi
 
@@ -1214,4 +1279,6 @@ phase_building
 
 phase_bricks
 
-echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand and exactly one to a wooden pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two"
+phase_polished
+
+echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand and exactly one to a wooden pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two; and the eight polished-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab (the table the jar omits) drops one"

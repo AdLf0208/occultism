@@ -6,8 +6,9 @@ delivered slices are the **spirit-fire conversion loop** (its gateway), the
 **datura crop** that lights it, the four carried **loot tables**, the two
 **crafting-table recipes** the package can carry (`demons_dream_essence`,
 `book_of_binding_empty`), and the **otherstone/otherrock building family**: the
-slabs, stairs and walls (0.2.6) and the bricks tier — bricks, their slab, stair
-and wall, the chiseled pair and the cracked pair (0.2.7).
+slabs, stairs and walls (0.2.6), the bricks tier — bricks, their slab, stair and
+wall, the chiseled pair and the cracked pair (0.2.7) — and the polished tier:
+the smelted plain pair and their slabs, stairs and walls (0.2.8).
 
 ## What works
 
@@ -32,15 +33,18 @@ and wall, the chiseled pair and the cracked pair (0.2.7).
   the bricks tier on top of them — a 2x2 of the stone makes four bricks, the
   brick slab/stair/wall recipes work from those bricks, two brick slabs stacked
   make the chiseled block, and a furnace turns the bricks into the cracked pair.
-  All of them are pickaxe blocks (a bare hand breaks them and drops nothing).
+  The polished pair is smelted from the raw stone (200 ticks, 0.5 experience) and
+  then shaped into its slabs, stairs and walls. All of them are pickaxe blocks (a
+  bare hand breaks them and drops nothing).
 - `/occultism info <x> <y> <z>` and `/occultism recipes` for a readout.
 
 ## What it does not do (yet)
 
 The pentacle rituals (158 recipes), the summoned spirits and their AI, the
 Otherworld dimension, the guide book, accessory slots, and the crafting recipes
-whose result (the rest of the otherstone/otherrock building family — polished,
-cobblestone, buttons, frames, pedestals, tablets, bowls — and the impure chalks)
+whose result (the rest of the otherstone/otherrock building family — the
+cobblestone family, buttons, pressure plates, frames, pedestals, tablets, bowls —
+and the impure chalks)
 or ingredients this package does not carry yet. See
 [`notes.md`](notes.md) for the full gap list and the reason for each.
 
@@ -48,7 +52,7 @@ or ingredients this package does not carry yet. See
 
 One file: `occultism.hmod`. It is the whole mod — `horizon-mod.toml`,
 `src/lib.rs` + `src/support.rs` (the code), `src/runtime.rs` (the pure rules and
-their 45 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
+their 50 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
 tags and lang) and the licence notices.
 
 A native SDK package is built against the game by the launcher:

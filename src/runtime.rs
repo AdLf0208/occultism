@@ -1266,6 +1266,248 @@ mod tests {
         }
     }
 
+    /// The eight blocks of the polished tier this slice carries, with the vanilla
+    /// template each copies and the count its jar recipe makes. The two plain
+    /// blocks make nothing in a grid: their recipe is a furnace one.
+    const POLISHED: [(&str, &str, u32); 8] = [
+        ("polished_otherstone", "minecraft:stone", 0),
+        ("polished_otherstone_slab", "minecraft:stone_slab", 6),
+        ("polished_otherstone_stairs", "minecraft:stone_stairs", 4),
+        ("polished_otherstone_wall", "minecraft:cobblestone_wall", 6),
+        ("polished_otherrock", "minecraft:stone", 0),
+        ("polished_otherrock_slab", "minecraft:stone_slab", 6),
+        ("polished_otherrock_stairs", "minecraft:stone_stairs", 4),
+        ("polished_otherrock_wall", "minecraft:cobblestone_wall", 6),
+    ];
+
+    #[test]
+    fn the_polished_recipes_are_the_jars_shapes_in_the_26_3_dialect() {
+        // The jar's six polished-tier grids (`building_blocks/crafting`): three
+        // polished blocks in the middle row make six slabs, the stair step makes
+        // four stairs and two rows of three make six walls. The 26.3 loader reads
+        // an ingredient as a bare `"id"`; the jar's `{"item": …}` object is
+        // dropped without a word (the 0.2.5/0.2.6/0.2.7 finding), so a
+        // byte-for-byte carry yields nothing.
+        for (name, _, count) in POLISHED {
+            if count == 0 {
+                continue; // the plain pair: smelted, tested below
+            }
+            let text = content(&format!("occultism/recipe/crafting/{name}.json"));
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{name} carries the 1.21.1 object-form ingredient {object_form}, \
+                     which the 26.3 loader drops: {text}"
+                );
+            }
+            assert!(
+                text.contains("\"minecraft:crafting_shaped\""),
+                "{name} is the jar's shaped recipe: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{name}\"")),
+                "{name} does not make itself: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"count\": {count}")),
+                "{name} does not make {count}: {text}"
+            );
+        }
+        // Each shape is made of the **polished** block, never of the raw stone:
+        // the raw id, quoted, would be the un-polished recipe's ingredient.
+        for stone in ["otherstone", "otherrock"] {
+            let polished = format!("occultism:polished_{stone}");
+            let raw = format!("\"occultism:{stone}\"");
+            let slab = content(&format!(
+                "occultism/recipe/crafting/polished_{stone}_slab.json"
+            ));
+            assert!(
+                slab.contains(&format!("\"{polished}\"")) && slab.contains("\"ooo\""),
+                "the polished slab recipe is one row of three polished blocks: {slab}"
+            );
+            assert!(
+                !slab.contains(&raw),
+                "the polished slab recipe names the raw stone: {slab}"
+            );
+            let stairs = content(&format!(
+                "occultism/recipe/crafting/polished_{stone}_stairs.json"
+            ));
+            for row in ["\"#  \"", "\"## \"", "\"###\""] {
+                assert!(
+                    stairs.contains(row),
+                    "the polished stair recipe lost {row}: {stairs}"
+                );
+            }
+            assert!(
+                stairs.contains(&format!("\"{polished}\"")),
+                "the polished stairs are not made of {polished}: {stairs}"
+            );
+            let wall = content(&format!(
+                "occultism/recipe/crafting/polished_{stone}_wall.json"
+            ));
+            assert_eq!(
+                wall.matches("\"ooo\"").count(),
+                2,
+                "the polished wall recipe is two rows of three: {wall}"
+            );
+            assert!(
+                wall.contains(&format!("\"{polished}\"")),
+                "the polished wall is not made of {polished}: {wall}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_polished_pair_is_smelted_from_the_raw_stones() {
+        // The jar's only recipe for the plain polished pair: a furnace one, 200
+        // ticks, 0.5 experience, from the raw stone (0.3 for the cracked bricks
+        // is the neighbouring tier's figure — this is its own). 26.3 reads the
+        // ingredient as a bare string and the result as `{id, count}`.
+        for stone in ["otherstone", "otherrock"] {
+            let polished = format!("polished_{stone}");
+            let text = content(&format!("occultism/recipe/smelting/{polished}.json"));
+            assert!(
+                text.contains("\"type\": \"minecraft:smelting\""),
+                "{polished} is not a furnace recipe: {text}"
+            );
+            assert!(
+                !text.contains("\"item\":") && !text.contains("\"tag\":"),
+                "{polished} carries a 1.21.1 object-form ingredient: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"ingredient\": \"occultism:{stone}\"")),
+                "{polished} is not smelted from {stone}: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{polished}\"")),
+                "{polished} does not smelt into itself: {text}"
+            );
+            assert!(
+                text.contains("\"cookingtime\": 200") && text.contains("\"experience\": 0.5"),
+                "{polished} lost the jar's 200 ticks / 0.5 xp: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_polished_block_has_a_26_3_loot_table_that_drops_itself() {
+        // The rule the jar breaks a third time: `polished_otherrock_slab.json` is
+        // the only polished table the jar does not ship, although the block is
+        // registered `LootTableType.CUSTOM`, so nothing generates a default. A
+        // missing table means the block drops nothing at all; the port ships it.
+        for (name, _, _) in POLISHED {
+            let text = content(&format!("occultism/loot_table/blocks/{name}.json"));
+            for legacy in ["\"function\":", "\"functions\":"] {
+                assert!(
+                    !text.contains(legacy),
+                    "{name}'s loot table uses the 1.21.1 {legacy} shape, which the 26.3 \
+                     loader does not read (it reads `modifier`): {text}"
+                );
+            }
+            assert!(
+                text.contains(&format!("\"name\": \"occultism:{name}\"")),
+                "{name}'s loot table does not drop itself: {text}"
+            );
+        }
+        // A polished slab's table is the jar's: one when single, two when double.
+        for name in ["polished_otherstone_slab", "polished_otherrock_slab"] {
+            let text = content(&format!("occultism/loot_table/blocks/{name}.json"));
+            assert!(
+                text.contains("\"minecraft:match_block\"")
+                    && text.contains("\"type\": \"double\"")
+                    && text.contains("\"count\": 2"),
+                "{name}'s double-slab branch is missing: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_polished_blocks_copy_the_upstream_stone_templates() {
+        // Upstream (`OccultismBlocks.java:181-233`): the plain pair and the slabs
+        // are `ofFullCopy(OTHERSTONE)`/`ofFullCopy(POLISHED_*)` (hardness 1.5,
+        // resistance 30), the stairs and walls
+        // `of().strength(1.5f).requiresCorrectToolForDrops()` (1.5). Every one of
+        // them needs a pickaxe, so a bare hand rolls nothing.
+        for (name, template, _) in POLISHED {
+            let text = content(&format!("occultism/horizon/block/{name}.json"));
+            assert!(
+                text.contains(&format!("\"template\": \"{template}\"")),
+                "{name} does not copy {template}: {text}"
+            );
+            assert!(
+                text.contains("\"requires_tool\": true"),
+                "{name} must be gated on a pickaxe as upstream gates it: {text}"
+            );
+            assert!(
+                text.contains("\"hardness\": 1.5"),
+                "{name} is not hardness 1.5: {text}"
+            );
+            let resistance = if name.ends_with("_stairs") || name.ends_with("_wall") {
+                1.5
+            } else {
+                30.0
+            };
+            assert!(
+                text.contains(&format!("\"explosion_resistance\": {resistance}")),
+                "{name} is not resistance {resistance}: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_polished_block_has_its_state_model_and_name() {
+        // A block with no blockstate renders as the missing model, an item with
+        // no model is a purple-black cube, and an id absent from
+        // `mineable/pickaxe` never drops to a pickaxe; a wall outside
+        // `minecraft:walls` does not connect to its neighbours.
+        let pickaxe = content("minecraft/tags/block/mineable/pickaxe.json");
+        let walls = content("minecraft/tags/block/walls.json");
+        let slabs = content("minecraft/tags/block/slabs.json");
+        let stairs = content("minecraft/tags/block/stairs.json");
+        let lang = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("assets/occultism/lang/en_us.json"),
+        )
+        .expect("the package's lang file");
+        for (name, _, _) in POLISHED {
+            let id = format!("occultism:{name}");
+            assert!(
+                pickaxe.contains(&format!("\"{id}\"")),
+                "{id} is not in mineable/pickaxe"
+            );
+            let tag = if name.ends_with("_wall") {
+                &walls
+            } else if name.ends_with("_slab") {
+                &slabs
+            } else if name.ends_with("_stairs") {
+                &stairs
+            } else {
+                // The plain pair is in no shape tag.
+                &pickaxe
+            };
+            assert!(
+                tag.contains(&format!("\"{id}\"")),
+                "{id} is missing from its tag"
+            );
+            assert!(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join(format!("assets/occultism/blockstates/{name}.json"))
+                    .is_file(),
+                "{id} has no blockstate"
+            );
+            assert!(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join(format!("assets/occultism/models/item/{name}.json"))
+                    .is_file(),
+                "{id} has no item model"
+            );
+            assert!(
+                lang.contains(&format!("\"block.occultism.{name}\"")),
+                "{id} has no lang entry"
+            );
+        }
+    }
+
     #[test]
     fn a_conversion_is_scoped_to_its_world_and_dimension() {
         let mut recent = Recent::default();

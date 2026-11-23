@@ -312,3 +312,43 @@ The phase-R transcript (the ten grids, the two differentials, the four-step chai
 the furnace pair with its no-fuel differential, the twelve default states with hand 0 / pickaxe 1, the
 brick wall connection and the double brick slab dropping two), the jar's second missing slab table and
 the two measured behaviours of the furnace/menu harness are in `notes.md` under "Slice 6".
+
+## 11. SDK 0.2.8 (the polished tier of the `otherstone`/`otherrock` family), pin `0a875da`
+
+Every step in a `ports/tools/build-slot.sh` lease (`BUILD_LOCAL=1` for the SDK ladder, as trap 10 of
+0.2.0 records), `CARGO_INCREMENTAL=0`, no `--target-dir`, no private slots. Evidence in
+`../_shared/evidence/occultism/` (ladder) and `../_shared/evidence/occultism-e2e/` (game legs). The
+slice adds eight block declarations, six 26.3 crafting recipes, two smelting recipes, eight loot
+tables (one of which the jar omits), eight blockstates, fourteen block models, eight item models, two
+textures, eight lang keys, four block tags and eight creative-tab entries; the enumeration and the
+upstream defect are in `notes.md`, §"Slice 7". The family is **eight** results, not the brief's nine
+(the jar has 8 blockstates and 8 lang keys; the artefact wins).
+
+| Step | Command | Result |
+|---|---|---|
+| red 1 (unit, the dialect) | `cargo test --offline` with the jar's 6 grids, 7 tables and 2 smelting files carried verbatim | **47 passed; 3 failed** — `the_polished_recipes_are_the_jars_shapes_in_the_26_3_dialect` ("carries the 1.21.1 object-form ingredient"), `the_polished_pair_is_smelted_from_the_raw_stones` and the loot table's `"function":` shape — `sdk-test-red-0.2.8.log` |
+| red 2 (unit, the upstream defect) | same, after the dialect rewrite | **49 passed; 1 failed** — `polished_otherrock_slab.json: No such file or directory` — `sdk-test-red2-0.2.8.log` |
+| green (unit) | `cargo test --offline` | **50 passed, 0 failed** — `sdk-test.log` |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **`REPRODUCIBLE`**: 207,277 B, `c1faa25a…1d0e2` — `sdk-build-0.2.8.log`, `sdk-build-second-0.2.8.log`, `sdk-reproducible-0.2.8.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | 207,277 B, `c1faa25ad14a03c78cdea9183c48b38985997518e033f1e0d1a089f7f1e1d0e2`, **401 entries**, no packed `Cargo.lock`, declares **0.2.8**, `src/runtime.rs` inside = outside (`798ab04a…`) — `sdk-artifact-0.2.8.txt` |
+| tree match | a build from the final tree + `cmp occultism.hmod` | **`PACKAGE_MATCHES_TREE`** — the delivered file is the tree's build — `sdk-reproducible-0.2.8.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed) | exit 0, `occultism 0.2.8 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` (sha printed) | `0a875da  made for`, exit 0 — `sdk-fits.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` (sha printed) | `0b14f8a  fits`, exit 0 — `sdk-fits-next.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** — `sdk-gate-0.2.8.txt` |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.7 export removed first) | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-9231e7cc9d32`, manifest `version = "0.2.8"` — `launcher-build-0.2.8.log` |
+| red (in game, the family) | `POLISHED_ONLY=1` against the **0.2.7** export | **FAIL** + `EXIT:1` (`the furnace made None from otherstone, expected one occultism:polished_otherstone`) — `e2e-polished-red-0.2.7-package.log` |
+| in game (the family) | `POLISHED_ONLY=1` | **PASS** + `EXIT:0` — `e2e-polished-0.2.8.log` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen) | **PASS** + `EXIT:0` (A..S) — `e2e-default-0.2.8.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | **FAIL** + `EXIT:1` (`Unknown item 'occultism:datura'`) — `e2e-control-0.2.8.log` |
+| fail-capability (scenario) | `SELFTEST=1` | **FAIL** + `EXIT:1` (3 awakened feathers ≠ the flipped 2) — `e2e-selftest-0.2.8.log` |
+| fail-capability (this family) | `POLISHED_ONLY=1 POLISHED_NEGATIVE=1` | **FAIL** + `EXIT:1` (`negative: the polished slab grid made occultism:polished_otherstone_slab x6, expected nothing`) — `e2e-negative-polished-0.2.8.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | **42 logs, 42 ok**, 0 missing-exit, 0 bad-exit |
+
+The phase-S transcript (the six grids with consumption, the two furnace legs at 230 101 42 with a
+240-tick wait and a no-fuel differential, the eight default states with hand 0 / pickaxe 1, the
+polished wall connection, the double slab dropping two and the missing-table slab dropping one) and
+the family's one unported recipe half (the six stonecutting shortcuts) are in `notes.md` under
+"Slice 7".
