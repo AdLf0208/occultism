@@ -2136,3 +2136,294 @@ storage controllers)"*. The same slice can carry the tier's reverse smelt pair
 pedestals, tablets and bowls are the first results that are not plain building blocks (shapes, and
 for the bowls a block entity upstream) and belong in a slice of their own; the stonecutter half waits
 for a ctl way to select a recipe.
+
+## Slice 9 (0.2.10, 2026-11-23) — the redstone pair of the building family, and the reverse smelt
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). Class
+**content**, tier **deep** (ledger row 345). Licence **MIT**, ours on `main` → an
+`Update occultism 0.2.10` publication.
+
+**Gap line it comes from:** 0.2.9's parity row — *"the remaining 10 building recipes (buttons,
+pressure plates, frames, pedestals, tablets, sacrificial bowls, storage controllers) — **not carried**"*
+— and 0.2.9's `## Next slice`, which named exactly this pair and offered the tier's reverse smelt
+alongside it. It is a behaviour change (four obtainable blocks with real redstone state, and a
+furnace loop that had one half), so it is a real version.
+
+**Shape:** the data half of a `deep` mod, as slices 3–8 — with one addition this family needs: the
+engine's own **`ButtonBlock`/`PressurePlateBlock` classes** come with the vanilla template, so the
+press tick, the release tick, the player-sensing scan and the click all exist at the pin. Nothing
+runs in the port; the four blocks copy `minecraft:stone_button` / `minecraft:stone_pressure_plate`
+and the engine's `Class::Button` / `Class::BasePressurePlate` paths do the rest
+(`horizon-world/src/level/redstone.rs:933-1060`, `tick.rs:50`, `hooks.rs:543`).
+
+### What was carried (and from where)
+
+| family | files | source |
+|---|---|---|
+| block declarations | 4 (`data/occultism/horizon/block/<name>.json`) | port-authored from `OccultismBlocks` (tag `release/v1.21.1-1.225.0`) |
+| crafting recipes | 4 (`.../recipe/crafting/<name>.json`) | the jar's `recipe/crafting/` shapes, rewritten to the 26.3 dialect |
+| loot tables | 4 (`.../loot_table/blocks/<name>.json`) | the jar's four, in the 26.3 condition dialect |
+| smelting recipes | 2 (`.../recipe/smelting/{otherstone,otherrock}.json`) | the jar's reverse pair, 26.3 dialect |
+| blockstates | 4 | the jar's (unchanged format; the buttons' 24 variants each) |
+| block models | 8 | the jar's (`button`/`button_pressed`, `pressure_plate_up`/`_down`) |
+| item models | 4 | the jar's (`button_inventory`; the plate's block model) |
+| textures | 0 new | the carried `block/otherstone.png` / `block/otherrock.png` |
+| lang | 4 keys | the jar's `en_us` |
+| tags | 3 new (`minecraft:stone_buttons` block **and item**, `minecraft:stone_pressure_plates`) + 2 ids in `mineable/pickaxe` | the jar's datagen output |
+| creative tab | 4 entries | after the eight 0.2.9 cobble-tier blocks |
+
+### The rule under test
+
+| block | template | hardness / resistance | map colour | `requires_tool` | recipe |
+|---|---|---|---|---|---|
+| `otherstone_button`, `otherrock_button` | `minecraft:stone_button` | 0.5 / 0.5 | 0 (NONE) | **false** | shapeless, 1 stone → 1 |
+| `otherstone_pressure_plate`, `otherrock_pressure_plate` | `minecraft:stone_pressure_plate` | 0.5 / 0.5 | 11 (STONE) | **false** | `oo` → 1 |
+
+Upstream (`OccultismBlocks.java`): `OTHERSTONE_BUTTON`/`OTHERROCK_BUTTON` are
+`new ButtonBlock(BlockSetType.STONE, 30, BlockBehaviour.Properties.of().noCollission()
+.strength(0.5F).pushReaction(PushReaction.DESTROY))`, and the two plates are
+`new PressurePlateBlock(BlockSetType.STONE, BlockBehaviour.Properties.ofFullCopy(
+Blocks.STONE_PRESSURE_PLATE))`. Neither calls `requiresCorrectToolForDrops`; `Properties.of()`
+leaves the map colour at `MapColor.NONE`, and the full copy of the vanilla plate takes the vanilla
+plate's `MapColor.STONE`. The pin's own `gameplay-facts.json` agrees with the templates:
+`minecraft:stone_button` and `minecraft:stone_pressure_plate` are `hardness 0.5` with
+`requires_tool: false`, so a **bare hand drops one** and a pickaxe drops one.
+
+### The brief's trap line is wrong for this family (the artefact wins)
+
+The brief's traps say *"`requires_tool` is true for these stone-family blocks — hand 0 / pickaxe
+1"*. Measured, it is **false** for all four: upstream's properties above have no
+`requiresCorrectToolForDrops`, and the pin's template facts read `requires_tool: false`. The jar's
+`mineable/pickaxe` lists only the two **pressure plates** (vanilla's stone button is not in it
+either), and `mineable` is a *speed* tag — it does not gate drops when `requires_tool` is false.
+The port therefore declares `requires_tool: false` and proves **hand 1 / pickaxe 1** in game, with a
+bare-hand break of `occultism:otherstone` (a `requires_tool: true` block) dropping nothing as the
+differential that keeps the hand leg fail-capable. Copying the brief's "hand 0" would have been a
+port defect: the blocks would be unobtainable by hand while upstream's drop first try.
+
+### The jar's loot-table inventory for this family (enumerated, not guessed)
+
+`unzip -l occultism-1.21.1-neoforge-1.225.0.jar | grep loot_table/blocks | grep -E "button|pressure"`:
+
+```
+otherstone_button.json          otherrock_button.json
+otherstone_pressure_plate.json  otherrock_pressure_plate.json
+```
+
+**Four of four are present** — the first family in this build tier with no omission (the four
+`otherrock`-family slabs the earlier slices had to add are the pattern's whole extent here). The
+enumeration is still a unit test (`every_redstone_block_has_a_26_3_loot_table_that_drops_itself`),
+so a future jar that drops one fails the run instead of shipping.
+
+### The dialect finding this slice re-confirms: the guard's shape
+
+The jar's tables are plain, but they spell their guard `"condition": "minecraft:survives_explosion"`
+— the 1.21.1 string form. The 26.3 loader reads a condition's kind as `"type"`, and an unknown kind
+is false; a verbatim carry would therefore drop **nothing at all** (the same silent-drop class as
+0.2.9's `match_tool`). The port writes `"condition": { "type": "minecraft:survives_explosion" }`,
+the shape every other carried table uses, and the unit test refuses the string form.
+
+### Upstream defects fixed
+
+1. **The item tag `minecraft:stone_buttons` lists only `otherstone_button`.** The jar's **block** tag
+   of the same name lists both buttons (`data/minecraft/tags/block/stone_buttons.json`), and the
+   `stone_pressure_plates` tags list both plates — so the item tag is an incomplete datagen output,
+   not a design choice. A pack or mod that looks the item up through the tag cannot find
+   `otherrock_button`.
+   - **Proved** by the two jar files side by side (block tag: both ids; item tag: one).
+   - **Fixed** minimally: the port declares both ids in the item tag, as the block tag does
+     (`the mod's data is incomplete → declare both`, the 2026-11-11 compatibility rule).
+   - **User-visible**: an `#minecraft:stone_buttons` item query finds both buttons.
+   - The unit test `every_redstone_block_has_its_state_model_and_name` reads both tags, so a
+     future re-carry of the jar's single-entry file fails.
+
+### Deviations (deliberate, and why)
+
+| Area | Upstream | This port |
+|---|---|---|
+| a button's press duration | `new ButtonBlock(BlockSetType.STONE, 30, …)` — 30 ticks | **20 ticks**: the only way to copy the STONE button set type is the vanilla template, and the pin's block declaration has no `ticksToStayPressed` field (`horizon-mods/src/content.rs` `BlockProperties`), so the copied `minecraft:stone_button` (20, as vanilla's stone button is at 26.3) is what ships. The game leg asserts the **measured** 20 (pressed at +2 and +12 ticks, released by +32) and this row records why it is not 30. Choosing `minecraft:oak_button` would give 30 but the wrong set type (arrows press it, wooden click sounds, `EVERYTHING` sensitivity): 20 ticks on the right set type is the smaller deviation. |
+| the reverse smelt pair | two `smelting/` recipes | **carried** (they were recorded as unported in 0.2.9); the furnace leg proves one cobble + one coal → one stone, and a fuel-less furnace cooking nothing |
+| stonecutting shortcuts | six per tier | still not carried; the crafting grids produce the same blocks and the harness cannot select a stonecutter recipe (unchanged from 0.2.9) |
+
+### Red → green
+
+**Unit red #1 — the family is absent** (`sdk-test-red-0.2.10.log`), the tests written first:
+
+```
+---- runtime::tests::every_redstone_block_has_a_26_3_loot_table_that_drops_itself stdout ----
+thread '…' panicked at src/runtime.rs:831:59:
+…/data/occultism/loot_table/blocks/otherstone_button.json: No such file or directory (os error 2)
+… (the recipe, the declaration, the tags and the smelt pair too)
+test result: FAILED. 55 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+**Unit red #2 — the jar's bytes verbatim** (`sdk-test-red2-0.2.10.log`), with the four recipes,
+four tables, two smelting recipes, assets and lang carried byte for byte:
+
+```
+---- runtime::tests::every_redstone_block_has_a_26_3_loot_table_that_drops_itself stdout ----
+thread '…' panicked at src/runtime.rs:1873:13:
+otherstone_button carries the 1.21.1 string-form condition kind, which the 26.3 loader does not read (it reads `type`): {
+---- runtime::tests::the_cobble_smelts_back_into_the_stone stdout ----
+otherstone's smelting recipe carries the 1.21.1 object-form ingredient "item"::
+---- runtime::tests::the_redstone_recipes_are_the_jars_shapes_in_the_26_3_dialect stdout ----
+otherstone_button carries the 1.21.1 object-form ingredient "item":, which the 26.3 loader drops: {
+test result: FAILED. 55 passed; 5 failed;
+```
+
+Green after the dialect rewrite and the new declarations/assets: **60 passed, 0 failed**
+(`sdk-test.log`).
+
+**In-game red — the family** (`e2e-redstone-red-0.2.9-package.log`, the **0.2.9** export,
+`REDSTONE_ONLY=1`):
+
+```
+== U: the four otherstone/otherrock redstone blocks ==
+REDSTONE FAIL: the furnace made None from othercobblestone, expected one occultism:otherstone
+FAIL: the redstone block check failed (see the REDSTONE FAIL line above)
+EXIT:1
+```
+
+The 0.2.9 package carries neither the reverse smelt nor the four blocks, so the leg's first carried
+recipe fails — the exact state this slice changes. The 0.2.10 package, same leg: `PASS` + `EXIT:0`
+(`e2e-redstone-0.2.10.log`).
+
+### In game (phase U, verbatim from `e2e-redstone-0.2.10.log`, abridged)
+
+```
+== the reverse smelt pair: the cobble block back into the stone ==
+  furnace with coal: [null, null, {"count": 1, "item": "occultism:otherstone"}]
+  othercobblestone + coal -> occultism:otherstone (the input is gone)
+  furnace with coal: [null, null, {"count": 1, "item": "occultism:otherrock"}]
+  furnace without fuel: [{"count": 1, "item": "occultism:othercobblestone"}, null, null]
+  no fuel: the output stayed empty and the input stayed put
+== the four redstone grids ==
+  the otherstone_button grid: the result slot reads occultism:otherstone_button x1
+  the otherstone_button recipe: every ingredient was consumed ({"occultism:otherstone_button": 1})
+  … the otherstone plate x1, the otherrock button x1 and the otherrock plate x1, the same three assertions …
+== the wrong ingredients: nothing in the same grids ==
+  one othercobblestone in the button grid: the result slot stayed empty
+  one othercobblerock in the button grid: the result slot stayed empty
+  two othercobblestone in the plate grid: the result slot stayed empty
+  one otherstone in the plate grid (the button recipe, not the plate): the result slot reads occultism:otherstone_button x1
+== the four blocks: default state, hand 1, wooden pickaxe 1 ==
+  placed occultism:otherstone_button[face=wall,facing=north,powered=false] at x=214
+  occultism:otherstone_button by hand: {"…", "block": "minecraft:air", "drops": {"occultism:otherstone_button": 1}}
+  occultism:otherstone_button with a wooden pickaxe: {"…", "drops": {"occultism:otherstone_button": 1}}
+  placed occultism:otherstone_pressure_plate[powered=false] at x=216
+  … the same two breaks for both plates and for otherrock_button …
+  differential, otherstone by hand: {}
+  press station: placed occultism:otherstone_pressure_plate[powered=false] at x=214
+  standing on occultism:otherstone_pressure_plate: occultism:otherstone_pressure_plate[powered=true]
+  stepped off (30 ticks later): occultism:otherstone_pressure_plate[powered=false]
+  … the otherrock plate the same …
+  click station: placed occultism:otherstone_button[face=wall,facing=north,powered=false] at x=218
+  after the click: occultism:otherstone_button[face=wall,facing=north,powered=true]
+  ten ticks later: occultism:otherstone_button[face=wall,facing=north,powered=true]
+  twenty ticks after that: occultism:otherstone_button[face=wall,facing=north,powered=false]
+  … the otherrock button the same …
+```
+
+The driver is `tools/redstone_recipes.py`. It opens a **real** table (`ctl interact`) for each grid,
+fills it as the recipe declares, reads the result slot, takes it and asserts every ingredient was
+consumed. Each button is placed on a **stone support** one block north, so the read-back is the
+template's *default* state (`face=wall,facing=north,powered=false`) and the block survives its own
+support check. The press leg places the plate under a teleported player and reads the **block
+state** (`powered=true`) — a plate's trigger is a physics scan, so there is no block entity to read —
+then steps off and reads `powered=false` 30 ticks later (the engine's 20-tick re-check plus the
+scheduled tick). The click leg right-clicks from three blocks away, and reads `powered=true`, then
+still true ten ticks later, then `powered=false`. `BUTTON_SELFTEST=1` and `PLATE_SELFTEST=1` each
+invert their own assertion, so a working package must fail:
+`e2e-selftest-button-0.2.10.log` (`button selftest: … reads '…[powered=true]' after the click`) and
+`e2e-selftest-plate-0.2.10.log` (`plate selftest: … reads '…[powered=true]' under the player`), both
+`EXIT:1`. `CONTROL_LEG=1 REDSTONE_ONLY=1` proves all four ids are unknown on a game without the
+package, as a block and as an item (`e2e-control-redstone-0.2.10.log`, `EXIT:0`).
+
+### Ladder
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests (red 1) | `cargo test --offline`, tests first | `sdk-test-red-0.2.10.log` | **55 passed, 5 failed** (the family's files absent) |
+| tests (red 2) | the jar's bytes carried verbatim | `sdk-test-red2-0.2.10.log` | **55 passed, 5 failed** (object-form ingredient, string-form condition, missing declarations/tags) |
+| tests | `cargo test --offline` | `sdk-test-0.2.10.log` (copied to `sdk-test.log`) | **60 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy-0.2.10.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt-0.2.10.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.10.log`, `sdk-build-second-0.2.10.log`, `sdk-reproducible-0.2.10.txt` | **`REPRODUCIBLE`**, 241,148 B, `b4807a00…d978` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | `sdk-artifact-0.2.10.txt` | 241,148 B, `b4807a007516b46c6a5b8684a2bd84f0d65a7e14d65391fd3a62d8d3deb4d978`, **492 entries**, no packed `Cargo.lock`, declares **0.2.10**, `src/runtime.rs` inside = outside (`8ee7d89a…`) |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed) | `sdk-check-0.2.10.log` | exit 0, `occultism 0.2.10 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` (sha printed) | `sdk-fits-0.2.10.log` | `0a875da  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` (sha printed) | `sdk-fits-next-0.2.10.log` | **`0b14f8a  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | `sdk-gate-0.2.10.txt` | **1/1** (tests read 60 passed) |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.9 export renamed first) | `launcher-build-0.2.10.log` | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-a79120a2bd80`, exported manifest version `0.2.10` |
+| in game (the family, red) | `REDSTONE_ONLY=1` against the **0.2.9** export | `e2e-redstone-red-0.2.9-package.log` | **FAIL** + `EXIT:1` (`the furnace made None from othercobblestone`) |
+| in game (the family) | `REDSTONE_ONLY=1` | `e2e-redstone-0.2.10.log` | **PASS** + `EXIT:0` |
+| in game (all phases) | `launcher-game.sh run occultism` (offscreen) | `e2e-default-0.2.10.log` | **PASS** + `EXIT:0` (A..U) |
+| in game (control ids) | `CONTROL_LEG=1 REDSTONE_ONLY=1` | `e2e-control-redstone-0.2.10.log` | **PASS** + `EXIT:0` (all four ids unknown, block and item) |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | `e2e-control-0.2.10.log` | **FAIL** + `EXIT:1` (`the datura item did not register`) |
+| fail-capability (button) | `REDSTONE_ONLY=1 BUTTON_SELFTEST=1` | `e2e-selftest-button-0.2.10.log` | **FAIL** + `EXIT:1` |
+| fail-capability (plate) | `REDSTONE_ONLY=1 PLATE_SELFTEST=1` | `e2e-selftest-plate-0.2.10.log` | **FAIL** + `EXIT:1` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | **57 logs, 57 ok**, 0 missing-exit, 0 bad-exit |
+
+### Parity coverage (0.2.10)
+
+| family | state |
+|---|---|
+| `otherstone_button`, `otherrock_button` — grid, block, item | **tested** — U (one stone → one button with the ingredient consumed; the default `face=wall,facing=north,powered=false` read back; hand 1 / wooden pickaxe 1; a click reads `powered=true`, still true ten ticks later, `false` by +32 ticks; `BUTTON_SELFTEST` invert) |
+| `otherstone_pressure_plate`, `otherrock_pressure_plate` — grid, block, item | **tested** — U (`oo` → one plate with both stones consumed; `powered=false` read back; hand 1 / pickaxe 1; under the player `powered=true`, after stepping off `powered=false`; `PLATE_SELFTEST` invert) |
+| the four grids' wrong-ingredient controls | **tested** — U (one cobble in the button grid, two cobble in the plate grid: nothing; one stone in the plate grid: the **button**, so the plate's shape needs two) |
+| the four loot tables | **tested** — U (hand 1 and pickaxe 1 are the table's roll; the jar ships all four, and the test enumerates them) |
+| `minecraft:stone_buttons` (block + item), `stone_pressure_plates`, `mineable/pickaxe` | **tested** — the unit test reads each tag; the item tag's fix (both buttons) is pinned there; the pickaxe break is the `mineable` proof |
+| the reverse smelt pair (`smelting/{otherstone,otherrock}`) | **tested** — U (one cobble + one coal → one stone, input consumed, 200 ticks; a fuel-less furnace cooks nothing) |
+| blockstates, block models (pressed/down), item models, lang | **tested** — the unit test reads each file; the click leg renders `otherstone_button_pressed` by moving `powered` in the blockstate, and the press leg the plate's `_down` model |
+| the six `stonecutting/` shortcuts | **not carried** — same reason as 0.2.9: the pin reads `minecraft:stonecutting` but the harness cannot select a stonecutter recipe (a GUI button, not a menu slot) |
+| the remaining 6 building recipes (frames, pedestals, tablets, sacrificial bowls, storage controllers) | **not carried** — their results are still unregistered; the bowls are a block entity upstream and belong in a slice of their own |
+| the 17 impure-chalk craftings | **not carried** — ingredients missing (unchanged) |
+| spirit fire, the 26 conversion recipes, the crop, the seed source, the readouts, the spectator guard, the loot tables, the 0.2.5/0.2.6/0.2.7/0.2.8/0.2.9 families | **tested** — phases A..T, unchanged in this slice's full run |
+| pentacle rituals, spirits/AI, GeckoLib models, Otherworld, guide book, Curios, machine recipes | **not ported** — the gap list above (unchanged) |
+
+### Measured behaviours of this pin (added by this slice)
+
+1. **A content block copies its template's *behaviour class*, not just its states.** The four blocks
+   inherit `ButtonBlock`/`PressurePlateBlock` from `minecraft:stone_button`/`stone_pressure_plate`
+   (`mod_content.rs` copies the template's `facts.json`/`block-behaviours.json` rows with the id
+   renamed), so the press/release tick, the click, the player-sensing scan and the sounds all work
+   with no port code. `tick.rs:50` and `redstone.rs:933-1060` are the engine's own vanilla paths.
+2. **A stone plate is pressed by a *player*** at this pin: `Sensitivity.MOBS` is
+   `EntityQuery::Mobs` = "living entities only" (`level/mod.rs:211-215`), and the press leg's
+   `powered=true` is that query's in-game proof.
+3. **A button's default state is `face=wall,facing=north`, and it needs a support**: the driver puts
+   a stone one block north. A `setblock` of the bare id over air is destroyed by its own survival
+   check, which is why the read-back asserts the support-attached state.
+4. **The press duration is the template's `ticksToStayPressed`** — 20 for the vanilla stone button at
+   26.3 — and the release is observed by +32 ticks (the scheduled tick at +20, the state write, and
+   the client's read); the deviation table records why upstream's 30 is not expressible.
+5. **A break reply's `.drops` counts every item entity at the block's position**, so a leftover drop
+   from the previous leg merged into the next reply and read 2 on the phase's second run (measured
+   2026-11-23). The driver now kills item entities before every placement — a harness fix, the table
+   rolls once (`{…: 1}` on both picks after it).
+6. The 0.2.4–0.2.9 findings stand (peaceful in the End, the break reply as the drop assertion, a
+   fresh table per grid, `--offscreen` for menu phases, the stale-export trap, `ctl container`).
+
+### Harness defects fixed (and why the product did not change)
+
+| defect | symptom | fix |
+|---|---|---|
+| a leftover item entity merged into a later break reply | `a wooden pickaxe dropped {'occultism:otherstone_button': 2}` on the second run of phase U | `kill @e[type=minecraft:item]` before every block placement in `redstone_recipes.py` |
+| a wrong differential ("one stone in the plate grid makes nothing") | the grid legitimately made the **button** (the shapeless one-stone recipe) | the case now asserts the button, which is what proves the plate's `oo` needs two |
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+### Next slice
+
+The **frames and pedestals** are the next results of the family, and the first that are not plain
+building blocks: `otherstone_frame` (a wall-mounted item frame with its own block entity upstream),
+`otherstone_pedestal`/`otherstone_pedestal_silver` (a block with a shape and a use) and the storage
+controller bases. Gap line: this slice's parity row — *"the remaining 6 building recipes (frames,
+pedestals, tablets, sacrificial bowls, storage controllers)"*. It no longer fits the pure data shape
+(a frame's item display is a block entity, a pedestal's use is a click), so it belongs in a slice
+that adds the pin's `native_block_entity` + `native_use_item_on` glue — the tier's `machines`-style
+half, still inside the ledger's `deep` row. Its in-game assertion would be a placed frame holding an
+item (the block entity's saved `Item` read back through `ctl container`/`ctl block`), a pedestal's
+click returning the held item, and a `requires_tool: true` hand 0 / pickaxe 1 pair. If the frames are
+out of reach, the six stonecutting shortcuts wait on a `ctl` way to select a stonecutter recipe (a
+`player_stonecutter_recipe_select` moment), which is a harness feature, not a port one.

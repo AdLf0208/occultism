@@ -119,6 +119,22 @@
 # COBBLE_ONLY=1 is this family's red/green leg; COBBLE_NEGATIVE=1 inverts the
 # cobble slab grid assertion, so the run must FAIL.
 #
+# The redstone pair (0.2.10) is phase U, on the cobble row and at the same table:
+# the two buttons (one stone in the grid -> one button, shapeless) and the two
+# pressure plates (two stones in one row -> one plate), with a cobble button
+# grid and a cobble plate grid as wrong-ingredient differentials and one stone in
+# the plate grid making the button rather than the plate (the plate needs two); the jar's reverse smelt pair (cobble -> stone, 200 ticks,
+# 0.5 xp) in a real furnace with a no-fuel differential; then each of the four
+# blocks placed, its default state read back, a bare hand (exactly one — these
+# templates are `requires_tool: false`) and a wooden pickaxe (exactly one), with
+# a bare-hand break of `otherstone` (nothing) as the differential that makes the
+# hand leg fail-capable; then a **press** (a plate under the player reads
+# `powered=true`, `false` after stepping off) and a **click** (a button reads
+# `powered=true`, is still pressed ten ticks later, and `false` after the
+# template's press duration). REDSTONE_ONLY=1 is this family's red/green leg;
+# PLATE_SELFTEST=1 and BUTTON_SELFTEST=1 each invert their own leg, so those runs
+# must FAIL.
+#
 # SELFTEST=1 flips the count assertion (3 awakened feathers -> 2): it must FAIL,
 # proving the scenario can fail. NEGATIVE=1 flips the ripe-crop harvest's
 # assertion (a ripe crop must drop a fruit) the same way; LOOT_NEGATIVE=1 is the
@@ -181,6 +197,14 @@ COBBLE_NEGATIVE=${COBBLE_NEGATIVE:-0}
 # `COBBLE_ONLY=1` launches and runs only the cobblestone-tier phase (the red/green
 # leg for that family), then exits 0.
 COBBLE_ONLY=${COBBLE_ONLY:-0}
+# `REDSTONE_ONLY=1` launches and runs only the redstone-pair phase (the red/green
+# leg for that family), then exits 0.
+REDSTONE_ONLY=${REDSTONE_ONLY:-0}
+# The redstone pair's own counterfactuals: `PLATE_SELFTEST=1` asserts a plate is
+# NOT powered under the player, and `BUTTON_SELFTEST=1` asserts a clicked button
+# is NOT pressed. Both must fail (see phase U).
+PLATE_SELFTEST=${PLATE_SELFTEST:-0}
+BUTTON_SELFTEST=${BUTTON_SELFTEST:-0}
 # `CONTROL_LEG=1` runs the packaged leg first on the same socket, as 0.2.0/0.2.2 did.
 # The default is a *separate* invocation (`GAME=$CONTROL_GAME`), because a control
 # launch in the same HORIZON_HOME leaves the main game without its log file and the
@@ -303,8 +327,9 @@ arena() {
     done
     [ "$loaded" = true ] || fail "the End arena chunk never loaded"
     # Big enough for the fire stations (z -12..8), the crop family
-    # (x 214..233, z 0..40), the loot row (x 232..238, z 30) and the bricks row
-    # (x 214..236, z 46..50, phase R), with clear air above all of them.
+    # (x 214..233, z 0..40), the loot row (x 232..238, z 30), the bricks row
+    # (x 214..236, z 46..50, phases R..U, with phase U's furnace row at z=44 and
+    # its press/click stations at z=48), with clear air above all of them.
     ctl command "execute in minecraft:the_end run fill 196 100 -16 242 100 52 minecraft:stone" >/dev/null
     ctl wait 6 >/dev/null
     ctl command "execute in minecraft:the_end run fill 196 101 -16 242 108 52 minecraft:air" >/dev/null
@@ -476,6 +501,41 @@ control_leg() {
         [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
     done
     echo "  without the package: none of the eight cobblestone-tier blocks either"
+    # The redstone pair (0.2.10) must be unknown too.
+    for id in occultism:otherstone_button occultism:otherrock_button \
+              occultism:otherstone_pressure_plate occultism:otherrock_pressure_plate; do
+        ctl command "execute in minecraft:the_end run setblock $X0 101 0 $id" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        name=$(block_name "$X0" 101 0)
+        [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
+    done
+    echo "  without the package: none of the four redstone-pair blocks either"
+    ctl quit >/dev/null 2>&1 || true
+}
+
+# The redstone pair's own control probe: `CONTROL_LEG=1 REDSTONE_ONLY=1` launches
+# the game **without** the package, asserts the four ids are unknown as blocks and
+# as items, and exits 0. The standard control leg (`GAME=$CONTROL_GAME`) stops at
+# phase A's datura assertion, so this is the leg that proves *this* family's ids
+# are the package's and not the engine's.
+control_redstone() {
+    echo "== control: the four redstone ids on a game without the package =="
+    launch "$CONTROL_GAME" "$CONTROL_WORLD"
+    arena
+    local id name
+    for id in occultism:otherstone_button occultism:otherrock_button \
+              occultism:otherstone_pressure_plate occultism:otherrock_pressure_plate; do
+        ctl command "execute in minecraft:the_end run setblock $X0 101 0 $id" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        name=$(block_name "$X0" 101 0)
+        [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known"
+        ctl command "clear @s" >/dev/null || true
+        ctl command "item replace entity @s hotbar.0 with $id 1" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        ctl inventory | jq -e --arg i "$id" '[.hotbar[], .main[] | select(.item == $i)] | length == 0' >/dev/null \
+            || fail "the control game has the $id item, so it carries this package"
+    done
+    echo "  without the package: none of the four redstone ids exist as a block or an item"
     ctl quit >/dev/null 2>&1 || true
 }
 
@@ -758,6 +818,44 @@ phase_cobble() {
     echo "  the raw stones drop one cobble block without silk touch and keep themselves with it"
 }
 
+# The redstone pair (0.2.10): the four grids (one stone -> one button, two
+# stones in one row -> one plate) with the wrong-ingredient differentials, the
+# jar's reverse smelt pair in a real furnace, each of the four blocks placed,
+# read back, broken by a hand and by a wooden pickaxe (one each — these
+# templates are `requires_tool: false`, with otherstone's hand break dropping
+# nothing as the differential), a plate pressed by the player and released, and a
+# button clicked (powered, held, released). PLATE_SELFTEST=1 and
+# BUTTON_SELFTEST=1 each invert their own leg so those runs must FAIL.
+phase_redstone() {
+    echo "== U: the four otherstone/otherrock redstone blocks =="
+    end "gamerule random_tick_speed 0"
+    # Standing still over the dark End floor: peaceful keeps hostile spawns away
+    # (a mob on the plate would keep it pressed after the player steps off).
+    end "difficulty peaceful"
+    end "kill @e[type=!player]"
+    ctl wait 20 >/dev/null
+    end "setblock $CRAFT_X 100 $CRAFT_Z minecraft:stone"
+    ctl wait 4 >/dev/null
+    PLATE_SELFTEST=$PLATE_SELFTEST BUTTON_SELFTEST=$BUTTON_SELFTEST \
+        python3 "$PORT/tools/redstone_recipes.py" \
+        "$SOCK" "$CTL" "$CRAFT_X" 101 "$CRAFT_Z" \
+        || fail "the redstone block check failed (see the REDSTONE FAIL line above)"
+    echo "  the four redstone grids craft their declared counts with every ingredient consumed;"
+    echo "  a cobble button grid and a cobble plate grid made nothing, and one stone in the plate grid made the button, not the plate;"
+    echo "  the cobble block smelted back into the stone in a real furnace while a fuel-less one stayed idle;"
+    echo "  each block reads its template's default state, drops exactly one to a hand and one to a wooden pickaxe;"
+    echo "  otherstone's bare-hand break dropped nothing (the differential);"
+    echo "  each plate reads powered=true under the player and false after stepping off;"
+    echo "  each button reads powered=true after a click, still true ten ticks later and false after its press duration"
+}
+
+# The redstone pair's own control leg: the game without the package, four ids.
+if [ "$CONTROL_LEG" = 1 ] && [ "$REDSTONE_ONLY" = 1 ] && [ -n "$CONTROL_GAME" ]; then
+    control_redstone
+    echo "PASS: a game without the package refuses all four redstone ids as a block and as an item"
+    exit 0
+fi
+
 echo "== launch (The End arena, launcher-built game with the package) =="
 if [ "$CONTROL_LEG" = 1 ] && [ -n "$CONTROL_GAME" ]; then control_leg; fi
 launch "$GAME" "$WORLD"
@@ -802,6 +900,13 @@ fi
 if [ "$COBBLE_ONLY" = 1 ]; then
     phase_cobble
     echo "PASS: the six cobble-tier othercobblestone/othercobblerock recipes craft at a real table with every ingredient consumed (three cobble blocks in the middle row make six slabs, the stair step four stairs, two rows six walls; four cobble blocks in the 2x2 and four dirt make nothing), each of the eight blocks reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, a cobble wall pair connects, a double cobble slab drops two, othercobblerock_slab — the table the jar omits — drops one, and the raw stones drop one othercobblestone/othercobblerock with a wooden pickaxe and keep themselves under silk touch"
+    exit 0
+fi
+
+# The red/green leg for the redstone pair: launch, arena, phase U only.
+if [ "$REDSTONE_ONLY" = 1 ]; then
+    phase_redstone
+    echo "PASS: the four otherstone/otherrock redstone blocks work end to end: one stone in a real table makes one button and two stones in one row make one pressure plate (each of the four grids with every ingredient consumed, while a cobble button grid and a cobble plate grid make nothing and one stone in the plate grid makes the button rather than the plate), the cobble block smelts back into the stone in a real furnace at 200 ticks and 0.5 experience while a fuel-less furnace stays idle, each of the four blocks reads its template's default state and drops exactly one of itself to a bare hand and exactly one to a wooden pickaxe (with otherstone's hand break dropping nothing as the differential), each pressure plate reads powered=true under the player and powered=false after stepping off, and each button reads powered=true after a right click, is still pressed ten ticks later and reads powered=false after its press duration"
     exit 0
 fi
 
@@ -1382,4 +1487,6 @@ phase_polished
 
 phase_cobble
 
-echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand, exactly one othercobblestone/othercobblerock to a wooden pickaxe and themselves to a silk-touch pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two; and the eight polished-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab (the table the jar omits) drops one; and the eight cobblestone-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four cobble blocks in the 2x2 and four dirt make nothing), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a cobble wall pair connects, a double cobble slab drops two, othercobblerock_slab (the table the jar omits) drops one, and the raw stones drop one othercobblestone/othercobblerock without silk touch and keep themselves with it"
+phase_redstone
+
+echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand, exactly one othercobblestone/othercobblerock to a wooden pickaxe and themselves to a silk-touch pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two; and the eight polished-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab (the table the jar omits) drops one; and the eight cobblestone-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four cobble blocks in the 2x2 and four dirt make nothing), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a cobble wall pair connects, a double cobble slab drops two, othercobblerock_slab (the table the jar omits) drops one, and the raw stones drop one othercobblestone/othercobblerock without silk touch and keep themselves with it; and the four redstone-pair blocks work the same way: one stone in a real table makes one button and two stones in one row make one pressure plate (every ingredient consumed, while a cobble button grid and a cobble plate grid make nothing and one stone in the plate grid makes the button rather than the plate), the cobble block smelts back into the stone in a real furnace at 200 ticks and 0.5 experience while a fuel-less furnace stays idle, each block reads its template's default state and drops exactly one of itself to a bare hand and one to a wooden pickaxe (otherstone's hand break dropping nothing, the differential), each plate reads powered=true under the player and false after stepping off, and each button reads powered=true after a click, is still pressed ten ticks later and false after its press duration"

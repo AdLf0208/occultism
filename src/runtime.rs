@@ -1767,6 +1767,284 @@ mod tests {
         }
     }
 
+    /// The four `otherstone`/`otherrock` redstone blocks this slice carries, with
+    /// the vanilla template each copies. Upstream (`OccultismBlocks.java`):
+    /// `otherstone_button`/`otherrock_button` are
+    /// `new ButtonBlock(BlockSetType.STONE, 30, Properties.of().noCollission()
+    /// .strength(0.5F).pushReaction(DESTROY))`, and the two pressure plates are
+    /// `new PressurePlateBlock(BlockSetType.STONE, Properties.ofFullCopy(
+    /// Blocks.STONE_PRESSURE_PLATE))`. `Blocks.STONE_BUTTON` and
+    /// `Blocks.STONE_PRESSURE_PLATE` are the same two properties at the pin
+    /// (`gameplay-facts.json`: hardness 0.5, `requires_tool` **false**), so the
+    /// templates are the exact vanilla pair and neither block is
+    /// `requiresCorrectToolForDrops` — a bare hand drops one.
+    const REDSTONE: [(&str, &str); 4] = [
+        ("otherstone_button", "minecraft:stone_button"),
+        (
+            "otherstone_pressure_plate",
+            "minecraft:stone_pressure_plate",
+        ),
+        ("otherrock_button", "minecraft:stone_button"),
+        ("otherrock_pressure_plate", "minecraft:stone_pressure_plate"),
+    ];
+
+    /// The stone each redstone block's jar grid takes (`otherstone` for the two
+    /// `otherstone` blocks, `otherrock` for the two `otherrock` ones).
+    fn redstone_stone(name: &str) -> &'static str {
+        if name.starts_with("otherrock") {
+            "otherrock"
+        } else {
+            "otherstone"
+        }
+    }
+
+    #[test]
+    fn the_redstone_recipes_are_the_jars_shapes_in_the_26_3_dialect() {
+        // The jar's four grids (`recipe/crafting/{otherstone,otherrock}_{button,
+        // pressure_plate}.json`): one stone makes one button (shapeless), two
+        // stones in one row make one pressure plate (shaped `oo`). The 26.3
+        // loader reads an ingredient as a bare `"id"`; the jar's `{"item": …}`
+        // object is dropped without a word and the grid then yields nothing.
+        for (name, _) in REDSTONE {
+            let stone = redstone_stone(name);
+            let text = content(&format!("occultism/recipe/crafting/{name}.json"));
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{name} carries the 1.21.1 object-form ingredient {object_form}, \
+                     which the 26.3 loader drops: {text}"
+                );
+            }
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{name}\"")),
+                "{name} does not make itself: {text}"
+            );
+            assert!(
+                text.contains("\"count\": 1"),
+                "{name} does not make one: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"occultism:{stone}\"")),
+                "{name} is not made of occultism:{stone}: {text}"
+            );
+            // The cobble tier is a different block: a copy of the 0.2.9 recipe
+            // would name it and craft nothing a player could get.
+            let cobble = match stone {
+                "otherrock" => "occultism:othercobblerock",
+                _ => "occultism:othercobblestone",
+            };
+            assert!(
+                !text.contains(cobble),
+                "{name} names the cobble block {cobble}: {text}"
+            );
+            if name.ends_with("_button") {
+                assert!(
+                    text.contains("\"minecraft:crafting_shapeless\""),
+                    "{name} is the jar's shapeless one-stone grid: {text}"
+                );
+            } else {
+                assert!(
+                    text.contains("\"minecraft:crafting_shaped\""),
+                    "{name} is the jar's shaped `oo` grid: {text}"
+                );
+                assert_eq!(
+                    text.matches("\"oo\"").count(),
+                    1,
+                    "the {name} recipe is one row of two: {text}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_redstone_block_has_a_26_3_loot_table_that_drops_itself() {
+        // The jar ships all four tables for this family (unlike the four
+        // `otherrock`-family slabs the earlier slices had to add), but they spell
+        // their guard `"condition": "minecraft:survives_explosion"` — the 1.21.1
+        // string form, which the 26.3 loader reads as an unknown kind and so as
+        // false: a verbatim carry drops **nothing at all**. The port's tables use
+        // the `explosion_decay` modifier, as every carried table does.
+        for (name, _) in REDSTONE {
+            let text = content(&format!("occultism/loot_table/blocks/{name}.json"));
+            for legacy in ["\"function\":", "\"functions\":"] {
+                assert!(
+                    !text.contains(legacy),
+                    "{name}'s loot table uses the 1.21.1 {legacy} shape, which the 26.3 \
+                     loader does not read (it reads `modifier`): {text}"
+                );
+            }
+            assert!(
+                !text.contains("\"condition\": \"minecraft:"),
+                "{name} carries the 1.21.1 string-form condition kind, which the 26.3 \
+                 loader does not read (it reads `type`): {text}"
+            );
+            assert!(
+                text.contains(&format!("\"name\": \"occultism:{name}\"")),
+                "{name}'s loot table does not drop itself: {text}"
+            );
+            assert!(
+                text.contains("\"type\": \"minecraft:survives_explosion\""),
+                "{name} lost the jar's survives_explosion guard: {text}"
+            );
+            assert!(
+                text.contains("\"type\": \"minecraft:block\""),
+                "{name}'s loot table is not a block table: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_redstone_blocks_copy_the_upstream_templates() {
+        // Upstream's four declarations: both buttons are `Properties.of()
+        // .noCollission().strength(0.5F)` (hardness 0.5, resistance 0.5, map
+        // colour NONE because `of()` leaves it unset) and both plates are a full
+        // copy of `Blocks.STONE_PRESSURE_PLATE` (1.21.1: hardness 0.5, resistance
+        // 0.5, map colour STONE). None calls `requiresCorrectToolForDrops`, so
+        // `requires_tool` is false: a bare hand drops one. The brief's trap line
+        // claims hand 0 / pickaxe 1 for this family; the artefact says otherwise
+        // and the artefact wins (recorded in notes.md).
+        for (name, template) in REDSTONE {
+            let text = content(&format!("occultism/horizon/block/{name}.json"));
+            assert!(
+                text.contains(&format!("\"template\": \"{template}\"")),
+                "{name} does not copy {template}: {text}"
+            );
+            assert!(
+                text.contains("\"requires_tool\": false"),
+                "{name} must not gate its drops on a pickaxe (upstream has no \
+                 requiresCorrectToolForDrops): {text}"
+            );
+            assert!(
+                text.contains("\"hardness\": 0.5"),
+                "{name} is not hardness 0.5: {text}"
+            );
+            assert!(
+                text.contains("\"explosion_resistance\": 0.5"),
+                "{name} is not resistance 0.5: {text}"
+            );
+            let colour = if name.ends_with("_pressure_plate") {
+                11 // MapColor.STONE, the full copy of Blocks.STONE_PRESSURE_PLATE
+            } else {
+                0 // MapColor.NONE, `Properties.of()` for the buttons
+            };
+            assert!(
+                text.contains(&format!("\"map_color\": {colour}")),
+                "{name} is not map colour {colour}: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_redstone_block_has_its_state_model_and_name() {
+        // The jar's tags: the two plates are in `mineable/pickaxe` (the buttons
+        // are not — vanilla's stone button is not either), the buttons are in
+        // `stone_buttons` (block and item) and the plates in
+        // `stone_pressure_plates`. A button needs its up and pressed model, a
+        // plate its up and down model, or the pressed state renders as the
+        // missing model.
+        let pickaxe = content("minecraft/tags/block/mineable/pickaxe.json");
+        let buttons = content("minecraft/tags/block/stone_buttons.json");
+        let plates = content("minecraft/tags/block/stone_pressure_plates.json");
+        let button_items = content("minecraft/tags/item/stone_buttons.json");
+        let lang = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("assets/occultism/lang/en_us.json"),
+        )
+        .expect("the package's lang file");
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/occultism");
+        for (name, _) in REDSTONE {
+            let id = format!("occultism:{name}");
+            if name.ends_with("_pressure_plate") {
+                assert!(
+                    pickaxe.contains(&format!("\"{id}\"")),
+                    "{id} is not in mineable/pickaxe"
+                );
+                assert!(
+                    plates.contains(&format!("\"{id}\"")),
+                    "{id} is not in stone_pressure_plates"
+                );
+                for model in ["", "_down"] {
+                    assert!(
+                        assets
+                            .join(format!("models/block/{name}{model}.json"))
+                            .is_file(),
+                        "{id} has no block model {model}"
+                    );
+                }
+            } else {
+                assert!(
+                    !pickaxe.contains(&format!("\"{id}\"")),
+                    "{id} must not be in mineable/pickaxe (the jar's tag omits buttons)"
+                );
+                assert!(
+                    buttons.contains(&format!("\"{id}\"")),
+                    "{id} is not in stone_buttons"
+                );
+                assert!(
+                    button_items.contains(&format!("\"{id}\"")),
+                    "{id} is not in the item tag stone_buttons"
+                );
+                for model in ["", "_pressed"] {
+                    assert!(
+                        assets
+                            .join(format!("models/block/{name}{model}.json"))
+                            .is_file(),
+                        "{id} has no block model {model}"
+                    );
+                }
+            }
+            assert!(
+                assets.join(format!("blockstates/{name}.json")).is_file(),
+                "{id} has no blockstate"
+            );
+            assert!(
+                assets.join(format!("models/item/{name}.json")).is_file(),
+                "{id} has no item model"
+            );
+            assert!(
+                lang.contains(&format!("\"block.occultism.{name}\"")),
+                "{id} has no lang entry"
+            );
+        }
+    }
+
+    #[test]
+    fn the_cobble_smelts_back_into_the_stone() {
+        // The jar's reverse pair (`recipe/smelting/{otherstone,otherrock}`): the
+        // cobble block smelts back into the stone, 200 ticks, 0.5 experience.
+        // Both endpoints are carried, so the pair completes the tier's loop; the
+        // 26.3 loader drops the jar's `{"item": …}` ingredient object.
+        for (stone, cobble) in [
+            ("otherstone", "othercobblestone"),
+            ("otherrock", "othercobblerock"),
+        ] {
+            let text = content(&format!("occultism/recipe/smelting/{stone}.json"));
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{stone}'s smelting recipe carries the 1.21.1 object-form ingredient \
+                     {object_form}: {text}"
+                );
+            }
+            assert!(
+                text.contains("\"minecraft:smelting\""),
+                "{stone} is not a smelting recipe: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"occultism:{cobble}\"")),
+                "{stone} is not smelted from {cobble}: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"occultism:{stone}\"")),
+                "{stone}'s smelting recipe does not make it: {text}"
+            );
+            assert!(
+                text.contains("\"cookingtime\": 200") && text.contains("\"experience\": 0.5"),
+                "{stone} is not the jar's 200 ticks / 0.5 xp: {text}"
+            );
+        }
+    }
+
     #[test]
     fn a_conversion_is_scoped_to_its_world_and_dimension() {
         let mut recent = Recent::default();

@@ -394,3 +394,47 @@ states with hand 0 / pickaxe 1, the cobble wall connection, the double slab drop
 missing-table slab dropping one, and the raw stones' wooden-pickaxe/silk-touch pair) and the
 family's one unported recipe half (the six stonecutting shortcuts, with 0.2.8's reason corrected) are
 in `notes.md` under "Slice 8".
+
+## 13. SDK 0.2.10 (the redstone pair of the `otherstone`/`otherrock` family, and the reverse smelt), pin `0a875da`
+
+Every step in a `ports/tools/build-slot.sh` lease (`BUILD_LOCAL=1` for the SDK ladder), `CARGO_INCREMENTAL=0`,
+no `--target-dir`, no private slots. Evidence in `../_shared/evidence/occultism/` (ladder) and
+`../_shared/evidence/occultism-e2e/` (game legs). The slice adds four block declarations (the two
+buttons on `minecraft:stone_button`, the two plates on `minecraft:stone_pressure_plate`), four 26.3
+crafting recipes, four loot tables, two reverse-smelting recipes, four blockstates, eight block
+models, four item models, four lang keys, three tag files (plus two ids in `mineable/pickaxe`) and
+four creative-tab entries; the templates bring the engine's `ButtonBlock`/`PressurePlateBlock`
+behaviour, so no runtime rule and no glue were added. All four of the family's loot tables exist in
+the jar (the first family here with no omission), the brief's `requires_tool` claim is corrected
+against the artefact (false for all four), and the pin cannot express upstream's 30-tick stone button
+(it ships the template's 20). The enumeration, the deviation and the upstream item-tag defect are in
+`notes.md`, §"Slice 9".
+
+| Step | Command | Result |
+|---|---|---|
+| red 1 (unit) | `cargo test --offline`, the tests written before any file | **55 passed; 5 failed** — every family file absent (`...: No such file or directory`) — `sdk-test-red-0.2.10.log` |
+| red 2 (unit) | the jar's four recipes, four tables, two smelting recipes, assets and lang carried verbatim | **55 passed; 5 failed** — `otherstone_button carries the 1.21.1 string-form condition kind`, `otherstone's smelting recipe carries the 1.21.1 object-form ingredient "item":`, the missing declarations/tags — `sdk-test-red2-0.2.10.log` |
+| green (unit) | `cargo test --offline` | **60 passed, 0 failed** — `sdk-test-0.2.10.log` (copied to `sdk-test.log`, which the gate reads) |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy-0.2.10.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt-0.2.10.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **`REPRODUCIBLE`**: 241,148 B, `b4807a00…d978` — `sdk-build-0.2.10.log`, `sdk-build-second-0.2.10.log`, `sdk-reproducible-0.2.10.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -l` | 241,148 B, `b4807a007516b46c6a5b8684a2bd84f0d65a7e14d65391fd3a62d8d3deb4d978`, **492 entries**, no packed `Cargo.lock`, declares **0.2.10**, `src/runtime.rs` inside = outside (`8ee7d89a…`) — `sdk-artifact-0.2.10.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` (sha printed) | exit 0, `occultism 0.2.10 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check-0.2.10.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` (sha printed) | `0a875da  made for`, exit 0 — `sdk-fits-0.2.10.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` (sha printed) | **`0b14f8a  fits`**, exit 0 — `sdk-fits-next-0.2.10.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** (60 tests) — `sdk-gate-0.2.10.txt` |
+| game build | `launcher-game.sh build occultism` (the stale 0.2.9 export renamed first) | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-a79120a2bd80`, exported manifest `version = "0.2.10"` — `launcher-build-0.2.10.log` |
+| red (in game, the family) | `REDSTONE_ONLY=1` against the **0.2.9** export | **FAIL** + `EXIT:1` (`the furnace made None from othercobblestone`) — `e2e-redstone-red-0.2.9-package.log` |
+| in game (the family) | `REDSTONE_ONLY=1` | **PASS** + `EXIT:0` — `e2e-redstone-0.2.10.log` |
+| in game (all phases) | `launcher-game.sh run occultism` (offscreen) | **PASS** + `EXIT:0` (A..U) — `e2e-default-0.2.10.log` |
+| in game (control ids) | `CONTROL_LEG=1 REDSTONE_ONLY=1` | **PASS** + `EXIT:0` (the four ids unknown as blocks and items) — `e2e-control-redstone-0.2.10.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME=` | **FAIL** + `EXIT:1` (`the datura item did not register`) — `e2e-control-0.2.10.log` |
+| fail-capability (button) | `REDSTONE_ONLY=1 BUTTON_SELFTEST=1` | **FAIL** + `EXIT:1` (`button selftest: … reads '…[powered=true]' after the click`) — `e2e-selftest-button-0.2.10.log` |
+| fail-capability (plate) | `REDSTONE_ONLY=1 PLATE_SELFTEST=1` | **FAIL** + `EXIT:1` (`plate selftest: … reads '…[powered=true]' under the player`) — `e2e-selftest-plate-0.2.10.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | **57 logs, 57 ok**, 0 missing-exit, 0 bad-exit |
+
+The phase-U transcript (the reverse-smelt furnace pair with its no-fuel differential, the four grids
+with consumption, the three wrong-ingredient controls plus the one-stone-makes-the-button case, the
+four default states with hand 1 / pickaxe 1 and the `otherstone` hand-0 differential, both plates
+pressed and released, and both buttons clicked, held and released) and the family's deviations (the
+20-tick press, the item-tag fix) are in `notes.md` under "Slice 9".
