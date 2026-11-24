@@ -3476,3 +3476,140 @@ result and assert exactly **two** `occultism:otherstone_slab` (`ctl container` t
 consumed input), with `otherrock` in the same stonecutter making the otherrock slab and a vanilla
 stone making none as the differential; a `STONECUT_SELFTEST=1` run must flip the count to one and
 exit 1. `check_recipe_keys.py` must stay at 0 blocked (71 → 102 recipes).
+
+---
+
+## Slice 14 (0.2.15) — the stonecutting family
+
+**Choice and gap line.** The jar's `data/occultism/recipe/stonecutting/*.json` family. It comes
+from 0.2.14's own coverage row — *"the 31 stonecutting recipes — not carried; the stonecutting
+family is the next slice"* — and the 0.2.5 row's *"the rest of the building family"*. Pure data:
+the class is **content**, the tier **deep** (ledger row 345), and a data recipe sits inside that
+tier; every ingredient and result was already carried by earlier slices, so no new hook, code
+path or native module is needed. The pin reads `minecraft:stonecutting` from the datapack
+(`stations.rs:568`) and ships `player_stonecutter_recipe_select` (`stations.rs:1172`), so the
+family is both loadable and provable in game. No dependency on an unregistered mod.
+
+**Artefact vs brief (the artefact wins).** The brief and the 0.2.14 note say **31** files and
+`check_recipe_keys.py` 71 → **102**. The jar actually has **32** JSON files (FINDINGS.md's
+measured inventory says 32; `unzip -Z1 … | grep '…/stonecutting/.*\.json' | wc -l` says 32, and
+the per-directory count sums to the jar's 930 recipes). The "25 over otherstone/otherrock"
+in the note is an undercount: there are 26 (10 per raw stone + 3 per polished stone) plus the
+6 cobble recipes. All 32 are distinct `(ingredient, result, count)` triples and every endpoint is
+already carried, so all 32 were carried and the key check reads **103 craftable, 0 blocked**.
+
+**Dialect.** 26.3 reads a bare string ingredient (measured against vanilla's
+`data/minecraft/recipe/andesite_slab_from_andesite_stonecutting.json`:
+`"ingredient": "minecraft:andesite"`, `"result": {"count": 2, "id": "minecraft:andesite_slab"}`).
+The jar's object form `{"item": "occultism:…"}` is silently dropped at load. `tools/stonecutting_carry.py`
+rewrites only that key; the `{"count", "id"}` result is already 26.3's shape. `--check` re-reads
+the jar and verifies the tree byte for byte; both are in `stonecutting-carry-0.2.15.txt`.
+
+| file (`data/occultism/recipe/stonecutting/`) | jar ingredient → 26.3 bare string | result | count |
+|---|---|---|---:|
+| `othercobblerock_slab_from_othercobblerock` | `{"item": "occultism:othercobblerock"}` → `"occultism:othercobblerock"` | `occultism:othercobblerock_slab` | 2 |
+| `othercobblerock_stairs_from_othercobblerock` | `{"item": "occultism:othercobblerock"}` → `"occultism:othercobblerock"` | `occultism:othercobblerock_stairs` | 1 |
+| `othercobblerock_wall_from_othercobblerock` | `{"item": "occultism:othercobblerock"}` → `"occultism:othercobblerock"` | `occultism:othercobblerock_wall` | 1 |
+| `othercobblestone_slab_from_othercobblestone` | `{"item": "occultism:othercobblestone"}` → `"occultism:othercobblestone"` | `occultism:othercobblestone_slab` | 2 |
+| `othercobblestone_stairs_from_othercobblestone` | `{"item": "occultism:othercobblestone"}` → `"occultism:othercobblestone"` | `occultism:othercobblestone_stairs` | 1 |
+| `othercobblestone_wall_from_othercobblestone` | `{"item": "occultism:othercobblestone"}` → `"occultism:othercobblestone"` | `occultism:othercobblestone_wall` | 1 |
+| `otherrock_bricks_from_otherrock` | `{"item": "occultism:otherrock"}` → `"occultism:otherrock"` | `occultism:otherrock_bricks` | 1 |
+| `otherrock_bricks_slab_from_otherrock` | `{"item": "occultism:otherrock"}` → `"occultism:otherrock"` | `occultism:otherrock_bricks_slab` | 2 |
+| `otherrock_bricks_slab_from_otherrock_bricks` | `{"item": "occultism:otherrock_bricks"}` → `"occultism:otherrock_bricks"` | `occultism:otherrock_bricks_slab` | 2 |
+| `otherrock_bricks_stairs_from_otherrock` | `{"item": "occultism:otherrock"}` → `"occultism:otherrock"` | `occultism:otherrock_bricks_stairs` | 1 |
+| `otherrock_bricks_stairs_from_otherrock_bricks` | `{"item": "occultism:otherrock_bricks"}` → `"occultism:otherrock_bricks"` | `occultism:otherrock_bricks_stairs` | 1 |
+| `otherrock_bricks_wall_from_otherrock` | `{"item": "occultism:otherrock"}` → `"occultism:otherrock"` | `occultism:otherrock_bricks_wall` | 1 |
+| `otherrock_bricks_wall_from_otherrock_bricks` | `{"item": "occultism:otherrock_bricks"}` → `"occultism:otherrock_bricks"` | `occultism:otherrock_bricks_wall` | 1 |
+| `otherrock_slab_from_otherrock` | `{"item": "occultism:otherrock"}` → `"occultism:otherrock"` | `occultism:otherrock_slab` | 2 |
+| `otherrock_stairs_from_otherrock` | `{"item": "occultism:otherrock"}` → `"occultism:otherrock"` | `occultism:otherrock_stairs` | 1 |
+| `otherrock_wall_from_otherrock` | `{"item": "occultism:otherrock"}` → `"occultism:otherrock"` | `occultism:otherrock_wall` | 1 |
+| `otherstone_bricks_from_otherstone` | `{"item": "occultism:otherstone"}` → `"occultism:otherstone"` | `occultism:otherstone_bricks` | 1 |
+| `otherstone_bricks_slab_from_otherstone` | `{"item": "occultism:otherstone"}` → `"occultism:otherstone"` | `occultism:otherstone_bricks_slab` | 2 |
+| `otherstone_bricks_slab_from_otherstone_bricks` | `{"item": "occultism:otherstone_bricks"}` → `"occultism:otherstone_bricks"` | `occultism:otherstone_bricks_slab` | 2 |
+| `otherstone_bricks_stairs_from_otherstone` | `{"item": "occultism:otherstone"}` → `"occultism:otherstone"` | `occultism:otherstone_bricks_stairs` | 1 |
+| `otherstone_bricks_stairs_from_otherstone_bricks` | `{"item": "occultism:otherstone_bricks"}` → `"occultism:otherstone_bricks"` | `occultism:otherstone_bricks_stairs` | 1 |
+| `otherstone_bricks_wall_from_otherstone` | `{"item": "occultism:otherstone"}` → `"occultism:otherstone"` | `occultism:otherstone_bricks_wall` | 1 |
+| `otherstone_bricks_wall_from_otherstone_bricks` | `{"item": "occultism:otherstone_bricks"}` → `"occultism:otherstone_bricks"` | `occultism:otherstone_bricks_wall` | 1 |
+| `otherstone_slab_from_otherstone` | `{"item": "occultism:otherstone"}` → `"occultism:otherstone"` | `occultism:otherstone_slab` | 2 |
+| `otherstone_stairs_from_otherstone` | `{"item": "occultism:otherstone"}` → `"occultism:otherstone"` | `occultism:otherstone_stairs` | 1 |
+| `otherstone_wall_from_otherstone` | `{"item": "occultism:otherstone"}` → `"occultism:otherstone"` | `occultism:otherstone_wall` | 1 |
+| `polished_otherrock_slab_from_polished_otherrock` | `{"item": "occultism:polished_otherrock"}` → `"occultism:polished_otherrock"` | `occultism:polished_otherrock_slab` | 2 |
+| `polished_otherrock_stairs_from_polished_otherrock` | `{"item": "occultism:polished_otherrock"}` → `"occultism:polished_otherrock"` | `occultism:polished_otherrock_stairs` | 1 |
+| `polished_otherrock_wall_from_polished_otherrock` | `{"item": "occultism:polished_otherrock"}` → `"occultism:polished_otherrock"` | `occultism:polished_otherrock_wall` | 1 |
+| `polished_otherstone_slab_from_polished_otherstone` | `{"item": "occultism:polished_otherstone"}` → `"occultism:polished_otherstone"` | `occultism:polished_otherstone_slab` | 2 |
+| `polished_otherstone_stairs_from_polished_otherstone` | `{"item": "occultism:polished_otherstone"}` → `"occultism:polished_otherstone"` | `occultism:polished_otherstone_stairs` | 1 |
+| `polished_otherstone_wall_from_polished_otherstone` | `{"item": "occultism:polished_otherstone"}` → `"occultism:polished_otherstone"` | `occultism:polished_otherstone_wall` | 1 |
+
+### Red → green
+
+**Unit red** (`sdk-test-red-0.2.15.log`, written before any recipe file): `81 passed; 1 failed`.
+Verbatim:
+
+```
+---- runtime::tests::the_32_stonecutting_recipes_are_in_the_jars_26_3_dialect stdout ----
+thread 'runtime::tests::the_32_stonecutting_recipes_are_in_the_jars_26_3_dialect' (207904) panicked at src/runtime.rs:3566:33:
+/home/deepseek/atm10/ports/occultism/data/occultism/recipe/stonecutting: No such file or directory (os error 2)
+```
+
+A second red (after the carry, before the test's declaration helper was corrected) read
+`othercobblerock_slab_from_othercobblerock: occultism:othercobblerock is not carried`; the helper
+now checks both `horizon/item/` and `horizon/block/`, since every endpoint here is a block item.
+
+**Green:** `82 passed, 0 failed`, clippy 0 warnings, fmt exit 0. The data-contract test reads all
+32 files, refuses the object-form ingredient, and asserts every ingredient and result is carried.
+
+### In-game transcript (phase Z)
+
+A real `minecraft:stonecutter` at `(222, 101, 38)` on a stone base, opened with `ctl interact`
+after `ctl look-at-block`; `ctl menu` guarded on `station = "Stonecutter"`. One otherstone into
+slot 600, the seven offered `occultism:stonecutting/otherstone_*` ids listed, cell 5 selected
+first (`occultism:otherstone_stairs x1`) as the differential, then cell 4:
+`occultism:otherstone_slab x2`, taken into the inventory with the input gone. The same with
+otherrock made `occultism:otherrock_slab x2`. Vanilla stone offered eleven `minecraft:…` ids and
+**no** `occultism:` id; no occultism slab appeared. `STONECUT_SELFTEST=1` asserted x1 and failed
+with `selected 4, result 'occultism:otherstone_slab x2', expected cell 4 and 'occultism:otherstone_slab x1'`.
+The control game could not `give occultism:otherstone` (`STONECUT FAIL: occultism:otherstone is not
+in the inventory`). No `invalid ingredient` line in the game log. Full log: `e2e-stonecut-0.2.15.log`.
+
+**Measured behaviours of this pin (added by this slice):**
+
+1. `ctl menu` lists **only non-empty slots** — an empty station slot 600/650 is absent, not zero;
+   the guard is the station name, and slot reads treat absence as empty. `ctl screen` lists all
+   slots and is used to find the inventory source and a free destination.
+2. Station offers are namespaced `occultism:stonecutting/<file stem>`, not `occultism:<stem>`.
+3. A stonecutter has **no block entity** here: `ctl container 222 101 38` answers
+   `{"error":"no container there"}`. Its container is the guarded station menu's slots 600/650;
+   every `ctl container` probe is kept in the transcript.
+4. The recipe cell GUI centres are `(52 + 16*(p%4) + 8, 14 + 18*(p//4) + 9)`, matching
+   `game/stations.rs::station_targets`.
+
+### Parity coverage (0.2.15)
+
+| family | state |
+|---|---|
+| all 32 stonecutting recipes | **tested** — Z (both raw stones cut into two slabs at a real stonecutter, the selected cell decides the result, the input is consumed; a wrong cell and vanilla stone are the differentials); check_recipe_keys reads all 32 as craftable |
+| the crafting grids, smelts, loot tables, bowls, chalks, tablet and 0.2.2–0.2.13 families | **tested** — phases A..Y, unchanged, re-run in this slice's full sweep |
+| storage controllers and their bases, machine recipes, pentacle rituals, spirits/AI, GeckoLib, Otherworld, guide book, Curios | **not carried / blocked** — the gap list above; controllers stay `blocked(ritual:craft_storage_controller_base)` |
+
+### Upstream defects fixed
+
+None. All 32 jar files are internally consistent (bare-string rewrite aside, which is the pin's
+dialect, not an upstream defect).
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+### Next slice
+
+**All 30 remaining stonecutting results.** Phase Z crafts two of the 32 carried recipes (the
+otherstone and otherrock slabs) as the brief prescribed; the parity rule (AGENTS.md 2026-11-20)
+asks for *every* carried recipe to be exercised, so the remaining 30 are the next honest gap and
+they need no new data or code — only the harness. Family: stonecutting, from this slice's own
+coverage row ("all 32 stonecutting recipes — tested" covers only the two slabs in game). It fits
+the tier (pure data) and reuses the proven `ctl menu` + `ctl click-gui` station route. The
+in-game assertion: feed one `occultism:otherstone`, select
+`occultism:stonecutting/otherstone_bricks_from_otherstone`, click slot 650 and read exactly one
+`occultism:otherstone_bricks` with the input consumed; repeat for the stairs, wall and bricks-slab
+cuts and the `otherstone_bricks` input, then the six polished and six cobble cuts. A
+`STONECUT_SELFTEST`-style count flip on the bricks cut must exit 1. The storage controllers stay
+`blocked(ritual:craft_storage_controller_base)`, and the cobble→stone reverse smelt is already
+proven in phase U, so neither is a candidate.

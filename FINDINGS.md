@@ -228,3 +228,20 @@ recipe's result — except `otherflower`, which the jar excludes by item.
 **The family's loot tables are all present** (ten, one per bowl), so the `otherrock`-slab omission rule
 has no instance here; the four bowls this port does not carry are the silver pair (their grid's
 `#c:ingots/silver` has no member in the package) and the iesnium pair (ritual results).
+
+## Slice 14 findings (2026-11-24) — the stonecutting family is 32 recipes
+
+Read the jar's `data/occultism/recipe/stonecutting/*.json` directly: **32** files, not the 31 the
+brief and the 0.2.14 note claim (that note's "25 over otherstone/otherrock" is 26: ten per raw
+stone — slab, stairs, wall, bricks, and the bricks' slab/stairs/wall — plus three per polished
+stone, plus six over the cobble pair). All 32 are distinct `(ingredient, result, count)` triples
+and every endpoint is a block/item this port already carries; the per-directory jar count (32)
+is what makes FINDINGS' 930 total recipes add up.
+
+Every jar file has the 1.21.1 object-form ingredient `{"item": "occultism:<id>"}` and a
+`{"count", "id"}` result. Vanilla 26.3's own `andesite_slab_from_andesite_stonecutting.json`
+uses a **bare string** ingredient (`"ingredient": "minecraft:andesite"`) and the same result
+shape, so the port rewrites only the ingredient key. In game the station offers these as
+`occultism:stonecutting/<file stem>` (seven offers for `otherstone`), and the 26.3 stonecutter's
+container is its menu's slots 600/650 — the block has no block entity, so `ctl container` at its
+position answers `no container there`. Measured at the pinned build.

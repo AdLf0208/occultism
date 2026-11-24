@@ -3512,4 +3512,268 @@ mod tests {
             vec!["minecraft:gold_ingot".to_owned()]
         );
     }
+
+    // ---- the stonecutting family (0.2.15) --------------------------------
+
+    /// The jar's `data/occultism/recipe/stonecutting/*.json`, measured as
+    /// **32** files (FINDINGS.md's inventory; the 0.2.14 note's "31" undercounted
+    /// the raw-stone family by one). Each row is
+    /// `(file stem, bare ingredient, result id, result count)`.
+    const STONECUTTING: [(&str, &str, &str, u32); 32] = [
+        (
+            "othercobblerock_slab_from_othercobblerock",
+            "occultism:othercobblerock",
+            "occultism:othercobblerock_slab",
+            2,
+        ),
+        (
+            "othercobblerock_stairs_from_othercobblerock",
+            "occultism:othercobblerock",
+            "occultism:othercobblerock_stairs",
+            1,
+        ),
+        (
+            "othercobblerock_wall_from_othercobblerock",
+            "occultism:othercobblerock",
+            "occultism:othercobblerock_wall",
+            1,
+        ),
+        (
+            "othercobblestone_slab_from_othercobblestone",
+            "occultism:othercobblestone",
+            "occultism:othercobblestone_slab",
+            2,
+        ),
+        (
+            "othercobblestone_stairs_from_othercobblestone",
+            "occultism:othercobblestone",
+            "occultism:othercobblestone_stairs",
+            1,
+        ),
+        (
+            "othercobblestone_wall_from_othercobblestone",
+            "occultism:othercobblestone",
+            "occultism:othercobblestone_wall",
+            1,
+        ),
+        (
+            "otherrock_bricks_from_otherrock",
+            "occultism:otherrock",
+            "occultism:otherrock_bricks",
+            1,
+        ),
+        (
+            "otherrock_bricks_slab_from_otherrock",
+            "occultism:otherrock",
+            "occultism:otherrock_bricks_slab",
+            2,
+        ),
+        (
+            "otherrock_bricks_slab_from_otherrock_bricks",
+            "occultism:otherrock_bricks",
+            "occultism:otherrock_bricks_slab",
+            2,
+        ),
+        (
+            "otherrock_bricks_stairs_from_otherrock",
+            "occultism:otherrock",
+            "occultism:otherrock_bricks_stairs",
+            1,
+        ),
+        (
+            "otherrock_bricks_stairs_from_otherrock_bricks",
+            "occultism:otherrock_bricks",
+            "occultism:otherrock_bricks_stairs",
+            1,
+        ),
+        (
+            "otherrock_bricks_wall_from_otherrock",
+            "occultism:otherrock",
+            "occultism:otherrock_bricks_wall",
+            1,
+        ),
+        (
+            "otherrock_bricks_wall_from_otherrock_bricks",
+            "occultism:otherrock_bricks",
+            "occultism:otherrock_bricks_wall",
+            1,
+        ),
+        (
+            "otherrock_slab_from_otherrock",
+            "occultism:otherrock",
+            "occultism:otherrock_slab",
+            2,
+        ),
+        (
+            "otherrock_stairs_from_otherrock",
+            "occultism:otherrock",
+            "occultism:otherrock_stairs",
+            1,
+        ),
+        (
+            "otherrock_wall_from_otherrock",
+            "occultism:otherrock",
+            "occultism:otherrock_wall",
+            1,
+        ),
+        (
+            "otherstone_bricks_from_otherstone",
+            "occultism:otherstone",
+            "occultism:otherstone_bricks",
+            1,
+        ),
+        (
+            "otherstone_bricks_slab_from_otherstone",
+            "occultism:otherstone",
+            "occultism:otherstone_bricks_slab",
+            2,
+        ),
+        (
+            "otherstone_bricks_slab_from_otherstone_bricks",
+            "occultism:otherstone_bricks",
+            "occultism:otherstone_bricks_slab",
+            2,
+        ),
+        (
+            "otherstone_bricks_stairs_from_otherstone",
+            "occultism:otherstone",
+            "occultism:otherstone_bricks_stairs",
+            1,
+        ),
+        (
+            "otherstone_bricks_stairs_from_otherstone_bricks",
+            "occultism:otherstone_bricks",
+            "occultism:otherstone_bricks_stairs",
+            1,
+        ),
+        (
+            "otherstone_bricks_wall_from_otherstone",
+            "occultism:otherstone",
+            "occultism:otherstone_bricks_wall",
+            1,
+        ),
+        (
+            "otherstone_bricks_wall_from_otherstone_bricks",
+            "occultism:otherstone_bricks",
+            "occultism:otherstone_bricks_wall",
+            1,
+        ),
+        (
+            "otherstone_slab_from_otherstone",
+            "occultism:otherstone",
+            "occultism:otherstone_slab",
+            2,
+        ),
+        (
+            "otherstone_stairs_from_otherstone",
+            "occultism:otherstone",
+            "occultism:otherstone_stairs",
+            1,
+        ),
+        (
+            "otherstone_wall_from_otherstone",
+            "occultism:otherstone",
+            "occultism:otherstone_wall",
+            1,
+        ),
+        (
+            "polished_otherrock_slab_from_polished_otherrock",
+            "occultism:polished_otherrock",
+            "occultism:polished_otherrock_slab",
+            2,
+        ),
+        (
+            "polished_otherrock_stairs_from_polished_otherrock",
+            "occultism:polished_otherrock",
+            "occultism:polished_otherrock_stairs",
+            1,
+        ),
+        (
+            "polished_otherrock_wall_from_polished_otherrock",
+            "occultism:polished_otherrock",
+            "occultism:polished_otherrock_wall",
+            1,
+        ),
+        (
+            "polished_otherstone_slab_from_polished_otherstone",
+            "occultism:polished_otherstone",
+            "occultism:polished_otherstone_slab",
+            2,
+        ),
+        (
+            "polished_otherstone_stairs_from_polished_otherstone",
+            "occultism:polished_otherstone",
+            "occultism:polished_otherstone_stairs",
+            1,
+        ),
+        (
+            "polished_otherstone_wall_from_polished_otherstone",
+            "occultism:polished_otherstone",
+            "occultism:polished_otherstone_wall",
+            1,
+        ),
+    ];
+
+    #[test]
+    fn the_32_stonecutting_recipes_are_in_the_jars_26_3_dialect() {
+        // Every input and result here is a block item, so `item_declared` (which
+        // reads only horizon/item/) is not enough: a block declaration creates
+        // its item. Mirror check_recipe_keys.py's rule.
+        fn carried(id: &str) -> bool {
+            let name = id.strip_prefix("occultism:").unwrap_or(id);
+            let horizon =
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data/occultism/horizon");
+            horizon.join("item").join(format!("{name}.json")).is_file()
+                || horizon.join("block").join(format!("{name}.json")).is_file()
+        }
+        // The jar's object-form `{"item": "occultism:…"}` ingredient is dropped at
+        // load by 26.3, which reads a bare string (measured against vanilla's
+        // `andesite_slab_from_andesite_stonecutting.json`). The result's
+        // `{"count", "id"}` shape is already 26.3's and carries over verbatim.
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("data/occultism/recipe/stonecutting");
+        let files: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+            .map(|entry| {
+                entry
+                    .expect("readable stonecutting entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        assert_eq!(
+            files.len(),
+            STONECUTTING.len(),
+            "the stonecutting family has {} files, expected {} ({files:?})",
+            files.len(),
+            STONECUTTING.len()
+        );
+        for (file, ingredient, result, count) in STONECUTTING {
+            let text = content(&format!("occultism/recipe/stonecutting/{file}.json"));
+            assert!(
+                text.contains("\"type\": \"minecraft:stonecutting\""),
+                "{file} is not a stonecutting recipe: {text}"
+            );
+            assert!(
+                !text.contains("\"item\":") && !text.contains("\"tag\":"),
+                "{file} carries the 1.21.1 object-form ingredient, which the 26.3 loader drops: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"ingredient\": \"{ingredient}\"")),
+                "{file} lost the bare ingredient {ingredient}: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"{result}\"")),
+                "{file} does not make {result}: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"count\": {count}")),
+                "{file} does not make {count}: {text}"
+            );
+            // A recipe whose ingredient or result is not carried is dead data.
+            assert!(carried(ingredient), "{file}: {ingredient} is not carried");
+            assert!(carried(result), "{file}: {result} is not carried");
+        }
+    }
 }

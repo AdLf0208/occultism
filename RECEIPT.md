@@ -1,11 +1,11 @@
-# Package receipt — occultism 0.2.14
+# Package receipt — occultism 0.2.15
 
 | field | value |
 |---|---|
-| version | `0.2.14` |
+| version | `0.2.15` |
 | file | `occultism.hmod` |
-| bytes | 313,735 |
-| sha256 | `bfef6df24eef45495c74318b30515993e94caf608662b6f9068b799a6eeeebfc` |
+| bytes | 326,088 |
+| sha256 | `2327e0e0273225ba3109a792b2c2cca26844a874817988a8579acda30892b565` |
 | source | this tag — the tree here is the source that produced the archive |
 | game | 26.3 |
 | horizon | `0a875da91dbb0fdcb7ba8c42c11341aa229af51a` |

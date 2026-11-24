@@ -12,7 +12,9 @@ smelted plain pair and their slabs, stairs and walls (0.2.8) — the cobblestone
 tier mined from the raw stones (0.2.9), the button and pressure-plate pair
 (0.2.10), the frames and pedestals (0.2.11), the sacrificial bowls
 (0.2.12) — the tier's first block entity — the 17 impure-chalk craftings
-(0.2.13) with the tags and items they need, and the otherstone tablet (0.2.14).
+(0.2.13) with the tags and items they need, the otherstone tablet (0.2.14), and the
+32 stonecutting recipes (0.2.15) — every stone, polished stone, brick and cobble
+cuts into its own slab, stairs, wall or bricks at a real stonecutter.
 
 ## What works
 

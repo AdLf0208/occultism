@@ -1,6 +1,6 @@
 id = "occultism"
 name = "Occultism"
-version = "0.2.14"
+version = "0.2.15"
 description = """A port of Occultism 1.225.0 for Horizon: the spirit-fire conversion loop and the datura it
 is lit with. A datura (Demon's Dream Fruit) struck with flint and steel or a fire charge lights
 occultism:spirit_fire; any item entity standing in that fire which one of the carried
@@ -20,7 +20,7 @@ and returns but does not convert, and the pentacle ritual it would start is not 
 carries 52 blocks (with their item forms), 71 carried item declarations, 51 loot tables (the crop's,
 the four carried blocks', the six stone building blocks', the twelve bricks-tier ones', the eight
 polished-tier ones', the eight cobblestone-tier ones', the four redstone ones', the two pedestals'
-and the six bowls'), 27 spirit-fire recipes, 63 crafting-table recipes, 8 smelting recipes, 43 tags
+and the six bowls'), 27 spirit-fire recipes, 63 crafting-table recipes, 32 stonecutting recipes, 8 smelting recipes, 43 tags
 and the models, textures and lang they need. The crafting
 recipes are the ones whose result and every ingredient the package provides (or declares as an
 item): a 3x3 grid of
@@ -51,7 +51,10 @@ cell resolves; the two burnt stones are smelted from the carried polished pair (
 experience), while the coloured grids' remaining ingredients are still crushing/ritual results of
 the unported half. The otherstone tablet is obtainable too: the jar's two aga/gsg/aga grids of
 four otherworld ashes, four gold ingots and one otherstone or otherrock each make one
-occultism:otherstone_tablet, whose model, texture and name are carried. The pentacle rituals,
+occultism:otherstone_tablet, whose model, texture and name are carried. The stonecutter works too:
+all 32 of the jar's stonecutting recipes are carried in the 26.3 bare-string ingredient dialect —
+one raw or polished stone or brick cuts into its own slab, stairs, wall or bricks (slabs yield two,
+the rest one), and the two cobble pairs cut into their slab, stairs and wall. The pentacle rituals,
 the summoned spirits and their AI, the GeckoLib models, the Otherworld dimension, the guide book, Curios
 slots and the spirit-job recipes are not ported yet."""
 authors = ["klikli-dev", "AdLf0208"]

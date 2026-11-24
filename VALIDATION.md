@@ -581,3 +581,44 @@ launcher-migrated route: `build-slot.sh e2e` prepends the retired `tools/horizon
 
 Every leg above ran on the final 313,735 B artifact / tree. `E2E_TMP`
 (`~/.cache/horizon-e2e/scratch`) was used throughout; no leg wrote under `/tmp`.
+
+## 7. SDK 0.2.15 — the stonecutting family
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). The family,
+the jar's **32** rows (the brief's "31" undercounted the raw-stone family), the dialect rewrite and
+the in-game transcript are in `notes.md`, §"Slice 14". Every compile/test step below used
+`build-slot.sh run --job W1-occultism --port ports/occultism --step <…> -- <cmd>` with the
+**relative** `--port`; each printed `build-slot: forwarding <step> for ports/occultism to the
+remote runner` and ran on **AdLf-PC** (`remote-slot.sh ping`: `reachable AdLf-PC cores=12 mem=10G`),
+with no `BUILD_LOCAL=1`, no `--target-dir`, no private cache. The e2e legs stayed local on that
+port's slot (`build-slot.sh run --step e2e`), with `E2E_TMP` from `launcher-game.sh env` for every
+scratch path. `sdk-test.log` was regenerated after the last forwarded step (the runner pulls the
+remote evidence tree back, including older same-named logs).
+
+| Step | Command | Result |
+|---|---|---|
+| red (unit) | `cargo test --offline`, the family test written before any file | **81 passed; 1 failed** — `…/stonecutting: No such file or directory (os error 2)` — `sdk-test-red-0.2.15.log` |
+| carry | `python3 tools/stonecutting_carry.py [--check]` | **32 recipes** rewritten from the jar's `{"item": …}` to the 26.3 bare string — `stonecutting-carry-0.2.15.txt` |
+| green (unit) | `cargo test --offline` | **82 passed, 0 failed** — `sdk-test.log`, `sdk-test-0.2.15.log` |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy-0.2.15.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt-0.2.15.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **`REPRODUCIBLE`**: 326,088 B, `2327e0e0…92b565` — `sdk-build-0.2.15.log`, `sdk-build-second-0.2.15.log`, `sdk-reproducible-0.2.15.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -Z1 \| wc -l` | 326,088 B, `2327e0e0273225ba3109a792b2c2cca26844a874817988a8579acda30892b565`, **666 entries**, all 32 stonecutting recipes packed, no packed `Cargo.lock`, declares **0.2.15** — `sdk-artifact-0.2.15.txt` |
+| runtime inside/outside | `unzip -p … src/runtime.rs \| sha256sum` vs the tree | identical, `190aca6c…d556db4` — `sdk-artifact-0.2.15.txt` |
+| tree match | `verify-sdk-package.py` | **package matches the tree** (manifest and README edited before the final build) — `sdk-gate-0.2.15.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` | exit 0, `occultism 0.2.15 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check-0.2.15.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` | `0a875da  made for`, exit 0 — `sdk-fits-0.2.15.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` | **`0b14f8a  fits`**, exit 0 — `sdk-fits-next-0.2.15.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** (82 tests, 0 clippy warnings, package = tree, R9 tables/deps, no lock) — `sdk-gate-0.2.15.txt` |
+| recipe types | `python3 ports/tools/check-recipe-types.py occultism` | `occultism: ok`, exit 0 — `check-recipe-types-0.2.15.log` |
+| recipe keys | `python3 tools/check_recipe_keys.py` | **`103 recipe(s), 103 craftable, 0 blocked, 0 failure(s)`** (the brief's 102 assumed 31 files; the jar has 32) — `check-recipe-keys-0.2.15.log` |
+| game build | `launcher-game.sh build occultism` (the one `native-*` tag carrying 0.2.14 removed first) | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-378b6a87b0f3`, exported manifest version `0.2.15` — `launcher-build-0.2.15.log` |
+| in game (the family) | `STONECUT_ONLY=1` | **PASS** + `EXIT:0` (two slabs from the two raw stones, seven offers, cell differential, vanilla stone offers none, input consumed, no `invalid ingredient`) — `e2e-stonecut-0.2.15.log` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen, launcher-built game) | **PASS** + `EXIT:0` (A..Z) — `e2e-default-0.2.15.log` |
+| in game (control ids) | `CONTROL_LEG=1 STONECUT_ONLY=1` | **PASS** + `EXIT:0` (the slab ids unknown as items) — `e2e-control-ids-stonecut-0.2.15.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME= STONECUT_ONLY=1` | **FAIL** + `EXIT:1` (`STONECUT FAIL: occultism:otherstone is not in the inventory`) — `e2e-control-stonecut-0.2.15.log` |
+| fail-capability (this family) | `STONECUT_ONLY=1 SELFTEST=stonecut` | **FAIL** + `EXIT:1` (result `occultism:otherstone_slab x2`, flipped assertion wants x1) — `e2e-selftest-stonecut-0.2.15.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | **87 logs, 87 ok**, 0 missing-exit, 0 bad-exit |
+
+Every leg above ran on the final 326,088 B artifact / tree. `E2E_TMP`
+(`~/.cache/horizon-e2e/scratch`) was used throughout; no leg wrote under `/tmp`.
