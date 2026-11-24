@@ -43,6 +43,9 @@ stack) (§"Slice 10"). **0.2.12 (2026-11-23):** the six sacrificial bowls, the
 tier's first block entity (§"Slice 11"). **0.2.13 (2026-11-23):** the 17
 impure-chalk craftings, their 26 tags (the nested chalk base included), the 26
 ingredient items and the two burnt-dust smelting recipes (§"Slice 12").
+**0.2.14 (2026-11-24):** the `otherstone_tablet` — the jar's two `aga`/`gsg`/`aga`
+grids over the carried ashes, gold and either raw stone, with its item, model,
+texture, lang and creative-tab row (§"Slice 13").
 
 ## Class + tier and the approach
 
@@ -3286,3 +3289,190 @@ real table (four ashes + four gold + one stone), read `occultism:otherstone_tabl
 assert every ingredient consumed and the grid empty, with a wrong grid (three ashes) making nothing;
 `check_recipe_keys.py` must stay at 0 blocked. It is a real behaviour change (one obtainable item
 and two grids), so it is a version, not an evidence-only slice.
+
+## Slice 13 (0.2.14, 2026-11-24) — the `otherstone_tablet`
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). Class
+**content**, tier **deep** (ledger row 345). Licence **MIT**, ours on `main` → an
+`Update occultism 0.2.14` publication (0.2.13 is staged on PR #1828). This slice is the **data
+half** of a `deep` mod: two carried crafting files, one item and its art — no code path, no block
+entity, no hook changed.
+
+**Gap line it comes from:** 0.2.11's parity row — *"the remaining family: tablets
+(`otherstone_tablet`, needs `#c:dusts/otherworld_wood`)"* — repeated in 0.2.13's coverage row, and
+0.2.13's `## Next slice`, which said 0.2.13's `otherworld_ashes` unblocks it. The two ingredients
+are now carried: `#c:dusts/otherworld_wood` → `occultism:otherworld_ashes` (0.2.13) and
+`#c:ingots/gold` → `minecraft:gold_ingot` (0.2.12). Gap closed; the rest of the building family
+(storage controllers) stays `blocked(ritual:craft_storage_controller_base)`.
+
+### The jar, read at `release/v1.21.1-1.225.0` (commit `91de0d2a…`)
+
+`data/occultism/recipe/crafting/otherstone_tablet.json` **and** `…/otherstone_tablet2.json` are
+both `minecraft:crafting_shaped`, category `equipment`, pattern `aga`/`gsg`/`aga`, with `a` =
+`{"tag": "c:dusts/otherworld_wood"}`, `g` = `{"tag": "c:ingots/gold"}` and `s` =
+`occultism:otherstone` in the first file and `occultism:otherrock` in the second. Both make one
+`occultism:otherstone_tablet`. The jar's `assets/occultism/models/item/otherstone_tablet.json`
+is a `minecraft:item/generated` model over `occultism:item/otherstone_tablet` (a 16×16, 2,153-byte
+PNG), and `assets/occultism/lang/en_us.json` names the item "Otherworldly Tablet".
+
+The 1.21.1 object-form ingredients cannot be carried byte-for-byte: the 26.3 loader drops an
+ingredient object with no `type`, so both files were rewritten to bare `"#c:dusts/otherworld_wood"`
+/ `"#c:ingots/gold"` / `"occultism:otherstone"` strings — the same dialect translation as 0.2.5
+and 0.2.13, pinned by a unit test.
+
+### What was carried
+
+| family | files | source |
+|---|---|---|
+| crafting recipes | 2 (`data/occultism/recipe/crafting/otherstone_tablet{,2}.json`) | the jar's two shapes in the 26.3 dialect |
+| item declaration | 1 (`data/occultism/horizon/item/otherstone_tablet.json`, `minecraft:paper` template) | the jar's item registry |
+| item model / texture | 1 / 1 (`assets/occultism/models/item/otherstone_tablet.json`, `textures/item/otherstone_tablet.png`) | the jar's, byte-for-byte |
+| lang | 1 key (`item.occultism.otherstone_tablet`) | the jar's `en_us` |
+| creative tab | 1 entry | after the sacrificial bowls (the port's family grouping) |
+
+No tag was added: both tag-keyed cells resolve to members already carried. The manifest
+description was updated (63 crafting recipes, 71 item declarations) before the final build, and
+`README.md` was refreshed before it too, so the delivered archive matches the final tree.
+
+### Red → green
+
+**Unit red** (`sdk-test-red-0.2.14.log`) — two tests written before any file, both failing on the
+missing files (not on a compile error):
+
+```
+---- runtime::tests::the_tablet_is_declared_named_modelled_and_in_the_tab stdout ----
+thread 'runtime::tests::the_tablet_is_declared_named_modelled_and_in_the_tab' (94518) panicked at src/runtime.rs:936:59:
+/home/deepseek/atm10/ports/occultism/data/occultism/horizon/item/otherstone_tablet.json: No such file or directory (os error 2)
+
+---- runtime::tests::the_two_tablet_recipes_are_the_jars_shapes_in_the_26_3_dialect stdout ----
+thread 'runtime::tests::the_two_tablet_recipes_are_the_jars_shapes_in_the_26_3_dialect' (94521) panicked at src/runtime.rs:936:59:
+/home/deepseek/atm10/ports/occultism/data/occultism/recipe/crafting/otherstone_tablet.json: No such file or directory (os error 2)
+
+test result: FAILED. 79 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+```
+
+Green after the two recipes, the item, its model/texture/lang and the tab row: **81 passed, 0
+failed** (`sdk-test.log`, regenerated for 0.2.14).
+
+There was no previous-package in-game red: no `native-*` tag or export holding 0.2.13 remains on
+this box (the 0.2.14 build selected a fresh tag, `native-0a875da-78d415e66bb2`). The family's
+fail-capable proofs are the control game (`TABLET FAIL: missing ingredient
+occultism:otherworld_ashes`, `EXIT:1`), the wrong three-ashes grid (nothing made) and
+`SELFTEST=tablet` (the result read as x1 when the flipped assertion wants x2, `EXIT:1`).
+
+### In game (phase Y, verbatim from `e2e-tablet-0.2.14.log`, the same lines in the full run)
+
+```
+== Y: the two otherstone_tablet craftings ==
+  survival, table at 222,101,38
+== the two otherstone_tablet grids ==
+  the otherstone_tablet grid: the result slot (200) reads occultism:otherstone_tablet x1
+  the tablet: taken into slot 0 (inventory {"occultism:otherstone_tablet": 1})
+  the tablet recipe: every ingredient was consumed ({"occultism:otherstone_tablet": 1})
+  the tablet recipe: the grid is empty
+  the otherstone_tablet2 grid: the result slot (200) reads occultism:otherstone_tablet x1
+  the tablet: taken into slot 0 (inventory {"occultism:otherstone_tablet": 1})
+  the tablet recipe: every ingredient was consumed ({"occultism:otherstone_tablet": 1})
+  the tablet recipe: the grid is empty
+== the wrong grid: three ashes make nothing ==
+  three ashes in the first column: the result slot (200) stayed empty
+  the game log has no 'invalid ingredient' line (both tag-keyed cells resolved)
+```
+
+The driver (`tools/tablet_recipes.py`) opens a **real** crafting table (`ctl interact`), fills its
+3x3 grid through the screen's slots (100..108, result 200), reads the result **from slot 200** and
+refuses to judge any screen without that slot — `ctl screen` also answers the plain inventory
+menu, which has no 200. The player is in survival, so consumption is vanilla's rule; each grid
+gets a fresh table and a cleared inventory. `SELFTEST=tablet` maps to `TABLET_SELFTEST=1` in
+`tools/e2e.sh` and flips the first grid's expected count to two. The phase also greps the game log
+for `invalid ingredient` — the marker a tag-keyed cell that did not resolve leaves behind.
+
+### Ladder
+
+Every compile/test step below ran through
+`ports/tools/build-slot.sh run --job G11-occultism --port ports/occultism --step <…> -- <cmd>`;
+each printed `build-slot: forwarding <step> for ports/occultism to the remote runner` and ran on
+**AdLf-PC** (`remote-slot.sh ping`: `reachable AdLf-PC cores=12 mem=10G`), with no `BUILD_LOCAL=1`
+and no private cache. The e2e legs stayed **local** on that port's slot (`build-slot.sh run --step
+e2e`, the launcher-migrated route the brief prescribes; `build-slot.sh e2e` still prepends the
+retired `tools/horizon.py`), using `E2E_TMP` from `launcher-game.sh env` for every scratch path.
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests (red) | `cargo test --offline`, the two family tests first | `sdk-test-red-0.2.14.log` | **79 passed, 2 failed** (missing tablet files) |
+| tests | `cargo test --offline` | `sdk-test.log` | **81 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy-0.2.14.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt-0.2.14.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.14.log`, `sdk-build-second-0.2.14.log`, `sdk-reproducible-0.2.14.txt` | **`REPRODUCIBLE`**, 313,735 B, `bfef6df2…eeebfc` |
+| package | `sha256sum`, `stat -c%s`, `unzip -Z1 \| wc -l` | `sdk-artifact-0.2.14.txt` | 313,735 B, `bfef6df24eef45495c74318b30515993e94caf608662b6f9068b799a6eeeebfc`, **634 entries**, both recipes packed, no packed `Cargo.lock`, declares **0.2.14**, 0 empty json files |
+| runtime inside/outside | `unzip -p … src/runtime.rs \| sha256sum` vs the tree | `sdk-artifact-0.2.14.txt` | identical, `75456d98…f8479c` |
+| tree match | `verify-sdk-package.py` (every packed file but `uses.json`) | `sdk-gate-0.2.14.txt` | **`package matches the tree`** |
+| package check | `cargo horizon-mod check occultism.hmod` | `sdk-check-0.2.14.log` | exit 0, `occultism 0.2.14 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` | `sdk-fits-0.2.14.log` | `0a875da  made for`, exit 0 |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` | `sdk-fits-next-0.2.14.log` | **`0b14f8a  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | `sdk-gate-0.2.14.txt` | **1/1** (81 tests, 0 clippy warnings, package = tree, R9 tables/deps, no lock) |
+| recipe types | `python3 ports/tools/check-recipe-types.py occultism` | `check-recipe-types-0.2.14.log` | `occultism: ok`, exit 0 |
+| recipe keys | `python3 tools/check_recipe_keys.py` | `check-recipe-keys-0.2.14.log` | **`71 recipe(s), 71 craftable, 0 blocked, 0 failure(s)`**, exit 0 |
+| game build | `launcher-game.sh build occultism` (every `native-*` tag carrying the mod removed first — none remained) | `launcher-build-0.2.14.log` | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-78d415e66bb2`, exported manifest `version = "0.2.14"` |
+| in game (the family) | `TABLET_ONLY=1` | `e2e-tablet-0.2.14.log` | **PASS** + `EXIT:0` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen, launcher-built game) | `e2e-default-0.2.14.log` | **PASS** + `EXIT:0` (A..Y) |
+| in game (control ids) | `CONTROL_LEG=1 TABLET_ONLY=1` | `e2e-control-ids-tablet-0.2.14.log` | **PASS** + `EXIT:0` (tablet and ashes unknown as items) |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME= TABLET_ONLY=1` | `e2e-control-tablet-0.2.14.log` | **FAIL** + `EXIT:1` (`missing ingredient occultism:otherworld_ashes`) |
+| fail-capability (this family) | `TABLET_ONLY=1 SELFTEST=tablet` | `e2e-selftest-tablet-0.2.14.log` | **FAIL** + `EXIT:1` (grid made x1, flipped assertion wants x2) |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | **82 logs, 82 ok**, 0 missing-exit, 0 bad-exit |
+
+### Parity coverage (0.2.14)
+
+| family | state |
+|---|---|
+| `otherstone_tablet.json` | **tested** — Y (the `aga`/`gsg`/`aga` grid with four ashes, four gold and one `otherstone` makes one tablet from slot 200, taken, every ingredient consumed, grid empty) |
+| `otherstone_tablet2.json` | **tested** — Y (same with `otherrock` in the centre; both results are the same item) |
+| the wrong grid | **tested** — Y (three ashes in the first column, no gold/stone, make nothing) |
+| `#c:dusts/otherworld_wood` / `#c:ingots/gold` in a grid | **tested** — Y (both cells resolve to `otherworld_ashes` / `gold_ingot`; the phase fails on any `invalid ingredient` line) |
+| the tablet item (declaration, model, texture, lang, tab) | **tested** — the unit test reads each file; in game the result is taken into the inventory and the id is `give`-able in the control's opposite leg |
+| spirit fire, its 26 rules, the crop, the loot tables, the readouts, 0.2.5–0.2.13 families | **tested** — phases A..X, unchanged, re-run in this slice's full sweep |
+| the 31 stonecutting recipes, the storage controllers and their bases, the machine recipes, pentacle rituals, spirits/AI, GeckoLib, Otherworld, guide book, Curios | **not carried / blocked** — the gap list above; the stonecutting family is the next slice, the controllers stay `blocked(ritual:craft_storage_controller_base)` |
+
+### Measured behaviours of this pin (added by this slice)
+
+1. **`ctl screen` also answers the plain inventory menu.** A result read without checking for slot
+   200 can mistake "no menu" for "nothing crafted"; the driver now refuses any screen without
+   slots 100..108 and 200.
+2. **The 26.3 stonecutter dialect is a bare `"ingredient"` string** and a `{"count", "id"}` result
+   (measured against vanilla's `andesite_slab_from_andesite_stonecutting.json`), so the jar's 31
+   `{"item": …}` stonecutting files will need the same translation as this slice's two recipes.
+3. **No `native-*` tag carried this mod** at build time; the launcher nevertheless produced a
+   fresh `native-0a875da-78d415e66bb2` and the exported manifest reads 0.2.14, so no cached package
+   was mistaken for the new one.
+4. The 0.2.4–0.2.13 findings stand (a fresh table per grid, survival for consumption,
+   `--offscreen` for menus, `E2E_TMP`, one `EXIT:` line from the script's trap).
+
+### Deviations (deliberate, and why)
+
+| Area | Upstream | This port |
+|---|---|---|
+| the tablet's item declaration | a custom `KnowledgeTabletItem`-like class | the plain `minecraft:paper` template (the jar's own model and texture are carried, so the look is upstream's); no behaviour slice needs code |
+
+### Upstream defects fixed
+
+None. The two jar recipes, their two tags and the item/model/texture/lang are internally
+consistent; the artefact-vs-brief correction this slice needed was already recorded in 0.2.13
+(the five essence/paste items are ritual results, not spirit-fire ones).
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+### Next slice
+
+The **stonecutting family** — the jar's 31 `data/occultism/recipe/stonecutting/*.json`
+(25 over `otherstone`/`otherrock` and their slab/stair/wall/brick/polished variants, six over the
+two cobble families). Gap line: this slice's coverage row — *"the 31 stonecutting recipes — not
+carried"* — and the 0.2.5 coverage row's *"the rest of the building family"*. It fits the tier:
+pure data, every ingredient and result already carried, only the 26.3 dialect rewrite
+(`"ingredient": "occultism:otherstone"` instead of the jar's `{"item": …}`), one unit test and an
+in-game table leg. The pin supports it: vanilla 26.3 ships `minecraft:stonecutting` files and the
+SDK has `player_stonecutter_recipe_select`. The in-game assertion: place a real stonecutter, put
+one `occultism:otherstone` in, select `occultism:otherstone_slab_from_otherstone`, click the
+result and assert exactly **two** `occultism:otherstone_slab` (`ctl container` the output and the
+consumed input), with `otherrock` in the same stonecutter making the otherrock slab and a vanilla
+stone making none as the differential; a `STONECUT_SELFTEST=1` run must flip the count to one and
+exit 1. `check_recipe_keys.py` must stay at 0 blocked (71 → 102 recipes).

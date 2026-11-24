@@ -543,3 +543,41 @@ Every leg above ran on the final 309,344 B artifact / tree. `E2E_TMP`
 (`~/.cache/horizon-e2e/scratch`) was used throughout; the only scratch file outside it is the
 one-off `/tmp/opencode/gen_impure_chalks.py` that translated the 17 jar recipes (not part of the
 port).
+
+## 6. SDK 0.2.14 — the otherstone tablet
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins `e59da90`). The family,
+the jar evidence and the in-game transcript are in `notes.md`, §"Slice 13". Every `run` step below
+used `build-slot.sh run --job G11-occultism --port ports/occultism --step <…> -- <cmd>` with the
+**relative** `--port`; each printed `build-slot: forwarding <step> for ports/occultism to the
+remote runner` and ran on **AdLf-PC**. No `BUILD_LOCAL=1`, no `--target-dir`, no private
+`BUILD_SLOTS_DIR`, `CARGO_INCREMENTAL=0`. The e2e legs stayed local on slot 1/3/5 (the
+launcher-migrated route: `build-slot.sh e2e` prepends the retired `tools/horizon.py`), with
+`E2E_TMP` from `launcher-game.sh env` for every scratch path.
+
+| Step | Command | Result |
+|---|---|---|
+| red (unit) | `cargo test --offline`, the two family tests written before any file | **79 passed; 2 failed**, each on a missing tablet file (`…otherstone_tablet.json: No such file or directory`) — `sdk-test-red-0.2.14.log` |
+| green (unit) | `cargo test --offline` | **81 passed, 0 failed** — `sdk-test.log` (regenerated for 0.2.14, which the gate reads) |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy-0.2.14.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt-0.2.14.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | **`REPRODUCIBLE`**: 313,735 B, `bfef6df2…eeebfc` — `sdk-build-0.2.14.log`, `sdk-build-second-0.2.14.log`, `sdk-reproducible-0.2.14.txt` |
+| package | `sha256sum`, `stat -c%s`, `unzip -Z1 \| wc -l` | 313,735 B, `bfef6df24eef45495c74318b30515993e94caf608662b6f9068b799a6eeeebfc`, **634 entries**, both tablet recipes packed, no packed `Cargo.lock`, declares **0.2.14**, 0 empty json — `sdk-artifact-0.2.14.txt` |
+| runtime inside/outside | `unzip -p … src/runtime.rs \| sha256sum` vs the tree | identical, `75456d98…f8479c` — `sdk-artifact-0.2.14.txt` |
+| tree match | `verify-sdk-package.py` | **package matches the tree** (manifest, README and lang edited before the final build) — `sdk-gate-0.2.14.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` | exit 0, `occultism 0.2.14 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)` — `sdk-check-0.2.14.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` | `0a875da  made for`, exit 0 — `sdk-fits-0.2.14.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` | **`0b14f8a  fits`**, exit 0 — `sdk-fits-next-0.2.14.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** (81 tests, 0 clippy warnings, package = tree, R9 tables/deps, no lock) — `sdk-gate-0.2.14.txt` |
+| recipe types | `python3 ports/tools/check-recipe-types.py occultism` | `occultism: ok`, exit 0 — `check-recipe-types-0.2.14.log` |
+| recipe keys | `python3 tools/check_recipe_keys.py` | **`71 recipe(s), 71 craftable, 0 blocked, 0 failure(s)`** — `check-recipe-keys-0.2.14.log` |
+| game build | `launcher-game.sh build occultism` (every `native-*` tag carrying this mod removed first — none remained) | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-78d415e66bb2`, exported manifest `version = "0.2.14"` — `launcher-build-0.2.14.log` |
+| in game (the family) | `TABLET_ONLY=1` | **PASS** + `EXIT:0` (both grids, slot-200 result, consumption, grid empty, three ashes make nothing, no `invalid ingredient`) — `e2e-tablet-0.2.14.log` |
+| in game (all phases) | `bash tools/e2e.sh` (offscreen, launcher-built game) | **PASS** + `EXIT:0` (A..Y) — `e2e-default-0.2.14.log` |
+| in game (control ids) | `CONTROL_LEG=1 TABLET_ONLY=1` | **PASS** + `EXIT:0` (the tablet and ashes unknown as items) — `e2e-control-ids-tablet-0.2.14.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME= TABLET_ONLY=1` | **FAIL** + `EXIT:1` (`TABLET FAIL: missing ingredient occultism:otherworld_ashes`) — `e2e-control-tablet-0.2.14.log` |
+| fail-capability (this family) | `TABLET_ONLY=1 SELFTEST=tablet` | **FAIL** + `EXIT:1` (grid made `occultism:otherstone_tablet x1`, the flipped assertion wants x2) — `e2e-selftest-tablet-0.2.14.log` |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | **82 logs, 82 ok**, 0 missing-exit, 0 bad-exit |
+
+Every leg above ran on the final 313,735 B artifact / tree. `E2E_TMP`
+(`~/.cache/horizon-e2e/scratch`) was used throughout; no leg wrote under `/tmp`.

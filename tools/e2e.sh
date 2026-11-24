@@ -184,6 +184,17 @@
 # CHALK_ONLY=1 is this family's red/green leg; CHALK_SELFTEST=1 flips the first
 # grid's count, so a working package must FAIL.
 #
+# The otherstone tablet (0.2.14) is phase Y, at the same table: the jar's two
+# shaped grids (`aga`/`gsg`/`aga`) — four #c:dusts/otherworld_wood (ashes), four
+# #c:ingots/gold and one otherstone (the first grid) or otherrock (the second) —
+# each make exactly one occultism:otherstone_tablet; the result is taken, every
+# ingredient is consumed and the grid is emptied. A three-ashes grid makes
+# nothing, and the game log must carry no `invalid ingredient` line. The result
+# is read from **slot 200 of the table screen** (a plain inventory screen has no
+# such slot). TABLET_ONLY=1 is this family's red/green leg; `SELFTEST=tablet`
+# (TABLET_SELFTEST=1) flips the first grid's count, so a working package must
+# FAIL. It is a tablet-only mode, not a second full sweep.
+#
 # SELFTEST=1 flips the count assertion (3 awakened feathers -> 2): it must FAIL,
 # proving the scenario can fail. NEGATIVE=1 flips the ripe-crop harvest's
 # assertion (a ripe crop must drop a fruit) the same way; LOOT_NEGATIVE=1 is the
@@ -278,6 +289,15 @@ CHALK_SELFTEST=${CHALK_SELFTEST:-0}
 # `CHALK_ONLY=1` launches and runs only the impure-chalk phase (the red/green leg
 # for that family), then exits 0.
 CHALK_ONLY=${CHALK_ONLY:-0}
+# `SELFTEST=tablet` is the tablet family's own failure mode: it flips the first
+# grid's expected output, so a working package must FAIL this run.
+TABLET_SELFTEST=${TABLET_SELFTEST:-0}
+case "$SELFTEST" in
+    tablet) TABLET_SELFTEST=1; SELFTEST=0 ;;
+esac
+# `TABLET_ONLY=1` launches and runs only the tablet phase (the red/green leg for
+# that family), then exits 0.
+TABLET_ONLY=${TABLET_ONLY:-0}
 # `CONTROL_LEG=1` runs the packaged leg first on the same socket, as 0.2.0/0.2.2 did.
 # The default is a *separate* invocation (`GAME=$CONTROL_GAME`), because a control
 # launch in the same HORIZON_HOME leaves the main game without its log file and the
@@ -1050,6 +1070,59 @@ control_chalks() {
     ctl quit >/dev/null 2>&1 || true
 }
 
+# The otherstone tablet (0.2.14): the two shaped grids, each filled with four
+# ashes, four gold and one of the two raw stones, the result read from slot 200
+# of the real table screen, taken, and every ingredient consumed with the grid
+# emptied; a three-ashes grid makes nothing; any `invalid ingredient` line in
+# the game log fails the phase. TABLET_SELFTEST=1 flips the first grid's count.
+phase_tablet() {
+    echo "== Y: the two otherstone_tablet craftings =="
+    end "gamerule random_tick_speed 0"
+    end "difficulty peaceful"
+    end "kill @e[type=!player]"
+    ctl wait 20 >/dev/null
+    end "setblock $CRAFT_X 100 $CRAFT_Z minecraft:stone"
+    ctl wait 4 >/dev/null
+    TABLET_SELFTEST=$TABLET_SELFTEST \
+        python3 "$PORT/tools/tablet_recipes.py" \
+        "$SOCK" "$CTL" "$CRAFT_X" 101 "$CRAFT_Z" \
+        || fail "the tablet check failed (see the TABLET FAIL line above)"
+    local logs
+    logs=$(ls "$SCRATCH"/launch-*.log 2>/dev/null || true)
+    [ -n "$logs" ] || fail "no game log to grep for invalid ingredients"
+    if grep -qi 'invalid ingredient' $logs; then
+        grep -in 'invalid ingredient' $logs >&2
+        fail "a tag-keyed ingredient did not resolve (invalid ingredient in the game log)"
+    fi
+    echo "  the game log has no 'invalid ingredient' line (both tag-keyed cells resolved)"
+    echo "  both grids made one otherstone_tablet with every ingredient consumed and the grid emptied;"
+    echo "  a three-ashes grid made nothing"
+}
+
+# The tablet's own control leg: the game without the package cannot fill a grid
+# with an ingredient it does not know.
+control_tablet() {
+    echo "== control: the tablet ids on a game without the package =="
+    launch "$CONTROL_GAME" "$CONTROL_WORLD"
+    arena
+    local id
+    for id in occultism:otherstone_tablet occultism:otherworld_ashes; do
+        ctl command "clear @s" >/dev/null || true
+        ctl command "item replace entity @s hotbar.0 with $id 1" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        ctl inventory | jq -e --arg i "$id" '[.hotbar[], .main[] | select(.item == $i)] | length == 0' >/dev/null \
+            || fail "the control game has the $id item, so it carries this package"
+    done
+    echo "  without the package: the tablet and the ashes are unknown as items"
+    ctl quit >/dev/null 2>&1 || true
+}
+
+if [ "$CONTROL_LEG" = 1 ] && [ "$TABLET_ONLY" = 1 ] && [ -n "$CONTROL_GAME" ]; then
+    control_tablet
+    echo "PASS: a game without the package refuses the tablet and the ashes as items"
+    exit 0
+fi
+
 # The bowls' own control leg: the game without the package, six ids.
 control_bowls() {
     echo "== control: the six bowl ids on a game without the package =="
@@ -1194,6 +1267,13 @@ fi
 if [ "$CHALK_ONLY" = 1 ]; then
     phase_chalk
     echo "PASS: the 17 impure-chalk recipes craft at a real table: each grid makes one impure chalk with every ingredient consumed and the grid emptied, the nested chalk base resolves through both burnt stones and the other tag-keyed cells through their own members (no 'invalid ingredient' in the game log), a pink grid with dirt for one demonic meat and a two-column chalk-base grid with no otherworld wood make nothing, and the polished pair smelts into burnt otherstone/otherrock in a real furnace (200 ticks, 0.15 experience) while a fuel-less one stays idle"
+    exit 0
+fi
+
+# The red/green leg for the otherstone tablet: launch, arena, phase Y only.
+if [ "$TABLET_ONLY" = 1 ]; then
+    phase_tablet
+    echo "PASS: the two otherstone_tablet recipes craft at a real table: the aga/gsg/aga grids of four otherworld ashes, four gold and one otherstone or otherrock each make exactly one occultism:otherstone_tablet, taken from slot 200 of the table screen with every ingredient consumed and the grid emptied; three ashes make nothing and no tag-keyed cell left an 'invalid ingredient' line in the game log"
     exit 0
 fi
 
@@ -1781,5 +1861,7 @@ phase_pedestal
 phase_bowl
 
 phase_chalk
+
+phase_tablet
 
 echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand, exactly one othercobblestone/othercobblerock to a wooden pickaxe and themselves to a silk-touch pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two; and the eight polished-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab (the table the jar omits) drops one; and the eight cobblestone-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four cobble blocks in the 2x2 and four dirt make nothing), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a cobble wall pair connects, a double cobble slab drops two, othercobblerock_slab (the table the jar omits) drops one, and the raw stones drop one othercobblestone/othercobblerock without silk touch and keep themselves with it; and the four redstone-pair blocks work the same way: one stone in a real table makes one button and two stones in one row make one pressure plate (every ingredient consumed, while a cobble button grid and a cobble plate grid make nothing and one stone in the plate grid makes the button rather than the plate), the cobble block smelts back into the stone in a real furnace at 200 ticks and 0.5 experience while a fuel-less furnace stays idle, each block reads its template's default state and drops exactly one of itself to a bare hand and one to a wooden pickaxe (otherstone's hand break dropping nothing, the differential), each plate reads powered=true under the player and false after stepping off, and each button reads powered=true after a click, is still pressed ten ticks later and false after its press duration; and the frames and pedestals work the same way: eight stones in a ring make one occultism:otherstone_frame or occultism:otherrock_frame (items, given and refused by /setblock), five slabs + one stone make one occultism:otherstone_pedestal or occultism:otherstone_pedestal_silver (whose file is otherrock_pedestal.json), every ingredient is consumed, a ninth stone in the frame's hole and one slab short of the pedestal make nothing, and each pedestal reads its state, drops nothing to a bare hand and exactly one to a wooden pickaxe (otherstone's hand break dropping nothing, the differential); and the six sacrificial bowls work end to end: their grids make one bowl each with every ingredient consumed (four stones and seven gold making nothing), each of the six places and reads back, a damaged diamond sword goes into a plain and a golden bowl and comes back to an empty hand with its component after being read through the block entity, five dirt put exactly one in the bowl and leave four in the hand, breaking a full bowl drops the bowl and spills its stack, a feather in a plain bowl over spirit fire becomes an awakened feather while a golden bowl leaves it a feather, a sneaking click changes nothing, and every bowl drops one to a bare hand and one to a wooden pickaxe with otherstone's hand break at nothing; and the 17 impure-chalk recipes craft at a real table: each grid makes its impure chalk with every ingredient consumed and the grid emptied, the nested chalk base resolves through both burnt stones and every tag-keyed cell through its member (no 'invalid ingredient' in the game log), a pink grid with dirt for one demonic meat and a two-column chalk-base grid with no otherworld wood make nothing, and the polished pair smelts into burnt otherstone/otherrock in a real furnace (200 ticks, 0.15 experience) while a fuel-less one stays idle"

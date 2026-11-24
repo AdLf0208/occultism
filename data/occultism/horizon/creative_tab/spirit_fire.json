@@ -120,7 +120,8 @@
     "occultism:copper_sacrificial_bowl",
     "occultism:dark_copper_sacrificial_bowl",
     "occultism:golden_sacrificial_bowl",
-    "occultism:dark_golden_sacrificial_bowl"
+    "occultism:dark_golden_sacrificial_bowl",
+    "occultism:otherstone_tablet"
   ],
   "title": "itemGroup.occultism"
 }

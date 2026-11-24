@@ -3413,4 +3413,103 @@ mod tests {
             assert!(tab.contains(&format!("\"{id}\"")), "{id} is not in the tab");
         }
     }
+
+    // ---- the otherstone tablet (0.2.14) ---------------------------------
+
+    /// The jar's two tablet grids: the same `aga`/`gsg`/`aga` shape over
+    /// `#c:dusts/otherworld_wood` (ashes), `#c:ingots/gold` and one of the two
+    /// raw stones. `(file, stone)`; both make the one result.
+    const TABLETS: [(&str, &str); 2] = [
+        ("otherstone_tablet", "occultism:otherstone"),
+        ("otherstone_tablet2", "occultism:otherrock"),
+    ];
+
+    #[test]
+    fn the_two_tablet_recipes_are_the_jars_shapes_in_the_26_3_dialect() {
+        // The jar's `data/occultism/recipe/crafting/otherstone_tablet{,2}.json`:
+        // shaped `aga`/`gsg`/`aga`, with `a` = #c:dusts/otherworld_wood (the
+        // ashes carried in 0.2.13), `g` = #c:ingots/gold (carried in 0.2.12)
+        // and `s` = otherstone in the first file, otherrock in the second.
+        // The 26.3 loader reads bare `"#tag"` / `"id"` strings; the jar's
+        // `{"tag": …}` objects are dropped without a word (0.2.5 finding).
+        for (file, stone) in TABLETS {
+            let text = content(&format!("occultism/recipe/crafting/{file}.json"));
+            for object_form in ["\"item\":", "\"tag\":"] {
+                assert!(
+                    !text.contains(object_form),
+                    "{file} carries the 1.21.1 object-form ingredient {object_form}, \
+                     which the 26.3 loader drops: {text}"
+                );
+            }
+            assert!(
+                text.contains("\"minecraft:crafting_shaped\""),
+                "{file} is not the jar's shaped recipe: {text}"
+            );
+            for row in ["aga", "gsg", "aga"] {
+                assert!(
+                    text.contains(&format!("\"{row}\"")),
+                    "{file} lost the row {row}: {text}"
+                );
+            }
+            for key in [
+                "\"a\": \"#c:dusts/otherworld_wood\"",
+                "\"g\": \"#c:ingots/gold\"",
+                &format!("\"s\": \"{stone}\""),
+            ] {
+                assert!(text.contains(key), "{file} lost the key {key}: {text}");
+            }
+            assert!(
+                text.contains("\"id\": \"occultism:otherstone_tablet\""),
+                "{file} does not make the tablet: {text}"
+            );
+            assert!(
+                text.contains("\"count\": 1"),
+                "{file} does not make one: {text}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_tablet_is_declared_named_modelled_and_in_the_tab() {
+        // The recipes' result must be a real item with a model, a texture and a
+        // name; an undeclared result would load as a recipe that can never be
+        // crafted. Both ingredient tags must also resolve to real members.
+        let declaration = content("occultism/horizon/item/otherstone_tablet.json");
+        assert!(
+            declaration.contains("\"template\": \"minecraft:paper\""),
+            "the tablet is not a plain carried item: {declaration}"
+        );
+        let model = asset_text("models/item/otherstone_tablet.json");
+        assert!(
+            model.contains("\"parent\": \"minecraft:item/generated\""),
+            "the tablet's model is not a generated item model: {model}"
+        );
+        assert!(
+            model.contains("\"layer0\": \"occultism:item/otherstone_tablet\""),
+            "the tablet's model does not name its texture: {model}"
+        );
+        assert!(
+            asset("textures/item/otherstone_tablet.png").len() > 100,
+            "the tablet's texture is missing or empty"
+        );
+        let lang = asset_text("lang/en_us.json");
+        assert!(
+            lang.contains("\"item.occultism.otherstone_tablet\": \"Otherworldly Tablet\""),
+            "the tablet has no jar lang entry"
+        );
+        let tab = content("occultism/horizon/creative_tab/spirit_fire.json");
+        assert!(
+            tab.contains("\"occultism:otherstone_tablet\""),
+            "the tablet is not in the creative tab"
+        );
+        assert_eq!(
+            tag_values("c/tags/item/dusts/otherworld_wood"),
+            vec!["occultism:otherworld_ashes".to_owned()]
+        );
+        assert!(item_declared("occultism:otherworld_ashes"));
+        assert_eq!(
+            tag_values("c/tags/item/ingots/gold"),
+            vec!["minecraft:gold_ingot".to_owned()]
+        );
+    }
 }

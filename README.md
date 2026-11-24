@@ -11,8 +11,8 @@ wall, the chiseled pair and the cracked pair (0.2.7) — the polished tier: the
 smelted plain pair and their slabs, stairs and walls (0.2.8) — the cobblestone
 tier mined from the raw stones (0.2.9), the button and pressure-plate pair
 (0.2.10), the frames and pedestals (0.2.11), the sacrificial bowls
-(0.2.12) — the tier's first block entity — and the 17 impure-chalk craftings
-(0.2.13) with the tags and items they need.
+(0.2.12) — the tier's first block entity — the 17 impure-chalk craftings
+(0.2.13) with the tags and items they need, and the otherstone tablet (0.2.14).
 
 ## What works
 
@@ -66,6 +66,9 @@ tier mined from the raw stones (0.2.9), the button and pressure-plate pair
   paste and essence items the grids name, and the 26 item tags they reach, are
   carried so every cell resolves; the ingredients whose only source is the
   unported crushing/ritual half are declared as items, not obtained.
+- **Tablet**: the jar's two `aga`/`gsg`/`aga` grids — four otherworld ashes, four
+  gold ingots and one otherstone or otherrock — each make one
+  `occultism:otherstone_tablet` (the "Otherworldly Tablet").
 - `/occultism info <x> <y> <z>` and `/occultism recipes` for a readout (a bowl
   answers with the stack its block entity holds).
 
@@ -75,15 +78,15 @@ The pentacle rituals (158 recipes), the summoned spirits and their AI, the
 Otherworld dimension, the guide book, accessory slots, the crushing/spirit-job
 recipes and the ritual results that source most of the impure chalks' colour
 materials, and the crafting recipes whose result (the rest of the
-otherstone/otherrock building family — the tablets and the storage controllers
-with their ritual-only bases) or ingredients this package does not carry yet.
+otherstone/otherrock building family — the storage controllers with their
+ritual-only bases) or ingredients this package does not carry yet.
 See [`notes.md`](notes.md) for the full gap list and the reason for each.
 
 ## Installing and building
 
 One file: `occultism.hmod`. It is the whole mod — `horizon-mod.toml`,
 `src/lib.rs` + `src/support.rs` (the code), `src/runtime.rs` (the pure rules and
-their 79 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
+their 81 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
 tags and lang) and the licence notices.
 
 A native SDK package is built against the game by the launcher:
