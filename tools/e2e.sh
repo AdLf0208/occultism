@@ -210,6 +210,19 @@
 # flips the bricks cut's count from one to two, so a working package must FAIL
 # that run. `SELFTEST=stonecut` (STONECUT_SELFTEST=1) is the older alias.
 #
+# The full declared id set (0.2.17) is phase AA: the harness enumerates 121
+# giveable item ids (71 explicit `data/occultism/horizon/item/` declarations plus
+# the 50 block items) and 52 `horizon/block/` declarations — the union of the
+# explicit items and the block items is exactly the 121-id creative tab — from
+# the package's own data. Every item is given and read back from the parsed
+# inventory as exactly one stack of that id; every block is placed in the End
+# and its default state read back from `ctl block`; a made-up
+# `occultism:definitely_not_an_item` gives nothing and places air. One PASS line
+# per id, like phase Z's 32 cuts. ALL_IDS_ONLY=1 is this family's red/green leg;
+# `SELFTEST=all-ids` asserts one more id than declared, so a working package
+# must FAIL that run. The statistical grass seed and the ritual-result blocks
+# are not ids the package declares, so neither is a candidate here.
+#
 # SELFTEST=1 flips the count assertion (3 awakened feathers -> 2): it must FAIL,
 # proving the scenario can fail. NEGATIVE=1 flips the ripe-crop harvest's
 # assertion (a ripe crop must drop a fruit) the same way; LOOT_NEGATIVE=1 is the
@@ -324,6 +337,24 @@ esac
 # `STONECUT_ONLY=1` launches, lays the arena and runs only phase Z (the red/green
 # leg for the 32 stonecutting recipes), then exits 0.
 STONECUT_ONLY=${STONECUT_ONLY:-0}
+# `SELFTEST=all-ids` (ALL_IDS_SELFTEST=1) asserts one more id than the package
+# declares, so a working package must FAIL this run (see phase AA).
+ALL_IDS_SELFTEST=${ALL_IDS_SELFTEST:-0}
+case "$SELFTEST" in
+    all-ids) ALL_IDS_SELFTEST=1; SELFTEST=0 ;;
+esac
+# `ALL_IDS_ONLY=1` launches, lays the arena and runs only phase AA (the red/green
+# leg for the whole declared item/block id set), then exits 0.
+ALL_IDS_ONLY=${ALL_IDS_ONLY:-0}
+# `SELFTEST=smelt` flips one smelting row's expected output count, so a working
+# package must FAIL this run (see phase AB).
+SMELT_SELFTEST=${SMELT_SELFTEST:-0}
+case "$SELFTEST" in
+    smelt) SMELT_SELFTEST=1; SELFTEST=0 ;;
+esac
+# `SMELT_ONLY=1` launches, lays the arena and runs only phase AB (the red/green
+# leg for the ten carryable smelting recipes), then exits 0.
+SMELT_ONLY=${SMELT_ONLY:-0}
 # `CONTROL_LEG=1` runs the packaged leg first on the same socket, as 0.2.0/0.2.2 did.
 # The default is a *separate* invocation (`GAME=$CONTROL_GAME`), because a control
 # launch in the same HORIZON_HOME leaves the main game without its log file and the
@@ -449,16 +480,26 @@ arena() {
     # (x 214..233, z 0..40), the loot row (x 232..238, z 30), the bricks row
     # (x 214..236, z 46..50, phases R..U, with phase U's furnace row at z=44 and
     # its press/click stations at z=48), with clear air above all of them.
-    ctl command "execute in minecraft:the_end run fill 196 100 -16 242 100 52 minecraft:stone" >/dev/null
-    ctl wait 6 >/dev/null
-    ctl command "execute in minecraft:the_end run fill 196 101 -16 242 108 52 minecraft:air" >/dev/null
-    ctl wait 6 >/dev/null
     ctl command "execute in minecraft:the_end run kill @e[type=!player]" >/dev/null
     ctl wait 20 >/dev/null
     ctl command "execute in minecraft:the_end run tp @s $X0.5 101 0.5" >/dev/null
     ctl wait 6 >/dev/null
-    [ "$(block_name "$X0" 100 0)" = "minecraft:stone" ] || fail "the arena floor is not stone"
-    [ "$(block_name "$X0" 101 0)" = "minecraft:air" ] || fail "the arena air above the floor is not air"
+    # The fill is asynchronous on the server thread: one leg on 0.2.17 read the
+    # old block at (200,100,0) six ticks later and failed before any assertion.
+    # Re-lay and re-read until both probe cells agree (8 attempts), instead of
+    # treating a slow chunk as a product failure.
+    local laid=false
+    for _ in $(seq 1 8); do
+        ctl command "execute in minecraft:the_end run fill 196 100 -16 242 100 52 minecraft:stone" >/dev/null
+        ctl command "execute in minecraft:the_end run fill 196 101 -16 242 108 52 minecraft:air" >/dev/null
+        ctl wait 10 >/dev/null
+        if [ "$(block_name "$X0" 100 0)" = "minecraft:stone" ] \
+           && [ "$(block_name "$X0" 101 0)" = "minecraft:air" ]; then
+            laid=true
+            break
+        fi
+    done
+    [ "$laid" = true ] || fail "the arena floor is not stone / the air above is not air after 8 fills"
 }
 
 # Helpers for the crop family: a block write in the End, a state read-back, the
@@ -1152,6 +1193,41 @@ phase_stonecut() {
     echo "  the game log has no 'invalid ingredient' line (every carried input resolved)"
 }
 
+# Phase AA: the whole declared id set. The Python driver enumerates the ids
+# from the package's own data (never the brief), gives/reads every item and
+# places/reads every block, and refuses a made-up id. Its golden default-state
+# table is cross-checked against the declarations and the carried blockstates
+# before the game is touched. ALL_IDS_SELFTEST=1 flips the declared counts by
+# one, so the run must FAIL.
+phase_all_ids() {
+    echo "== AA: every declared item and block id, read back in a real game =="
+    end "gamerule random_tick_speed 0"
+    end "difficulty peaceful"
+    end "kill @e[type=!player]"
+    ctl wait 20 >/dev/null
+    ALL_IDS_SELFTEST=$ALL_IDS_SELFTEST \
+        python3 "$PORT/tools/all_ids_check.py" \
+        "$SOCK" "$CTL" "$X0" 101 0 \
+        || fail "the all-id check failed (see the ALL IDS FAIL line above)"
+}
+
+# The ten carryable smelting recipes (phase AB). The driver reads the packed
+# recipe files for the row set and each row's ingredient/result/count/XP/time,
+# cooks one in a real furnace with coal (200 ticks), asserts the output, and
+# runs the no-fuel and wrong-input differentials on the two new dust rows.
+# SMELT_SELFTEST=1 flips one output count, so the run must FAIL.
+phase_smelting() {
+    echo "== AB: every carryable smelting recipe in a real furnace =="
+    end "gamerule random_tick_speed 0"
+    end "difficulty peaceful"
+    end "kill @e[type=!player]"
+    ctl wait 20 >/dev/null
+    SMELT_SELFTEST=$SMELT_SELFTEST \
+        python3 "$PORT/tools/smelting_check.py" \
+        "$SOCK" "$CTL" "$X0" 101 0 \
+        || fail "the smelting check failed (see the SMELT FAIL line above)"
+}
+
 # The stonecutting family's control: the ids a game without the package has not
 # got. The real differential (vanilla stone makes no occultism slab) is in the
 # phase itself.
@@ -1175,6 +1251,64 @@ control_stonecut() {
 if [ "$CONTROL_LEG" = 1 ] && [ "$STONECUT_ONLY" = 1 ] && [ -n "$CONTROL_GAME" ]; then
     control_stonecut
     echo "PASS: a game without the package refuses the stonecutting ids as items"
+    exit 0
+fi
+
+# The whole-id-set family's control: a game without the package knows none of
+# them, sampled from each family (the full 121-id differential is in phase AA
+# itself: a made-up occultism id must give nothing and place air).
+control_all_ids() {
+    echo "== control: the declared ids on a game without the package =="
+    launch "$CONTROL_GAME" "$CONTROL_WORLD"
+    arena
+    local id name
+    for id in occultism:spirit_attuned_gem occultism:datura occultism:otherstone \
+              occultism:otherstone_slab occultism:chalk_white \
+              occultism:sacrificial_bowl occultism:otherstone_tablet; do
+        ctl command "execute in minecraft:the_end run setblock $X0 101 0 $id" >/dev/null 2>&1 || true
+        ctl wait 3 >/dev/null
+        name=$(block_name "$X0" 101 0)
+        case "$id" in
+            occultism:datura) : ;; # the crop needs farmland, so air is expected either way
+            *) [ "$name" = "minecraft:air" ] || fail "the control game holds $name, so $id was known" ;;
+        esac
+        ctl command "clear @s" >/dev/null || true
+        ctl command "item replace entity @s hotbar.0 with $id 1" >/dev/null 2>&1 || true
+        ctl wait 3 >/dev/null
+        ctl inventory | jq -e --arg i "$id" '[.hotbar[], .main[] | select(.item == $i)] | length == 0' >/dev/null \
+            || fail "the control game has the $id item, so it carries this package"
+    done
+    echo "  without the package: none of the sampled ids exist as a block or an item"
+    ctl quit >/dev/null 2>&1 || true
+}
+
+if [ "$CONTROL_LEG" = 1 ] && [ "$ALL_IDS_ONLY" = 1 ] && [ -n "$CONTROL_GAME" ]; then
+    control_all_ids
+    echo "PASS: a game without the package refuses the sampled declared ids as blocks and items"
+    exit 0
+fi
+
+# The smelting family's control: the two new dust ingredients do not exist on a
+# game without the package, so their smelt recipes cannot resolve there.
+control_smelt() {
+    echo "== control: the two new smelting rows on a game without the package =="
+    launch "$CONTROL_GAME" "$CONTROL_WORLD"
+    arena
+    local id
+    for id in occultism:gold_dust occultism:iron_dust; do
+        ctl command "clear @s" >/dev/null || true
+        ctl command "item replace entity @s hotbar.0 with $id 1" >/dev/null 2>&1 || true
+        ctl wait 4 >/dev/null
+        ctl inventory | jq -e --arg i "$id" '[.hotbar[], .main[] | select(.item == $i)] | length == 0' >/dev/null \
+            || fail "the control game has the $id ingredient, so it carries this package"
+    done
+    echo "  without the package: neither dust ingredient exists"
+    ctl quit >/dev/null 2>&1 || true
+}
+
+if [ "$CONTROL_LEG" = 1 ] && [ "$SMELT_ONLY" = 1 ] && [ -n "$CONTROL_GAME" ]; then
+    control_smelt
+    echo "PASS: a game without the package refuses the two new smelting ingredients"
     exit 0
 fi
 
@@ -1360,6 +1494,20 @@ fi
 if [ "$STONECUT_ONLY" = 1 ]; then
     phase_stonecut
     echo "PASS: all 32 carried stonecutting recipes cut at a real stonecutter: each ingredient (otherstone, otherrock, their bricks and polished forms, and the othercobblestone/othercobblerock pair) fed into slot 600, its occultism:stonecutting/<stem> offer selected by a GUI cell click, and slot 650's output id and count asserted with the input consumed; a different selected cell yields a different result and vanilla stone offers no occultism recipe; no ingredient left an 'invalid ingredient' line in the game log"
+    exit 0
+fi
+
+# The red/green leg for the whole declared id set: launch, arena, phase AA only.
+if [ "$ALL_IDS_ONLY" = 1 ]; then
+    phase_all_ids
+    echo "PASS: all 121 declared item ids (71 explicit item declarations plus the 50 block items) give exactly one stack of their own id, all 52 declared block ids place and read their declared default state, and a made-up occultism id gives nothing as an item and places air as a block"
+    exit 0
+fi
+
+# The red/green leg for the smelting family: launch, arena, phase AB only.
+if [ "$SMELT_ONLY" = 1 ]; then
+    phase_smelting
+    echo "PASS: all ten carryable smelting recipes cook in a real furnace at 200 ticks (their declared id, count and experience), the input is consumed, and a fuel-less furnace or a wrong input makes nothing; a game without the package knows neither new dust ingredient"
     exit 0
 fi
 
@@ -1952,4 +2100,8 @@ phase_tablet
 
 phase_stonecut
 
-echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand, exactly one othercobblestone/othercobblerock to a wooden pickaxe and themselves to a silk-touch pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two; and the eight polished-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab (the table the jar omits) drops one; and the eight cobblestone-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four cobble blocks in the 2x2 and four dirt make nothing), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a cobble wall pair connects, a double cobble slab drops two, othercobblerock_slab (the table the jar omits) drops one, and the raw stones drop one othercobblestone/othercobblerock without silk touch and keep themselves with it; and the four redstone-pair blocks work the same way: one stone in a real table makes one button and two stones in one row make one pressure plate (every ingredient consumed, while a cobble button grid and a cobble plate grid make nothing and one stone in the plate grid makes the button rather than the plate), the cobble block smelts back into the stone in a real furnace at 200 ticks and 0.5 experience while a fuel-less furnace stays idle, each block reads its template's default state and drops exactly one of itself to a bare hand and one to a wooden pickaxe (otherstone's hand break dropping nothing, the differential), each plate reads powered=true under the player and false after stepping off, and each button reads powered=true after a click, is still pressed ten ticks later and false after its press duration; and the frames and pedestals work the same way: eight stones in a ring make one occultism:otherstone_frame or occultism:otherrock_frame (items, given and refused by /setblock), five slabs + one stone make one occultism:otherstone_pedestal or occultism:otherstone_pedestal_silver (whose file is otherrock_pedestal.json), every ingredient is consumed, a ninth stone in the frame's hole and one slab short of the pedestal make nothing, and each pedestal reads its state, drops nothing to a bare hand and exactly one to a wooden pickaxe (otherstone's hand break dropping nothing, the differential); and the six sacrificial bowls work end to end: their grids make one bowl each with every ingredient consumed (four stones and seven gold making nothing), each of the six places and reads back, a damaged diamond sword goes into a plain and a golden bowl and comes back to an empty hand with its component after being read through the block entity, five dirt put exactly one in the bowl and leave four in the hand, breaking a full bowl drops the bowl and spills its stack, a feather in a plain bowl over spirit fire becomes an awakened feather while a golden bowl leaves it a feather, a sneaking click changes nothing, and every bowl drops one to a bare hand and one to a wooden pickaxe with otherstone's hand break at nothing; and the 17 impure-chalk recipes craft at a real table: each grid makes its impure chalk with every ingredient consumed and the grid emptied, the nested chalk base resolves through both burnt stones and every tag-keyed cell through its member (no 'invalid ingredient' in the game log), a pink grid with dirt for one demonic meat and a two-column chalk-base grid with no otherworld wood make nothing, and the polished pair smelts into burnt otherstone/otherrock in a real furnace (200 ticks, 0.15 experience) while a fuel-less one stays idle; and all 32 carried stonecutting recipes cut at a real stonecutter: every ingredient fed into slot 600, its occultism:stonecutting/<stem> offer selected by a GUI cell click, slot 650's output id and count asserted with the input consumed, a different selected cell yields a different result, and vanilla stone offers no occultism recipe"
+phase_all_ids
+
+phase_smelting
+
+echo "PASS: spirit fire lights from datura and flint and steel, converts a 3-feather stack into exactly 3 awakened feathers with the recipe table read from the carried data (26 of 27 rules), leaves an unmatched item alone, keeps a feather on plain stone, takes its colour from a gold chalk, and ignores datura two blocks away; /occultism info is operator-only, answers a non-fire position without naming a block and is refused to a level-0 LAN guest while /occultism recipes still answers it; a spectator's chalk and lighter change nothing and consume no datura, while a survival player's do; the datura crop binds ages 0..7, occultism:datura_seeds plant it on farmland (and not on stone), it ripens by random tick, a right click harvests a ripe crop into exactly 1 fruit and at least 1 seed and replants it while a young one is left alone, mining the crop gives the carried loot table's two branches, and short grass broken with shears rolls its own loot and never the jar's 2% seed; and the four carried block loot tables give otherstone and otherrock nothing to a bare hand, exactly one othercobblestone/othercobblerock to a wooden pickaxe and themselves to a silk-touch pickaxe, and one otherflower and one natural sapling to a bare hand; and the two carried crafting recipes craft at a real table: a 3x3 grid of datura fruit, of datura seed and a mixed fruit/seed grid each make exactly one occultism:demons_dream_essence with every ingredient consumed, nine dirt and eight fruit with one dirt make nothing, and the shapeless awakened feather + purified ink + taboo book make one occultism:book_of_binding_empty; and the six carried otherstone/otherrock building recipes craft at a real table (six slabs from three stones in the middle row, four stairs, six walls, every ingredient consumed, three dirt making nothing) and each block reads its stone template's default state, drops nothing to a bare hand and exactly one of itself to a wooden pickaxe, two walls connect, and a double slab drops two; and the twelve bricks-tier blocks work the same way: their ten grids craft at a real table with every ingredient consumed (four dirt in the same 2x2 and three stones one cell short make nothing), a chain in one table turns twelve stones into bricks, six bricks into four stairs, three bricks into six slabs and two slabs into one chiseled block, the cracked pair smelts in a real furnace while a fuel-less furnace stays idle, all twelve read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a brick wall pair connects, and a double brick slab drops two; and the eight polished-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four polished blocks in the 2x2 and four dirt make nothing), the polished pair smelts in a real furnace (one raw stone + one coal makes exactly one polished block and consumes the input, while a fuel-less furnace stays idle), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a polished wall pair connects, a double polished slab drops two, and polished_otherrock_slab (the table the jar omits) drops one; and the eight cobblestone-tier blocks work the same way: their six grids craft at a real table with every ingredient consumed (four cobble blocks in the 2x2 and four dirt make nothing), all eight read their stone template's default state, drop nothing to a bare hand and exactly one to a wooden pickaxe, a cobble wall pair connects, a double cobble slab drops two, othercobblerock_slab (the table the jar omits) drops one, and the raw stones drop one othercobblestone/othercobblerock without silk touch and keep themselves with it; and the four redstone-pair blocks work the same way: one stone in a real table makes one button and two stones in one row make one pressure plate (every ingredient consumed, while a cobble button grid and a cobble plate grid make nothing and one stone in the plate grid makes the button rather than the plate), the cobble block smelts back into the stone in a real furnace at 200 ticks and 0.5 experience while a fuel-less furnace stays idle, each block reads its template's default state and drops exactly one of itself to a bare hand and one to a wooden pickaxe (otherstone's hand break dropping nothing, the differential), each plate reads powered=true under the player and false after stepping off, and each button reads powered=true after a click, is still pressed ten ticks later and false after its press duration; and the frames and pedestals work the same way: eight stones in a ring make one occultism:otherstone_frame or occultism:otherrock_frame (items, given and refused by /setblock), five slabs + one stone make one occultism:otherstone_pedestal or occultism:otherstone_pedestal_silver (whose file is otherrock_pedestal.json), every ingredient is consumed, a ninth stone in the frame's hole and one slab short of the pedestal make nothing, and each pedestal reads its state, drops nothing to a bare hand and exactly one to a wooden pickaxe (otherstone's hand break dropping nothing, the differential); and the six sacrificial bowls work end to end: their grids make one bowl each with every ingredient consumed (four stones and seven gold making nothing), each of the six places and reads back, a damaged diamond sword goes into a plain and a golden bowl and comes back to an empty hand with its component after being read through the block entity, five dirt put exactly one in the bowl and leave four in the hand, breaking a full bowl drops the bowl and spills its stack, a feather in a plain bowl over spirit fire becomes an awakened feather while a golden bowl leaves it a feather, a sneaking click changes nothing, and every bowl drops one to a bare hand and one to a wooden pickaxe with otherstone's hand break at nothing; and the 17 impure-chalk recipes craft at a real table: each grid makes its impure chalk with every ingredient consumed and the grid emptied, the nested chalk base resolves through both burnt stones and every tag-keyed cell through its member (no 'invalid ingredient' in the game log), a pink grid with dirt for one demonic meat and a two-column chalk-base grid with no otherworld wood make nothing, and the polished pair smelts into burnt otherstone/otherrock in a real furnace (200 ticks, 0.15 experience) while a fuel-less one stays idle; and all 32 carried stonecutting recipes cut at a real stonecutter: every ingredient fed into slot 600, its occultism:stonecutting/<stem> offer selected by a GUI cell click, slot 650's output id and count asserted with the input consumed, a different selected cell yields a different result, and vanilla stone offers no occultism recipe; every declared id is in game too: all 121 item ids give exactly one stack of their own id, all 52 block ids read their declared default state, and a made-up occultism id is refused as an item and as a block"

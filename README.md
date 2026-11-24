@@ -18,7 +18,20 @@ cuts into its own slab, stairs, wall or bricks at a real stonecutter. Version
 0.2.16 proves **all 32** of those recipes in game (0.2.15 proved only the two
 raw-stone slabs): each declared ingredient at a real stonecutter, the exact
 `occultism:stonecutting/<stem>` offer selected, the output id and count read back
-with the input consumed, and vanilla stone offering no occultism result.
+with the input consumed, and vanilla stone offering no occultism result. Version
+0.2.17 proves the whole declared id set in game: all 121 giveable item ids (the
+71 explicit item declarations plus the 50 block items — exactly the creative
+tab) give one stack of their own id, all 52 declared block ids place and read
+their default state back, and a made-up `occultism:` id is refused as both an
+item and a block. The id list is enumerated from the package's own data, not
+from a name or a brief. Version 0.2.17 also adds the two carryable smelting
+recipes the jar ships but the package did not yet carry — `#c:dusts/gold` →
+`minecraft:gold_ingot` and `#c:dusts/iron` → `minecraft:iron_ingot` (200 ticks,
+0.7 experience) — and proves **all ten** carryable smelting rows in a real
+furnace: declared input and fuel, output id, count and experience, the input
+consumed, and a fuel-less furnace or a wrong input making nothing. The jar's
+other nine smelting rows name an unported ingredient tag or result and are
+recorded as blocked, never invented.
 
 ## What works
 
@@ -49,6 +62,13 @@ with the input consumed, and vanilla stone offering no occultism result.
   `othercobblerock`, silk touch keeps the stone) and shaped the same way, and a
   cobble block smelts back into the stone. All of them are pickaxe blocks (a bare
   hand breaks them and drops nothing).
+- **Smelting**: ten of the jar's 19 smelting recipes are carried — the reverse
+  (cobble → stone), polished and burnt pairs, the cracked bricks pair, and now
+  `#c:dusts/gold` → `minecraft:gold_ingot` and `#c:dusts/iron` →
+  `minecraft:iron_ingot` (each 200 ticks, 0.7 experience). The other nine name
+  an unported ingredient tag (`c:ores/*`, `c:raw_materials/*`, copper and
+  netherite dusts) or an unported result (`iesnium_ingot`, `silver_ingot`) and
+  are not carried.
 - **Redstone**: one stone in a crafting table makes a stone button and two stones
   in one row make a pressure plate, in both stones; the plates read powered under
   a player and the buttons stay pressed for their template's press duration.
@@ -92,7 +112,7 @@ See [`notes.md`](notes.md) for the full gap list and the reason for each.
 
 One file: `occultism.hmod`. It is the whole mod — `horizon-mod.toml`,
 `src/lib.rs` + `src/support.rs` (the code), `src/runtime.rs` (the pure rules and
-their 82 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
+their 83 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
 tags and lang) and the licence notices.
 
 A native SDK package is built against the game by the launcher:

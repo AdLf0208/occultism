@@ -45,7 +45,13 @@ impure-chalk craftings, their 26 tags (the nested chalk base included), the 26
 ingredient items and the two burnt-dust smelting recipes (§"Slice 12").
 **0.2.14 (2026-11-24):** the `otherstone_tablet` — the jar's two `aga`/`gsg`/`aga`
 grids over the carried ashes, gold and either raw stone, with its item, model,
-texture, lang and creative-tab row (§"Slice 13").
+texture, lang and creative-tab row (§"Slice 13"). **0.2.15 (2026-11-24):** all 32
+stonecutting recipes carried and proven (§"Slice 14"). **0.2.16 (2026-11-24):**
+in-game proof for all 32 cuts (§"Slice 15"). **0.2.17 (2026-11-24):** the whole
+declared id set in game (§"Slice 16", evidence-only, never published), then the
+**product build** §"Slice 17": the two dust→ingot smelting recipes carried (10
+smelting rows total) and every one proven in a furnace. Published version stays
+**0.2.16**.
 
 ## Class + tier and the approach
 
@@ -3748,3 +3754,319 @@ item; `ctl setblock occultism:<block>` then `ctl block` reads the declared defau
 id than declared) must end `EXIT:1`. The pentacle-ritual results
 (`blocked(ritual:craft_storage_controller_base)`) and the statistical grass seed
 (`blocked(harness-break-reliability)`) stay untouched — neither is a candidate.
+
+## Slice 16 (0.2.17) — the full carried id set, given and placed in game
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins
+`e59da90`). Licence **MIT**; this is an **Update** of our own `main` entry
+(`Update occultism 0.2.17`; 0.2.16 is staged on PR #1828). Class **content**;
+the **ledger says tier `deep`** (row 350 — the brief's "row 345" is stale).
+This slice is the tier's **data** half: the id set and the content are already
+shipped; only the harness changes, so there is **no new Rust and no new data**.
+The user message's "tier `data`, no new code" describes this slice's shape, not
+a re-tiering of the ledger row.
+
+**Gap line it comes from:** 0.2.16's `### Next slice` — *"the parity rule's
+'every block and item — place or give it, read it back, assert an unknown id is
+refused' row is only covered piecemeal"*. Every recipe family is already
+exercised (phases A–Z); the id set itself was not.
+
+### Enumeration comes from the artefact
+
+`tools/all_ids_check.py` reads the package's own data, never a name or the
+brief:
+
+| source | count | meaning |
+|---|---:|---|
+| `data/occultism/horizon/item/*.json` | **71** | explicit item declarations |
+| `data/occultism/horizon/block/*.json` | **52** | block declarations |
+| of those, `"item": false` | 2 | `spirit_fire`, `datura` (no block item) |
+| **giveable item ids** | **121** | 71 explicit + 50 block items |
+| `horizon/creative_tab/spirit_fire.json` | **121** | **exactly the same set** as the giveable ids |
+| distinct declared ids | **173** | 121 items ∪ 52 blocks (50 ids are both) |
+
+The driver asserts all four counts, asserts the creative tab equals the giveable
+set exactly, and cross-checks its 52-entry golden default-state table
+(`tools/all_ids_states.json`, measured on the 0.2.16 game) against each block
+declaration's `default_state`/`state_properties`, the carried `blockstate`
+JSON and the vanilla template's blockstate before touching the game. The two
+blocks the tab cannot give and the two ids the package does not declare
+(`blocked(ritual:craft_storage_controller_base)`, the statistical grass seed
+`blocked(harness-break-reliability)`) stay untouched.
+
+### Red / inverted verdict
+
+A harness-only slice has no new product test to turn red; the fail-capable
+proof is the count flip. On the **0.2.16 game**, before packaging, phase AA
+after 121 real gives and 52 real placements ended
+`ALL IDS FAIL: asserted 121 item ids and 52 block ids, expected 122 and 53 (declared 121/52)`,
+`EXIT:1` — `e2e-selftest-all-ids-0.2.16.log`. On the final 0.2.17 game the
+same run (`e2e-selftest-all-ids-0.2.17.log`) again prints
+`(selftest: asserting 122 items and 53 blocks)` and ends `EXIT:1` on that exact
+line after the same 121/52 checks. The no-package control ends `EXIT:1` at
+`ALL IDS FAIL: give occultism:afrit_essence exited 1: {"error":"unknown item occultism:afrit_essence"}`
+(`e2e-control-all-ids-0.2.17.log`). The 82 carried-data unit tests stay green.
+
+### Green legs (final 0.2.17 game)
+
+`e2e-all-ids-0.2.17.log` **PASS + EXIT:0** with **175** observed lines
+(`all-ids-0.2.17-observed.txt`: 121 item lines, 52 block lines, 2 unknown-id
+lines); `e2e-control-ids-all-0.2.17.log` **PASS + EXIT:0** (sampled ids unknown
+without the package). Sample of the transcript:
+
+```
+PASS item occultism:spirit_attuned_gem: give 1 -> inventory {"occultism:spirit_attuned_gem": 1}
+PASS item occultism:datura_seeds: give 1 -> inventory {"occultism:datura_seeds": 1}
+PASS item occultism:otherstone_pedestal_silver: give 1 -> inventory {"occultism:otherstone_pedestal_silver": 1}
+PASS block occultism:datura: occultism:datura[age=0]
+PASS block occultism:otherstone_wall: occultism:otherstone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]
+PASS block occultism:spirit_fire: occultism:spirit_fire[color=white]
+PASS unknown item occultism:definitely_not_an_item: rc=1, gave nothing
+PASS unknown block occultism:definitely_not_an_item: setblock left minecraft:air
+```
+
+Inventory/world are cleared between ids (`clear @s` + kill item entities) so
+one stack cannot satisfy another id's check; `ctl wait 2` follows every give
+(the give lands on the next tick); every `setblock` uses
+`execute in minecraft:the_end run …` and is read back in that dimension.
+
+### Ladder (all `build-slot.sh`; Rust forwarded to AdLf-PC, no `BUILD_LOCAL=1`)
+
+`cargo test --offline` **82 passed, 0 failed** (`sdk-test.log` regenerated for
+0.2.17); `cargo clippy --all-targets --offline -- -D warnings` 0 warnings;
+`cargo fmt --check` exit 0; two `rm -f Cargo.lock && cargo horizon-mod build`
+runs are `cmp`-identical; `cargo horizon-mod check` reports **326,483 bytes,
+SHA-256 `54aa7d7e…f30be`**; `fits --build 0a875da…` → `0a875da  made for`,
+`fits --build 0b14f8a…` → `0b14f8a  fits`; `verify-sdk-package.py occultism`
+**1/1** (package matches the tree, R9 tables/deps, no packed `Cargo.lock`).
+`check-recipe-types.py occultism` → `occultism: ok`;
+`check_recipe_keys.py` → **103 recipe(s), 103 craftable, 0 blocked,
+0 failure(s)**. The README and the manifest `description` were edited **before**
+the final build, so the gate's "package matches the tree" is true. The game
+build removed the two stale `native-*` tags carrying 0.2.15/0.2.16 first and
+printed **`Compiling occultism (1 of 1)`**, tag `native-0a875da-4a63f658d175`,
+exported manifest `version = "0.2.17"`.
+`check-e2e-logs.py occultism-e2e --strict`: **100 logs, 100 ok**, 0
+missing-exit, 0 bad-exit (the original 92 plus these 8).
+
+### Measured harness facts (not worked around silently)
+
+1. `ctl block` reports a property-less state as the bare id
+   (`occultism:otherstone`), and a full state as `id[a=b,…]` with the
+   properties sorted; the golden table uses both shapes.
+2. `waterlogged` is a template property absent from both the carried and the
+   vanilla `stone_slab` blockstate JSON, so the driver has a small explicit
+   vanilla-template property map; every mod-declared property is still read
+   from the artefact.
+3. The arena's `fill` is asynchronous: one 0.2.17 leg read the old block six
+   ticks after the fill and failed before any assertion. `arena()` now re-lays
+   and re-reads up to eight times (harness fix, no product change).
+4. **The full A..AA sweep did not complete twice on this machine**: the shared
+   box sat at load ~25 with five concurrent e2e games, the game process died
+   mid-run (socket missing) in phase N (`e2e-default-0.2.17.log`) and again in
+   phase W (`e2e-default-0.2.17-retry.log`), each ending `EXIT:1` on a
+   connection error, not on an assertion. Both failures are at families
+   unchanged by this slice, both family legs had already passed on this final
+   game, and the 92 pre-existing sweep logs stay green. No product change was
+   made to accommodate them.
+
+### Parity coverage update
+
+| family | state |
+|---|---|
+| every declared item id (121) | **tested** — phase AA: `ctl give` → parsed inventory exactly one stack of that id, 121 lines in `e2e-all-ids-0.2.17.log`; count-flip selftest and no-package control both `EXIT:1` |
+| every declared block id (52) | **tested** — phase AA: `setblock` in the End → `ctl block` reads its declared default state; made-up id places air |
+| the creative tab's 121 entries | **tested** — the driver's set equality assertion (tab == 71 explicit items + 50 block items) |
+| all recipe families, loot tables, bowls, chalks, tablet, stonecutting | **tested** — phases A..Z, unchanged, re-run on the 0.2.17 game by the dedicated legs (the full sweep is the gap above) |
+| ritual results, spirits/AI, GeckoLib, Otherworld, guide book, Curios, spirit jobs | **not ported / blocked** — the gap list above; controllers stay `blocked(ritual:craft_storage_controller_base)`, the grass seed `blocked(harness-break-reliability)` |
+
+### Upstream defects fixed
+
+None. This slice adds no product data or code; the id set and states were
+already shipped.
+
+Skills: superpowers/using-superpowers,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices
+
+### Next slice
+
+**Smelting coverage.** The jar ships **19** `data/occultism/recipe/smelting/*.json`;
+the package carries **8** (the reverse-smelt pair, the polished pair, the burnt
+pair and the cracked pair). Enumerate all 19 from the jar, carry the ones whose
+result and ingredient now exist in the package, and assert each in a real
+furnace (output id and count, 200 ticks, experience, fuel-less differential);
+record the rest as `blocked(<unported ingredient>)`. It fits tier `data` (no new
+code), and the concrete in-game assertion is the same furnace shape phase R/S/X
+use: place the furnace, insert the declared input plus fuel, wait the declared
+time, read the output slot and assert the id and count, with no-fuel making
+nothing. If all 19 are already covered or every remaining one is blocked, the
+next candidate is the **17-colour chalk recolour table in game** (phase G/I
+prove only gold and red; assert all 16 chalk ids set their declared `color`
+state on `occultism:spirit_fire`, with a non-chalk item leaving it unchanged).
+
+## Slice 17 (0.2.17, **product build**) — smelting coverage
+
+Pin **`0a875da`** (SDK `0a875da91dbb0fdcb7ba8c42c11341aa229af51a`, mixins
+`e59da90`). Licence **MIT**; an **Update** of our own `main` entry
+(`Update occultism 0.2.17`). Class **content**, tier **deep** (ledger row 350);
+this is the tier's **data** half — two carried smelting recipes plus a new
+in-game assertion, no Rust behaviour change. **The version number is not
+skipped:** the 0.2.17 archive left by slice 16 was the *evidence-only* full-id-set
+build (its only differences from published 0.2.16 were the version lines and
+README/description text) and was never published; this slice replaces it with a
+real product change. **Published version remains 0.2.16.**
+
+**Gap line it comes from:** slice 16's `### Next slice` — *"The jar ships 19
+`data/occultism/recipe/smelting/*.json`; the package carries 8 … Enumerate all
+19 from the jar, carry the ones whose result and ingredient now exist in the
+package, and assert each in a real furnace … record the rest as
+`blocked(<unported ingredient>)`."*
+
+### The 19 jar rows, enumerated from the artefact (not guessed)
+
+Every row was read from `unzip -p <jar> data/occultism/recipe/smelting/*.json`.
+The rule: carry a row only when its ingredient resolves (a carried item, or a
+carried tag whose member is a carried item) **and** its result exists (a carried
+item or a vanilla item). A `#c:` ingredient is written in the 26.3 bare-string
+dialect; the jar's `{"tag": …}` / `{"item": …}` object is dropped at load.
+
+| # | jar row | ingredient | result | xp | state / reason |
+|---:|---|---|---|---:|---|
+| 1 | `burnt_otherstone` | `occultism:polished_otherstone` | `occultism:burnt_otherstone` | 0.15 | **carried** (0.2.13) |
+| 2 | `burnt_otherrock` | `occultism:polished_otherrock` | `occultism:burnt_otherrock` | 0.15 | **carried** (0.2.13) |
+| 3 | `cracked_otherstone_bricks` | `occultism:otherstone_bricks` | `occultism:cracked_otherstone_bricks` | 0.3 | **carried** (0.2.7) |
+| 4 | `cracked_otherrock_bricks` | `occultism:otherrock_bricks` | `occultism:cracked_otherrock_bricks` | 0.3 | **carried** (0.2.7) |
+| 5 | `otherstone` | `occultism:othercobblestone` | `occultism:otherstone` | 0.5 | **carried** (0.2.10, reverse) |
+| 6 | `otherrock` | `occultism:othercobblerock` | `occultism:otherrock` | 0.5 | **carried** (0.2.10, reverse) |
+| 7 | `polished_otherstone` | `occultism:otherstone` | `occultism:polished_otherstone` | 0.5 | **carried** (0.2.8) |
+| 8 | `polished_otherrock` | `occultism:otherrock` | `occultism:polished_otherrock` | 0.5 | **carried** (0.2.8) |
+| 9 | `gold_ingot_from_dust` | `#c:dusts/gold` → `occultism:gold_dust` | `minecraft:gold_ingot` | 0.7 | **carried now** — tag and member carried, result vanilla |
+| 10 | `iron_ingot_from_dust` | `#c:dusts/iron` → `occultism:iron_dust` | `minecraft:iron_ingot` | 0.7 | **carried now** — tag and member carried, result vanilla |
+| 11 | `copper_ingot_from_dust` | `#c:dusts/copper` | `minecraft:copper_ingot` | 0.7 | `blocked(c:dusts/copper)` — no such tag and no copper dust item in the package; result would be vanilla |
+| 12 | `netherite_ingot_from_dust` | `#c:dusts/netherite` | `minecraft:netherite_ingot` | 0.7 | `blocked(c:dusts/netherite)` — tag absent |
+| 13 | `netherite_scrap_from_dust` | `#c:dusts/netherite_scrap` | `minecraft:netherite_scrap` | 0.7 | `blocked(c:dusts/netherite_scrap)` — tag absent |
+| 14 | `iesnium_ingot_from_dust` | `#c:dusts/iesnium` → `occultism:iesnium_dust` | `occultism:iesnium_ingot` | 0.7 | `blocked(occultism:iesnium_ingot)` — ingredient resolves, result not carried |
+| 15 | `iesnium_ingot_from_ore` | `#c:ores/iesnium` | `occultism:iesnium_ingot` | 0.7 | `blocked(c:ores/iesnium + occultism:iesnium_ingot)` — both absent |
+| 16 | `iesnium_ingot_from_raw` | `#c:raw_materials/iesnium` | `occultism:iesnium_ingot` | 0.7 | `blocked(c:raw_materials/iesnium + occultism:iesnium_ingot)` |
+| 17 | `silver_ingot_from_dust` | `#c:dusts/silver` → `occultism:silver_dust` | `occultism:silver_ingot` | 0.7 | `blocked(occultism:silver_ingot)` — ingredient resolves, result not carried |
+| 18 | `silver_ingot_from_ore` | `#c:ores/silver` | `occultism:silver_ingot` | 0.7 | `blocked(c:ores/silver + occultism:silver_ingot)` |
+| 19 | `silver_ingot_from_raw` | `#c:raw_materials/silver` | `occultism:silver_ingot` | 0.7 | `blocked(c:raw_materials/silver + occultism:silver_ingot)` |
+
+Evidence for the nine blocked rows: the package's `data/c/tags/item/` set has
+`dusts/{gold,iron,iesnium,silver,…}` but **no** `dusts/copper`, `dusts/netherite`,
+`dusts/netherite_scrap`, `ores/*` or `raw_materials/*`; and the package declares
+no `occultism:iesnium_ingot` / `occultism:silver_ingot` (checked over every
+`data/occultism/horizon/{item,block}/*.json` and the creative tab). No input or
+use was invented for any of them. The nine are *not* put in
+`tools/recipe-blockers.json` (that file records blockers for recipes **in** the
+package; these files are deliberately not packed), so `check_recipe_keys.py`
+stays at **0 blocked**.
+
+### Red → green, unit (verbatim, quoted before the two files were added)
+
+`ports/_shared/evidence/occultism/sdk-test-red-0.2.17.log` — the test demands
+ten smelting rows; the eight-row tree fails on the count assertion (not a
+compile error):
+
+```
+thread 'runtime::tests::the_smelting_family_covers_every_carryable_jar_recipe' (543684) panicked at src/runtime.rs:3822:9:
+assertion `left == right` failed: the smelting family has 8 files, expected 10 (["burnt_otherrock.json", "polished_otherrock.json", "cracked_otherstone_bricks.json", "polished_otherstone.json", "cracked_otherrock_bricks.json", "otherstone.json", "burnt_otherstone.json", "otherrock.json"])
+  left: 8
+ right: 10
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.00s
+```
+
+Green after adding the two files: **83 passed, 0 failed** (`sdk-test.log`). The
+new test also pins each row's 26.3 dialect, ingredient, result, 200 ticks and XP,
+and proves the two `#c:dusts/*` tags hold a carried dust member.
+
+### Red → green, in game (phase AB, `SMELT_ONLY=1`)
+
+The *previous package* is a game built from the same tree with the two new recipe
+files removed (8 smelting rows; tag `native-0a875da-c556ad60d71a`). With all ten
+row files present on disk, phase AB cooks the four old rows and then fails on the
+first new one — `e2e-smelt-red-8recipe-game-0.2.17.log`:
+
+```
+  SMELT gold_ingot_from_dust: input=occultism:gold_dust fuel=coal -> output=None xNone xp=0.7 cookingtime=200 (want minecraft:gold_ingot x1)
+SMELT FAIL: gold_ingot_from_dust made None, expected minecraft:gold_ingot
+EXIT:1
+```
+
+On the final 0.2.17 game (10 rows) the same leg passes —
+`e2e-smelt-0.2.17.log`, **PASS + EXIT:0**:
+
+```
+  SMELT gold_ingot_from_dust: input=occultism:gold_dust fuel=coal -> output=minecraft:gold_ingot x1 xp=0.7 cookingtime=200 (want minecraft:gold_ingot x1)
+  SMELT iron_ingot_from_dust: input=occultism:iron_dust fuel=coal -> output=minecraft:iron_ingot x1 xp=0.7 cookingtime=200 (want minecraft:iron_ingot x1)
+  SMELT gold_ingot_from_dust no fuel: input=occultism:gold_dust output=None
+  SMELT gold_ingot_from_dust wrong input (dirt): output=None
+  SMELT iron_ingot_from_dust no fuel: input=occultism:iron_dust output=None
+  SMELT iron_ingot_from_dust wrong input (dirt): output=None
+```
+
+Fail-capability: `SELFTEST=smelt` flips the last row's count → `SMELT FAIL:
+polished_otherstone made x1, expected x2`, `EXIT:1`
+(`e2e-selftest-smelt-0.2.17.log`); the no-package control fails on the first row
+(`SMELT FAIL: burnt_otherrock made None`), `EXIT:1`
+(`e2e-control-smelt-0.2.17.log`). The XP value is parsed from each recipe JSON
+and printed on its row; `ctl container` exposes slots only (no stored-XP field),
+so the XP assertion itself is the unit test plus the driver's artefact
+cross-check, not an in-game read — recorded, not hidden.
+
+### Ladder (all `build-slot.sh`; Rust forwarded to AdLf-PC, no `BUILD_LOCAL=1`)
+
+| step | command | evidence | result |
+|---|---|---|---|
+| tests (red) | `cargo test --offline <new test>` | `sdk-test-red-0.2.17.log` | **0 passed, 1 failed** (8 files, expected 10) |
+| tests | `cargo test --offline` | `sdk-test.log` | **83 passed**, 0 failed, exit 0 |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | `sdk-clippy-0.2.17.log` | exit 0, 0 warnings |
+| format | `cargo fmt --check` | `sdk-fmt-0.2.17.log` | exit 0 |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `sdk-build-0.2.17.log`, `sdk-build-second-0.2.17.log` | **`REPRODUCIBLE`** |
+| package | `sha256sum`, `stat -c%s`, `unzip -Z1` | `sdk-check-0.2.17.log` | **328,419 B**, SHA-256 `b47e28b71fece1334f0c9cdca3459b725744bb19165f53c1e636da018341e3db`, **668 entries**, no packed `Cargo.lock`, declares **0.2.17** |
+| tree match | packed vs tree (every file) | gate | **`package matches the tree`** — README and `description` edited before the final build |
+| package check | `cargo horizon-mod check occultism.hmod` | `sdk-check-0.2.17.log` | exit 0, `occultism 0.2.17 (native-mod, …/0a875da…/e59da90…, for 26.3)` |
+| fits (pin) | `cargo horizon-mod fits … --build 0a875da91dbb…` | `sdk-fits-0.2.17.log` | **`0a875da  made for`**, exit 0 |
+| fits (another build) | `cargo horizon-mod fits … --build 0b14f8acfd97…` | `sdk-fits-next-0.2.17.log` | **`0b14f8a  fits`**, exit 0 |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | — | **1/1** |
+| recipe keys | `python3 tools/check_recipe_keys.py` | — | **105 recipe(s), 105 craftable, 0 blocked, 0 failure(s)** |
+| recipe types | `python3 ports/tools/check-recipe-types.py occultism` | `check-recipe-types-0.2.14.log` | `occultism: ok`, exit 0 |
+| game build | `launcher-game.sh build occultism` (stale `native-*` tag removed first) | `launcher-build-0.2.17.log` | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-9e6b256502a1`, exported manifest `version = "0.2.17"` |
+| in game (family) | `SMELT_ONLY=1` | `e2e-smelt-0.2.17.log` | **PASS + EXIT:0** (10 rows + 4 differentials) |
+| in game (previous package) | 8-recipe game, `SMELT_ONLY=1` | `e2e-smelt-red-8recipe-game-0.2.17.log` | **FAIL + EXIT:1** (`gold_ingot_from_dust made None`) |
+| fail-capability | `SELFTEST=smelt` | `e2e-selftest-smelt-0.2.17.log` | **FAIL + EXIT:1** (count 1 → wanted 2) |
+| in game (control) | no-package game | `e2e-control-smelt-0.2.17.log` | **FAIL + EXIT:1** (`burnt_otherrock made None`) |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | — | **105 logs, 105 ok, 0 missing-exit, 0 bad-exit** |
+
+### Parity coverage (slice 17, added rows)
+
+| family | state |
+|---|---|
+| the 8 previously carried smelting rows | **tested** — phase AB (input + coal, 200 ticks, output id/count/XP, input consumed) |
+| `gold_ingot_from_dust`, `iron_ingot_from_dust` | **tested** — phase AB (the two new rows; red on the 8-recipe game, green on 0.2.17) |
+| no-fuel and wrong-input furnace differentials | **tested** — phase AB (both new rows cook nothing without fuel and from dirt) |
+| the 9 blocked jar smelting rows | **blocked(...)** — the table above; no ingredient or result was invented |
+| every other family (spirit fire, 26 conversions, crop, loot, crafting, building, bricks, polished, cobble, redstone, frames, bowls, chalks, tablet, stonecutting, all ids) | **tested** — phases A..AA, unchanged; this slice's full sweep was not repeated under load (the box sat at load ~18 with 5 e2e games), each family's own leg stays green |
+
+### Measured harness facts (added by this slice)
+
+1. `ctl container X Y Z [ITEM COUNT]` inserts into the **first empty slot** of a
+   furnace, so one input + one coal land in slots 0/1 and the output is read from
+   slot 2 — the same shape the bricks/polished phases use.
+2. The furnace's stored XP is not in the `ctl container` reply (slots only), so
+   the XP value is asserted from the recipe JSON (unit + driver cross-check) and
+   printed per row; the in-game leg asserts id, count and consumption.
+3. A `#c:dusts/<metal>` smelting ingredient is a bare `"#c:dusts/<metal>"`
+   string in the 26.3 dialect (the same form the carried `#c:crops/datura`
+   crafting key uses); the jar's `{"tag": …}` object form would be dropped.
+4. The red-game export and the final export were kept separate on disk so the
+   8-recipe game (for the family red) and the 10-recipe game (for green) both
+   stayed available; the stale `native-*` tag was removed before the final build
+   so the launcher printed `Compiling occultism (1 of 1)`.
+
+### Upstream defects fixed
+
+None. The two carried rows are the jar's own shapes translated to the 26.3
+dialect; the nine blocked rows are not the port's defects (their ingredients or
+results are outside this slice's id set).
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices

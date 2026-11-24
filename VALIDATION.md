@@ -663,3 +663,71 @@ slot (`--step e2e`), with `E2E_TMP` from `launcher-game.sh env` for every scratc
 
 Every leg above ran on the final 326,218 B artifact / tree. `E2E_TMP`
 (`~/.cache/horizon-e2e/scratch`) was used throughout; no leg wrote under `/tmp`.
+
+## 9. SDK 0.2.17 — the full carried id set, given and placed in game
+
+Pin `0a875da`. **Harness-only slice**: the package differs from 0.2.16 in its
+version string and the two packed doc paragraphs (README + manifest
+description), both edited before the final build; the 121 item ids, 52 block
+ids and their data are unchanged. Every compile/test step ran through
+`build-slot.sh run --job W1-occultism --port ports/occultism --step <…>`
+(**forwarded to AdLf-PC**, no `BUILD_LOCAL=1`, no `--target-dir`, no private
+cache). The game legs stayed local on that port's slot with `E2E_TMP` from
+`launcher-game.sh env` for every scratch path; nothing wrote under `/tmp`.
+
+| Step | Command | Result |
+|---|---|---|
+| enumeration | `tools/all_ids_check.py` (import + enumerate) | **121** giveable item ids (71 explicit + 50 block items) == the **121** creative-tab ids; **52** block ids (2 with no item); 52 golden states cross-checked — `all-ids-enumeration-0.2.17.txt` |
+| red (inverted, previous game) | `ALL_IDS_ONLY=1 SELFTEST=all-ids` on 0.2.16 | **FAIL + EXIT:1** — `ALL IDS FAIL: asserted 121 item ids and 52 block ids, expected 122 and 53 (declared 121/52)` — `e2e-selftest-all-ids-0.2.16.log` |
+| green (previous game) | `ALL_IDS_ONLY=1` on 0.2.16 | **PASS + EXIT:0**, 175 observed lines — `e2e-all-ids-0.2.16.log` |
+| unit | `cargo test --offline` | **82 passed, 0 failed** — `sdk-test.log`, `sdk-test-0.2.17.log` |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | exit 0, 0 warnings — `sdk-clippy-0.2.17.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt-0.2.17.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cp target/horizon-mod/occultism.hmod ./occultism.hmod`, `cmp` | **`CMP_RC=0` REPRODUCIBLE**: 326,483 B, `54aa7d7e…f30be` — `sdk-build-0.2.17.log`, `sdk-build-second-0.2.17.log` |
+| package | `sha256sum`, `stat -c%s`, `unzip -Z1 \| wc -l`, packed manifest | 326,483 B, `54aa7d7eb2fdb4ae120eea174443c0ae6f3aee51b93d4077a1e3c4377c0f30be`, **666 entries**, no packed `Cargo.lock`, declares **0.2.17** |
+| runtime inside/outside | the gate's byte comparison | identical, `190aca6c…` (unchanged from 0.2.16) |
+| tree match | `verify-sdk-package.py` | **package matches the tree** (README and manifest edited before the final build) — `sdk-gate-0.2.17.txt` |
+| package check | `cargo horizon-mod check occultism.hmod` | exit 0, `occultism 0.2.17 (native-mod, format native-1/0a875da…/e59da90…, for 26.3)`, `326483 bytes, SHA-256 54aa7d7e…f30be` — `sdk-check-0.2.17.log` |
+| fits (pin) | `cargo horizon-mod fits occultism.hmod --build 0a875da91dbb…` | **`0a875da  made for`**, exit 0 — `sdk-fits-0.2.17.log` |
+| fits (another build) | `cargo horizon-mod fits occultism.hmod --build 0b14f8acfd97…` | **`0b14f8a  fits`**, exit 0 — `sdk-fits-next-0.2.17.log` |
+| gate | `python3 ports/tools/verify-sdk-package.py occultism` | **1/1** (82 tests, 0 clippy warnings, package = tree, R9 tables/deps, no lock) — `sdk-gate-0.2.17.txt` |
+| recipe types | `python3 ports/tools/check-recipe-types.py occultism` | `occultism: ok`, exit 0 — `check-recipe-types-0.2.17.log` |
+| recipe keys | `python3 tools/check_recipe_keys.py` | **103 recipe(s), 103 craftable, 0 blocked, 0 failure(s)** — `check-recipe-keys-0.2.17.log` |
+| game build | `launcher-game.sh build occultism` (the two stale `native-*` tags carrying 0.2.15/0.2.16 removed first) | **`Compiling occultism (1 of 1)`**, tag `native-0a875da-4a63f658d175`, exported manifest `version = "0.2.17"` — `launcher-build-0.2.17.log` |
+| in game (the family) | `ALL_IDS_ONLY=1` | **PASS + EXIT:0** — 121 give/inventory lines, 52 setblock/state lines, 2 unknown-id lines — `e2e-all-ids-0.2.17.log`, observed lines in `all-ids-0.2.17-observed.txt` |
+| in game (control ids) | `CONTROL_LEG=1 ALL_IDS_ONLY=1` | **PASS + EXIT:0** — sampled ids unknown without the package — `e2e-control-ids-all-ids-0.2.17.log` |
+| in game (control) | `GAME=$CONTROL_GAME CONTROL_GAME= ALL_IDS_ONLY=1` | **FAIL + EXIT:1** (`unknown item occultism:afrit_essence`) — `e2e-control-all-ids-0.2.17.log` |
+| fail-capability (this family) | `ALL_IDS_ONLY=1 SELFTEST=all-ids` | **FAIL + EXIT:1** (122/53 asserted vs 121/52 declared) — `e2e-selftest-all-ids-0.2.17.log` |
+| full sweep | `bash tools/e2e.sh` | **incomplete**: the shared box at load ~25 killed the game mid-run in phase N and again in phase W (connection error, no assertion), both `EXIT:1` — `e2e-default-0.2.17.log`, `e2e-default-0.2.17-retry.log`; the dedicated family legs above are the evidence |
+| log gate | `python3 ports/tools/check-e2e-logs.py occultism-e2e --strict` | **100 logs, 100 ok**, 0 missing-exit, 0 bad-exit — `check-e2e-logs-0.2.17.txt` |
+
+## Slice 17 (0.2.17, product build) — smelting coverage
+
+The 0.2.17 archive from slice 16 was evidence-only (version lines and
+README/description differ from published 0.2.16) and was never published. This
+slice keeps version 0.2.17 but makes it a real product build: two carried
+smelting recipes and their in-game proof. Published version stays 0.2.16.
+
+| step | command | result |
+|---|---|---|
+| tests (red) | `cargo test --offline the_smelting_family_covers_every_carryable_jar_recipe` | **0 passed, 1 failed** — 8 files, expected 10 — `sdk-test-red-0.2.17.log` |
+| tests | `cargo test --offline` | **83 passed, 0 failed** — `sdk-test.log` |
+| lints | `cargo clippy --all-targets --offline -- -D warnings` | 0 warnings — `sdk-clippy-0.2.17.log` |
+| format | `cargo fmt --check` | exit 0 — `sdk-fmt-0.2.17.log` |
+| build 1 + 2 | `rm -f Cargo.lock && cargo horizon-mod build` twice, `cmp` | `REPRODUCIBLE` — `sdk-build-0.2.17.log`, `sdk-build-second-0.2.17.log` |
+| artifact | `sha256sum`, `stat`, `unzip -Z1` | **328,419 B**, `b47e28b7…e3db`, **668 entries**, no packed `Cargo.lock`, 0.2.17 |
+| tree match | gate vs tree | `package matches the tree` — README + `description` edited before the final build |
+| check | `cargo horizon-mod check occultism.hmod` | `occultism 0.2.17 (native-mod, …/0a875da…/e59da90…, for 26.3)` — `sdk-check-0.2.17.log` |
+| fits (pin) | `--build 0a875da91dbb…` | `0a875da  made for` — `sdk-fits-0.2.17.log` |
+| fits (other) | `--build 0b14f8acfd97…` | `0b14f8a  fits` — `sdk-fits-next-0.2.17.log` |
+| gate | `verify-sdk-package.py occultism` | **1/1** (83 tests, 0 warnings, package = tree, R9, no lock) |
+| recipe keys | `python3 tools/check_recipe_keys.py` | **105 recipe(s), 105 craftable, 0 blocked** |
+| recipe types | `check-recipe-types.py occultism` | `occultism: ok` |
+| game build | `launcher-game.sh build occultism` (stale `native-*` tag removed first) | `Compiling occultism (1 of 1)`, tag `native-0a875da-9e6b256502a1`, manifest 0.2.17 — `launcher-build-0.2.17.log` |
+| in game (family) | `SMELT_ONLY=1` | **PASS + EXIT:0** — 10 rows + 4 differentials — `e2e-smelt-0.2.17.log` |
+| in game (previous package) | 8-recipe game, `SMELT_ONLY=1` | **FAIL + EXIT:1** (`gold_ingot_from_dust made None`) — `e2e-smelt-red-8recipe-game-0.2.17.log` |
+| fail-capability | `SELFTEST=smelt` | **FAIL + EXIT:1** (`polished_otherstone made x1, expected x2`) — `e2e-selftest-smelt-0.2.17.log` |
+| in game (control) | no-package game | **FAIL + EXIT:1** (`burnt_otherrock made None`) — `e2e-control-smelt-0.2.17.log` |
+| log gate | `check-e2e-logs.py occultism-e2e --strict` | **105 logs, 105 ok**, 0 missing-exit, 0 bad-exit |
+
+Skills: superpowers/using-superpowers,test-driven-development,verification-before-completion; BeautifulRust/rust-best-practices

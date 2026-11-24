@@ -3776,4 +3776,145 @@ mod tests {
             assert!(carried(result), "{file}: {result} is not carried");
         }
     }
+
+    /// The jar ships 19 `data/occultism/recipe/smelting/*.json`. A row is
+    /// carryable when its ingredient resolves (a carried item, or a carried tag
+    /// with a carried member) and its result exists (a carried item or a vanilla
+    /// item). Ten qualify: the eight carried since 0.2.7–0.2.13, and the two
+    /// dust → vanilla-ingot rows this slice adds. The other nine name an absent
+    /// tag or an absent result and are recorded as `blocked(...)` in notes.md —
+    /// never invented here. Every carried row must be 26.3 dialect (a bare
+    /// string or `#tag`, not the jar's `{"item":...}`/`{"tag":...}` object,
+    /// which the loader drops without a word) and keep the jar's time and XP.
+    #[test]
+    fn the_smelting_family_covers_every_carryable_jar_recipe() {
+        fn carried(id: &str) -> bool {
+            let name = id.strip_prefix("occultism:").unwrap_or(id);
+            let horizon =
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data/occultism/horizon");
+            horizon.join("item").join(format!("{name}.json")).is_file()
+                || horizon.join("block").join(format!("{name}.json")).is_file()
+        }
+        let rows: &[(&str, &str, &str, f64)] = &[
+            (
+                "burnt_otherstone",
+                "occultism:polished_otherstone",
+                "occultism:burnt_otherstone",
+                0.15,
+            ),
+            (
+                "burnt_otherrock",
+                "occultism:polished_otherrock",
+                "occultism:burnt_otherrock",
+                0.15,
+            ),
+            (
+                "cracked_otherstone_bricks",
+                "occultism:otherstone_bricks",
+                "occultism:cracked_otherstone_bricks",
+                0.3,
+            ),
+            (
+                "cracked_otherrock_bricks",
+                "occultism:otherrock_bricks",
+                "occultism:cracked_otherrock_bricks",
+                0.3,
+            ),
+            (
+                "otherstone",
+                "occultism:othercobblestone",
+                "occultism:otherstone",
+                0.5,
+            ),
+            (
+                "otherrock",
+                "occultism:othercobblerock",
+                "occultism:otherrock",
+                0.5,
+            ),
+            (
+                "polished_otherstone",
+                "occultism:otherstone",
+                "occultism:polished_otherstone",
+                0.5,
+            ),
+            (
+                "polished_otherrock",
+                "occultism:otherrock",
+                "occultism:polished_otherrock",
+                0.5,
+            ),
+            (
+                "gold_ingot_from_dust",
+                "#c:dusts/gold",
+                "minecraft:gold_ingot",
+                0.7,
+            ),
+            (
+                "iron_ingot_from_dust",
+                "#c:dusts/iron",
+                "minecraft:iron_ingot",
+                0.7,
+            ),
+        ];
+        let dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data/occultism/recipe/smelting");
+        let files: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+            .map(|entry| {
+                entry
+                    .expect("readable smelting entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        assert_eq!(
+            files.len(),
+            rows.len(),
+            "the smelting family has {} files, expected {} ({files:?})",
+            files.len(),
+            rows.len()
+        );
+        for (name, ingredient, result, xp) in rows {
+            let text = content(&format!("occultism/recipe/smelting/{name}.json"));
+            assert!(
+                text.contains("\"minecraft:smelting\""),
+                "{name} is not a smelting recipe: {text}"
+            );
+            assert!(
+                !text.contains("\"item\":") && !text.contains("\"tag\":"),
+                "{name} carries the 1.21.1 object-form ingredient, which the 26.3 loader drops: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"ingredient\": \"{ingredient}\"")),
+                "{name} lost the bare ingredient {ingredient}: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"id\": \"{result}\"")),
+                "{name} does not make {result}: {text}"
+            );
+            assert!(
+                text.contains(&format!("\"experience\": {xp}")),
+                "{name} does not declare the jar's {xp} experience: {text}"
+            );
+            assert!(
+                text.contains("\"cookingtime\": 200"),
+                "{name} does not declare the jar's 200-tick cooking time: {text}"
+            );
+            if let Some(tag) = ingredient.strip_prefix('#') {
+                let (namespace, path) = tag.split_once(':').expect("a namespaced tag");
+                let tag_text = content(&format!("{namespace}/tags/item/{path}.json"));
+                let member = if tag == "c:dusts/gold" {
+                    "occultism:gold_dust"
+                } else {
+                    "occultism:iron_dust"
+                };
+                assert!(
+                    tag_text.contains(&format!("\"{member}\"")) && carried(member),
+                    "{name}: the tag {tag} has no carried member ({member})"
+                );
+            }
+        }
+    }
 }
