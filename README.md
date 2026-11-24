@@ -14,7 +14,11 @@ tier mined from the raw stones (0.2.9), the button and pressure-plate pair
 (0.2.12) — the tier's first block entity — the 17 impure-chalk craftings
 (0.2.13) with the tags and items they need, the otherstone tablet (0.2.14), and the
 32 stonecutting recipes (0.2.15) — every stone, polished stone, brick and cobble
-cuts into its own slab, stairs, wall or bricks at a real stonecutter.
+cuts into its own slab, stairs, wall or bricks at a real stonecutter. Version
+0.2.16 proves **all 32** of those recipes in game (0.2.15 proved only the two
+raw-stone slabs): each declared ingredient at a real stonecutter, the exact
+`occultism:stonecutting/<stem>` offer selected, the output id and count read back
+with the input consumed, and vanilla stone offering no occultism result.
 
 ## What works
 
@@ -88,7 +92,7 @@ See [`notes.md`](notes.md) for the full gap list and the reason for each.
 
 One file: `occultism.hmod`. It is the whole mod — `horizon-mod.toml`,
 `src/lib.rs` + `src/support.rs` (the code), `src/runtime.rs` (the pure rules and
-their 81 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
+their 82 tests), `assets/` and `data/` (the carried blocks, items, recipes, loot,
 tags and lang) and the licence notices.
 
 A native SDK package is built against the game by the launcher:

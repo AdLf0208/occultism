@@ -3613,3 +3613,138 @@ cuts and the `otherstone_bricks` input, then the six polished and six cobble cut
 `STONECUT_SELFTEST`-style count flip on the bricks cut must exit 1. The storage controllers stay
 `blocked(ritual:craft_storage_controller_base)`, and the cobble→stone reverse smelt is already
 proven in phase U, so neither is a candidate.
+
+---
+
+## Slice 15 (0.2.16) — in-game proof for all 32 carried stonecutting recipes
+
+**Slice chosen / gap line.** 0.2.15's coverage row claimed "all 32 stonecutting recipes — tested",
+but its phase Z cut only the two raw-stone slabs; its own `### Next slice` proposed "All 30
+remaining stonecutting results". The parity rule (AGENTS.md 2026-11-20; ARCHITECTURE.md §5.0)
+requires *every* carried recipe to be exercised in game, so this slice makes that row true for
+all 32. Class **content**, tier **deep** (ledger — the brief's prose agrees). The work is a pure
+carried-data proof: **no new data and no code**, only the harness, so it stays inside the tier's
+data half. Licence **MIT**; this is an **Update** of our own `main` entry
+(`Update occultism 0.2.16`; 0.2.15 was staged on PR #1828), not a first `Add`.
+
+**Enumeration comes from the artefact, not the brief.** `tools/stonecutter_check.py` reads every
+`data/occultism/recipe/stonecutting/*.json`, parses the bare-string `ingredient` and the
+`{"count", "id"}` result, and asserts exactly 32. The jar
+`occultism-1.21.1-neoforge-1.225.0.jar` carries the same 32 stems (a diff of jar stems vs ported
+stems is empty; `stonecutting-carry-0.2.15.txt` is the dialect evidence). Ingredient distribution:
+otherstone 7, otherrock 7, otherstone_bricks 3, otherrock_bricks 3, polished_otherstone 3,
+polished_otherrock 3, othercobblestone 3, othercobblerock 3. `check_recipe_keys.py` stays
+**103 recipe(s), 103 craftable, 0 blocked, 0 failure(s)**; `check-recipe-types.py occultism` stays
+`occultism: ok`.
+
+**Red / inverted verdict.** A harness-only slice has no new Rust/data test to turn red; the
+fail-capable proof is the count flip, first run against the previous 0.2.15 game before packaging:
+16 real cuts passed, then `e2e-selftest-stonecut-all-0.2.15.log` ended
+`STONECUT FAIL: selected 0, result 'occultism:otherstone_bricks x1', expected cell 0 and 'occultism:otherstone_bricks x2'`,
+`EXIT:1`. On the final 0.2.16 game the same run (`e2e-selftest-stonecut-all-0.2.16.log`) again
+ends `EXIT:1` on that exact line after the same 16 real cuts. The control game without the package
+ends `EXIT:1` at `STONECUT FAIL: occultism:othercobblerock is not in the inventory ({})`. The
+carried-data unit test written in 0.2.15 (`the_32_stonecutting_recipes_are_in_the_jars_26_3_dialect`)
+stays green: 82 passed, 0 failed.
+
+**Green ladder (all through `build-slot.sh`, Rust forwarded to AdLf-PC, no `BUILD_LOCAL=1`).**
+`cargo test --offline` 82 passed / 0 failed; `cargo clippy --all-targets --offline -- -D warnings`
+0 warnings; `cargo fmt --check` exit 0; two `rm -f Cargo.lock && cargo horizon-mod build` runs are
+`cmp`-identical; `cargo horizon-mod check` reports `326218 bytes, SHA-256
+7ad8d4ac…742ecc, unsigned`; `fits --build 0a875da…` → `0a875da  made for`, `fits --build
+0b14f8a…` → `0b14f8a  fits`; `verify-sdk-package.py occultism` **1/1** (package matches the tree,
+R9 tables/deps, no packed `Cargo.lock`). The game build removed the stale 0.2.15 `native-*`
+tag first and printed `Compiling occultism (1 of 1)`, tag `native-0a875da-8476f64d8684`, exported
+manifest `version = "0.2.16"`.
+
+**In-game transcript (phase Z, all 32).** A real `minecraft:stonecutter` at (222, 101, 38) on a stone
+base, opened with `ctl interact` after `ctl look-at-block`; `ctl menu` guarded on
+`station = "Stonecutter"`. Each ingredient fed into slot 600, the exact
+`occultism:stonecutting/<stem>` offer selected by `ctl click-gui` on its 4x3 cell after a different
+cell was selected as the differential, slot 650's result read back, then taken into the inventory:
+output id and count asserted, input consumed. A `ctl container` probe at the block answers
+`{"error":"no container there"}` (the stonecutter has no block entity here) — kept in the log.
+Vanilla `minecraft:stone` offers only eleven `minecraft:…` ids and **no** `occultism:` id, and made
+no occultism slab. No `invalid ingredient` line in the game log. Green legs:
+`e2e-stonecut-all-0.2.16.log` **PASS + EXIT:0** (32 cut lines), `e2e-default-0.2.16.log`
+**PASS + EXIT:0** (full A..Z sweep, 32 cut lines), `e2e-control-ids-stonecut-all-0.2.16.log`
+**PASS + EXIT:0**. Fail legs: `e2e-control-stonecut-all-0.2.16.log` and
+`e2e-selftest-stonecut-all-0.2.16.log` both **FAIL + EXIT:1**.
+`check-e2e-logs.py occultism-e2e --strict`: **92 logs, 92 ok, 0 missing-exit, 0 bad-exit**
+(the original 87 plus these 5). `E2E_TMP` (`~/.cache/horizon-e2e/scratch`) was used throughout;
+no leg wrote under `/tmp`.
+
+**The 32 observed outputs** (verbatim `PASS` lines from `e2e-stonecut-all-0.2.16.log`, saved in
+`stonecut-all-0.2.16-observed.txt`; the full sweep prints the same 32):
+
+```
+occultism:stonecutting/othercobblerock_slab_from_othercobblerock -> occultism:othercobblerock_slab x2
+occultism:stonecutting/othercobblerock_stairs_from_othercobblerock -> occultism:othercobblerock_stairs x1
+occultism:stonecutting/othercobblerock_wall_from_othercobblerock -> occultism:othercobblerock_wall x1
+occultism:stonecutting/othercobblestone_slab_from_othercobblestone -> occultism:othercobblestone_slab x2
+occultism:stonecutting/othercobblestone_stairs_from_othercobblestone -> occultism:othercobblestone_stairs x1
+occultism:stonecutting/othercobblestone_wall_from_othercobblestone -> occultism:othercobblestone_wall x1
+occultism:stonecutting/otherrock_bricks_from_otherrock -> occultism:otherrock_bricks x1
+occultism:stonecutting/otherrock_bricks_slab_from_otherrock -> occultism:otherrock_bricks_slab x2
+occultism:stonecutting/otherrock_bricks_slab_from_otherrock_bricks -> occultism:otherrock_bricks_slab x2
+occultism:stonecutting/otherrock_bricks_stairs_from_otherrock -> occultism:otherrock_bricks_stairs x1
+occultism:stonecutting/otherrock_bricks_stairs_from_otherrock_bricks -> occultism:otherrock_bricks_stairs x1
+occultism:stonecutting/otherrock_bricks_wall_from_otherrock -> occultism:otherrock_bricks_wall x1
+occultism:stonecutting/otherrock_bricks_wall_from_otherrock_bricks -> occultism:otherrock_bricks_wall x1
+occultism:stonecutting/otherrock_slab_from_otherrock -> occultism:otherrock_slab x2
+occultism:stonecutting/otherrock_stairs_from_otherrock -> occultism:otherrock_stairs x1
+occultism:stonecutting/otherrock_wall_from_otherrock -> occultism:otherrock_wall x1
+occultism:stonecutting/otherstone_bricks_from_otherstone -> occultism:otherstone_bricks x1
+occultism:stonecutting/otherstone_bricks_slab_from_otherstone -> occultism:otherstone_bricks_slab x2
+occultism:stonecutting/otherstone_bricks_slab_from_otherstone_bricks -> occultism:otherstone_bricks_slab x2
+occultism:stonecutting/otherstone_bricks_stairs_from_otherstone -> occultism:otherstone_bricks_stairs x1
+occultism:stonecutting/otherstone_bricks_stairs_from_otherstone_bricks -> occultism:otherstone_bricks_stairs x1
+occultism:stonecutting/otherstone_bricks_wall_from_otherstone -> occultism:otherstone_bricks_wall x1
+occultism:stonecutting/otherstone_bricks_wall_from_otherstone_bricks -> occultism:otherstone_bricks_wall x1
+occultism:stonecutting/otherstone_slab_from_otherstone -> occultism:otherstone_slab x2
+occultism:stonecutting/otherstone_stairs_from_otherstone -> occultism:otherstone_stairs x1
+occultism:stonecutting/otherstone_wall_from_otherstone -> occultism:otherstone_wall x1
+occultism:stonecutting/polished_otherrock_slab_from_polished_otherrock -> occultism:polished_otherrock_slab x2
+occultism:stonecutting/polished_otherrock_stairs_from_polished_otherrock -> occultism:polished_otherrock_stairs x1
+occultism:stonecutting/polished_otherrock_wall_from_polished_otherrock -> occultism:polished_otherrock_wall x1
+occultism:stonecutting/polished_otherstone_slab_from_polished_otherstone -> occultism:polished_otherstone_slab x2
+occultism:stonecutting/polished_otherstone_stairs_from_polished_otherstone -> occultism:polished_otherstone_stairs x1
+occultism:stonecutting/polished_otherstone_wall_from_polished_otherstone -> occultism:polished_otherstone_wall x1
+```
+
+**Harness facts carried forward / extended from 0.2.15.** (1) `ctl menu` lists only non-empty
+slots, so the guard is the station name, not slot presence; slot reads treat absence as empty.
+(2) Station offers are namespaced `occultism:stonecutting/<file stem>`. (3) A stonecutter has no
+block entity here (`ctl container` → `no container there`); its container is the guarded station
+menu's slots 600/650. (4) Recipe cell GUI centres are
+`(52 + 16*(p%4) + 8, 14 + 18*(p//4) + 9)`. (5) New: each of the 32 cases selects a different
+cell first, so the *selection* (not just the input and the recipe list) is proven to decide the
+result. (6) New: `SELFTEST=stonecut-all` maps to `STONECUT_SELFTEST=stonecut-all`, flipping the
+bricks cut's expected count from x1 to x2.
+
+**Parity coverage update (replaces 0.2.15's two-slab row):**
+
+| family | state |
+|---|---|
+| all 32 stonecutting recipes | **tested** — phase Z in `e2e-stonecut-all-0.2.16.log` and the full sweep: every one of the 32 enumerated from the ported files, exact `occultism:stonecutting/<stem>` offer selected, output id and count asserted from slot 650, input consumed; a different cell and vanilla stone are the differentials; count-flip `SELFTEST=stonecut-all` and the no-package control both `EXIT:1`. `check_recipe_keys.py` reads all 32 as craftable (103 total, 0 blocked) |
+| crafting grids, smelts, loot tables, bowls, chalks, tablet and 0.2.2–0.2.14 families | **tested** — phases A..Y, unchanged, re-run in the 0.2.16 full sweep |
+| storage controllers and their bases, pentacle rituals, spirits/AI, GeckoLib, Otherworld, guide book, Curios | **not carried / blocked** — the gap list above; controllers stay `blocked(ritual:craft_storage_controller_base)` |
+
+Skills: superpowers/using-superpowers,brainstorming,writing-plans,test-driven-development,systematic-debugging,verification-before-completion; BeautifulRust/rust-best-practices,rust-review
+
+### Next slice
+
+**Prove the full carried id set at a real game.** Every other carried *recipe* family is now
+exercised in game, but the parity rule's "every block and item — place or give it, read it back,
+assert an unknown id is refused" row is only covered piecemeal (phase A checks datura, the other
+phases check the ids they use). Family: the carried item/block registry, from the coverage table's
+`not ported`→`tested` gap and the jar's own `data/occultism/horizon/{item,block}/` inventory, not
+from a name. It fits tier `data` and needs no code: enumerate every `occultism:*` id the package
+declares (plus the creative tab), give/place each in a scratch world, read its id and default
+state back, and assert an unknown `occultism:` id is refused. The concrete assertion: `ctl give
+occultism:<id> 1` then `ctl inventory` reports exactly one stack of that id for every declared
+item; `ctl setblock occultism:<block>` then `ctl block` reads the declared default state; a made-up
+`occultism:definitely_not_an_item` lands nothing. A `SELFTEST=all-ids` count flip (assert one more
+id than declared) must end `EXIT:1`. The pentacle-ritual results
+(`blocked(ritual:craft_storage_controller_base)`) and the statistical grass seed
+(`blocked(harness-break-reliability)`) stay untouched — neither is a candidate.

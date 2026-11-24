@@ -1,31 +1,41 @@
 #!/usr/bin/env python3
-"""Cut real slabs at a real stonecutter (slice 14, phase Z).
+"""Cut all 32 carried recipes at a real stonecutter (slice 15, phase Z).
 
-The recipe files are data; this is the fail-capable in-game proof that the 26.3
-dialect rewrite actually loads and produces the declared output.
+The recipe files are data; this is the fail-capable in-game proof that every one
+of the 26.3-dialect stonecutting recipes actually loads and produces its declared
+output. 0.2.15 proved only the two raw-stone slabs; the parity rule (AGENTS.md
+2026-11-20) requires every carried recipe to be exercised.
 
-For each of the three inputs the harness:
+The 32 ids are **enumerated from the ported files**, not from the brief: every
+`data/occultism/recipe/stonecutting/*.json` is read, its bare-string ingredient
+and `{"count", "id"}` result parsed, and the list asserted to be exactly 32.
+The jar was checked to carry the same 32 stems (`stonecutting-carry-0.2.15.txt`).
+
+For each recipe the harness:
 
 1. places a `minecraft:stonecutter` on a stone base at (x, y, z), opens it with
-   `ctl interact` (a `ctl use` leaves the screen in `playing` and every slot click
-   silently misses), and **guards** the open menu: `ctl menu` must answer
-   `station = "Stonecutter"` with the slots 600 (input) and 650 (result), so a
-   plain inventory screen can never be mistaken for the station;
-2. inserts **one** item into slot 600, reads back the station's container slots,
-   and asserts the offer list names the jar's recipe id;
+   `ctl interact`, and **guards** the open menu: `ctl menu` must answer
+   `station = "Stonecutter"`; `ctl menu` lists only non-empty slots, so an empty
+   station slot 600/650 is absent and the guard is the station name, not slot
+   presence. A stonecutter has no block entity here (`ctl container` answers
+   "no container there"), so its container is the guarded menu's slots 600/650;
+2. inserts **one** of the declared ingredient into slot 600 and asserts the
+   offer list names `occultism:stonecutting/<file stem>`;
 3. clicks a *different* offer first (the differential: the selection, not the
    input alone, decides the result), then selects the declared recipe with
    `ctl click-gui` on its 4x3 cell (the GUI geometry Horizon's
    `game/stations.rs::station_targets` uses);
-4. asserts the selected result reads `<id> x<count>`, that slot 600 holds the
-   consumed input and slot 650 holds exactly `count` of the result, then takes
-   it and checks the inventory gained exactly that count;
-5. repeats with `occultism:otherrock` (its own slab), and with vanilla
-   `minecraft:stone` (no `occultism:` offer, no occultism slab) as the
-   differential.
+4. asserts the selected result reads `<id> x<count>`, that slot 650 holds
+   exactly `count` of the result, then takes it and asserts the input was
+   consumed and the inventory gained exactly `count`;
+5. prints one `PASS <offer>: <result> x<count> ...` line per recipe.
 
-`STONECUT_SELFTEST=1` asserts the first slab is **one** instead of two, so a
-working package must FAIL that run (`EXIT:1` is its fail-capability proof).
+Finally vanilla `minecraft:stone` must offer no `occultism:` recipe and make no
+occultism slab — the differential against an input with no carried recipes.
+
+`SELFTEST=stonecut-all` (STONECUT_SELFTEST=stonecut-all) flips the bricks cut's
+expected count from one to two, so a working package must FAIL that run
+(`EXIT:1` is its fail-capability proof).
 
 Usage: python3 tools/stonecutter_check.py SOCK CTL X Y Z
 """
@@ -35,15 +45,51 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 INPUT = 600
 RESULT = 650
+# A count flip on this cut (one brick per otherstone -> expect two) is the
+# fail-capability probe for the whole sweep.
+SELFTEST_STEM = "otherstone_bricks_from_otherstone"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "occultism" / "recipe" / "stonecutting"
+
+
+def enumerate_recipes() -> list[dict]:
+    """Read every carried stonecutting recipe; the id list is the artefact's."""
+    if not DATA_DIR.is_dir():
+        raise SystemExit(f"STONECUT FAIL: no recipe directory {DATA_DIR}")
+    recipes: list[dict] = []
+    for path in sorted(DATA_DIR.glob("*.json")):
+        data = json.loads(path.read_text())
+        if data.get("type") != "minecraft:stonecutting":
+            raise SystemExit(f"STONECUT FAIL: {path.name} is not a stonecutting recipe")
+        ingredient = data.get("ingredient")
+        result = data.get("result") or {}
+        if not isinstance(ingredient, str) or not ingredient.startswith("occultism:"):
+            raise SystemExit(f"STONECUT FAIL: {path.name} has no bare-string occultism ingredient: {ingredient}")
+        if "id" not in result or "count" not in result:
+            raise SystemExit(f"STONECUT FAIL: {path.name} has no {{count,id}} result: {result}")
+        recipes.append({
+            "stem": path.stem,
+            "offer": f"occultism:stonecutting/{path.stem}",
+            "ingredient": ingredient,
+            "result": result["id"],
+            "count": int(result["count"]),
+        })
+    if len(recipes) != 32:
+        raise SystemExit(f"STONECUT FAIL: enumerated {len(recipes)} recipes, expected 32")
+    return recipes
 
 
 def main() -> int:
     sock, ctl = sys.argv[1], sys.argv[2]
     x, y, z = (int(v) for v in sys.argv[3:6])
-    selftest = os.environ.get("STONECUT_SELFTEST") == "1"
+    selftest = os.environ.get("STONECUT_SELFTEST", "0") not in ("", "0")
+    recipes = enumerate_recipes()
+    print(f"enumerated {len(recipes)} stonecutting recipes from {DATA_DIR}")
+    if selftest:
+        print(f"(selftest: asserting {SELFTEST_STEM} yields x2 instead of x1)")
 
     def run(*args: str) -> dict:
         out = subprocess.run([ctl, "--socket", sock, *args], text=True, capture_output=True)
@@ -149,16 +195,16 @@ def main() -> int:
         rc, out, err = raw("container", str(x), str(y), str(z))
         print(f"  ctl container {x} {y} {z} ({what}): rc={rc} {out.strip()}{err.strip()}")
 
-    def case(item: str, recipe: str, result_item: str, count: int) -> None:
-        # The recipe service namespaces station offers as
-        # `<ns>:stonecutting/<file stem>` (checked in game: the otherstone input
-        # offered seven `occultism:stonecutting/otherstone_*` ids).
-        stem = recipe.split(":", 1)[1] if ":" in recipe else recipe
-        offer = f"occultism:stonecutting/{stem}"
-        print(f"== {item} -> {recipe} ==")
+    def case(recipe: dict) -> None:
+        item = recipe["ingredient"]
+        offer = recipe["offer"]
+        result_item = recipe["result"]
+        count = recipe["count"]
+        # The inverted assertion for this whole sweep: flip the bricks cut.
+        expected = count + 1 if (selftest and recipe["stem"] == SELFTEST_STEM) else count
+        print(f"== {item} -> {offer} ({len(recipes)} recipes) ==")
         open_cutter(item)
         feed(item)
-        container_log(f"{item} inserted")
         info = menu().get("info") or {}
         offers = info.get("recipes") or []
         if offer not in offers:
@@ -170,7 +216,7 @@ def main() -> int:
                 f"STONECUT FAIL: {len(offers)} offers do not fit the 12 shown cells"
             )
         index = offers.index(offer)
-        want = f"{result_item} x{count}"
+        want = f"{result_item} x{expected}"
 
         # The differential: a different cell must select a different result.
         other = (index + 1) % len(offers)
@@ -226,24 +272,11 @@ def main() -> int:
                 f"STONECUT FAIL: the inventory holds {after} {result_item}, expected {old + count}"
             )
         container_log(f"{item} consumed, {count} {result_item} made")
-        print(f"  PASS {offer}: {want}, the {item} input was consumed")
+        print(f"PASS {offer}: {result_item} x{count}, the {item} input was consumed")
 
-    # ---- the two carried stone cases ---------------------------------------
-    first_count = 1 if selftest else 2
-    if selftest:
-        print("(selftest: asserting the first slab is x1 instead of x2)")
-    case(
-        "occultism:otherstone",
-        "occultism:otherstone_slab_from_otherstone",
-        "occultism:otherstone_slab",
-        first_count,
-    )
-    case(
-        "occultism:otherrock",
-        "occultism:otherrock_slab_from_otherrock",
-        "occultism:otherrock_slab",
-        2,
-    )
+    # ---- all 32 carried recipes --------------------------------------------
+    for recipe in recipes:
+        case(recipe)
 
     # ---- the differential: vanilla stone offers no occultism recipe --------
     print("== vanilla minecraft:stone: no occultism offer ==")
@@ -263,8 +296,9 @@ def main() -> int:
     if counts().get("occultism:otherstone_slab", 0) != before:
         raise SystemExit("STONECUT FAIL: vanilla stone made an occultism slab")
     print(f"  vanilla stone offers only {offers}; no occultism slab was made")
-    print("PASS: the stonecutter cut both carried stones into two slabs each, consumed "
-          "the inputs, and vanilla stone made no occultism slab")
+    print(f"PASS: all {len(recipes)} carried stonecutting recipes cut at a real stonecutter "
+          "(output id and count asserted, input consumed), a different selected cell yields a "
+          "different result, and vanilla stone offers no occultism recipe")
     return 0
 
 

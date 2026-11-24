@@ -1,6 +1,6 @@
 id = "occultism"
 name = "Occultism"
-version = "0.2.15"
+version = "0.2.16"
 description = """A port of Occultism 1.225.0 for Horizon: the spirit-fire conversion loop and the datura it
 is lit with. A datura (Demon's Dream Fruit) struck with flint and steel or a fire charge lights
 occultism:spirit_fire; any item entity standing in that fire which one of the carried
